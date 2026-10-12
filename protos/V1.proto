@@ -1,0 +1,43 @@
+syntax = "proto2";//指定文件语法
+package monitor;
+
+// 服务端 → 安卓客户端：任务状态包
+message TaskStatus
+{
+	required TaskState task_state = 1;
+    required double progress_percent = 2;
+    optional int64 processed_count = 3;
+    optional int64 total_count = 4;
+    required double cpu_usage = 5;
+    required double memory_usage_mb = 6;
+    optional string error_msg = 7;
+    required int64 timestamp = 8;
+}
+
+
+//命令包
+message CommandPackage
+{
+	required CommandType cmd_type =1;
+	required int64 timestamp =2;
+	required string token =3;
+	
+}
+
+
+// 任务状态枚举
+enum TaskState {
+    TASK_IDLE = 0;       //未启动
+    TASK_RUNNING = 1;    //运行中
+    TASK_FINISHED = 2;   //正常完成
+    TASK_ERROR = 3;      //异常崩溃
+    TASK_LOST = 4;       //业务程序失联（监控服务自动判定）
+}
+
+
+
+//命令类型 开始，结束，
+enum CommandType {
+	START = 0;
+	STOP =1;
+}

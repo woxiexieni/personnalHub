@@ -1,0 +1,103 @@
+syntax = "proto2";
+
+package personalhub;
+
+// =====================
+// 系统服务
+// =====================
+
+//使用gRPC,尝试链接服务器
+service System {
+    rpc Ping (PingRequest) returns (PingResponse);
+}
+
+message PingRequest {
+}
+
+message PingResponse {
+    optional bool ok = 1 [default = false];
+    optional string server_version = 2;
+}
+
+// =====================
+// 分类服务
+// =====================
+
+service CategoryService {
+    rpc GetCategories (Empty) returns (CategoryList);
+}
+
+message Empty {
+}
+
+message Category {
+    optional int32 id = 1;
+    optional string name = 2;
+    optional string icon = 3;
+    optional int32 sort_order = 4 [default = 0];
+    optional bool enabled = 5 [default = true];
+}
+
+message CategoryList {
+    repeated Category categories = 1;
+    optional int64 updated_at = 2;
+}
+
+// =====================
+// 记账服务
+// =====================
+
+//1.同步账单
+//2.手机下拉消费单元
+//3.
+service RecordService {
+    rpc UploadRecords (UploadRecordsRequest) returns (UploadRecordsResponse);
+    rpc GetTodayRecords (Empty) returns (RecordList);
+    rpc GetExpenseTrend (TrendRequest) returns (TrendResponse);
+}
+
+//传输的最基本单元：消费单元
+message Record {
+    optional string id = 1;
+    optional double amount = 2;
+    optional int32 category_id = 3;
+    optional string note = 4;
+    optional int64 spent_at = 5;
+    optional string pay_method = 6;
+    optional int64 created_at = 7;
+}
+
+//上传账单表格
+message UploadRecordsRequest {
+    repeated Record records = 1;
+}
+//服务器回复手机消息
+message UploadRecordsResponse {
+    optional int32 accepted_count = 1 [default = 0];
+    repeated string failed_ids = 2;
+    optional string error_msg = 3;
+}
+
+
+message RecordList {
+    repeated Record records = 1;
+}
+
+// =====================
+// 支出趋势
+// =====================
+
+message TrendRequest {
+    optional string range = 1;
+}
+
+message TrendPoint {
+    optional string label = 1;
+    optional double amount = 2;
+}
+
+message TrendResponse {
+    repeated TrendPoint points = 1;
+    optional double total = 2;
+    optional double daily_avg = 3;
+}
