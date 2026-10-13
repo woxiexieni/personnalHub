@@ -1,9 +1,0 @@
-﻿namespace MonitorClient
-{
-    class Progrom
-    {
-      
-    }
-}
-
-
