@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Grpc.Net.Client;
+using Microsoft.Extensions.Logging;
 
 namespace PersonalHub.Client
 {
@@ -19,6 +20,13 @@ namespace PersonalHub.Client
     		builder.Logging.AddDebug();
 #endif
 
+            // 注册 gRPC 通道
+            var channel = GrpcChannel.ForAddress("http://192.168.0.100:50051");
+            builder.Services.AddSingleton<GrpcChannel>(channel);
+
+            //// 注册生成的客户端
+            //builder.Services.AddSingleton(sp =>
+            //    new Personalhub.System.SystemClient(sp.GetRequiredService<GrpcChannel>()));
             return builder.Build();
         }
     }
