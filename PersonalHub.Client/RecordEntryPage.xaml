@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.RecordEntryPage"
+             Title="记一笔">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24,20" Spacing="12">
+
+            <Label
+                Text="记一笔"
+                Style="{StaticResource Headline}"
+                SemanticProperties.HeadingLevel="Level1"/>
+
+            <!-- ============ 同步状态条 ============ -->
+            <Border
+                Stroke="{StaticResource Gray300}"
+                StrokeThickness="1"
+                Padding="12,8">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
+                        <Label
+                            x:Name="SyncTitleLabel"
+                            Text="本地保存"
+                            FontSize="14"/>
+                        <Label
+                            x:Name="SyncInfoLabel"
+                            Text="尚未同步过"
+                            FontSize="12"
+                            TextColor="{StaticResource Gray500}"/>
+                    </VerticalStackLayout>
+                    <Button
+                        Grid.Column="1"
+                        x:Name="SyncBtn"
+                        Text="同步"
+                        Clicked="OnSyncClicked"
+                        Padding="14,0"
+                        HeightRequest="36"
+                        VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- ============ 金额 ============ -->
+            <Label Text="金额" Style="{StaticResource SubHeadline}"/>
+            <Entry
+                x:Name="AmountEntry"
+                Placeholder="0.00"
+                Keyboard="Numeric"
+                ClearButtonVisibility="WhileEditing"/>
+
+            <!-- ============ 分类 ============ -->
+            <Label Text="分类" Style="{StaticResource SubHeadline}"/>
+            <Picker x:Name="CategoryPicker" Title="请选择分类"/>
+
+            <!-- ============ 支付方式 ============ -->
+            <Label Text="支付方式" Style="{StaticResource SubHeadline}"/>
+            <Picker x:Name="PayPicker" Title="请选择支付方式"/>
+
+            <!-- ============ 消费时间 ============ -->
+            <Label Text="消费时间" Style="{StaticResource SubHeadline}"/>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                <DatePicker x:Name="DatePicker" Grid.Column="0" Format="yyyy-MM-dd"/>
+                <TimePicker x:Name="TimePicker" Grid.Column="1" Format="HH:mm"/>
+            </Grid>
+
+            <!-- ============ 备注 ============ -->
+            <Label Text="备注" Style="{StaticResource SubHeadline}"/>
+            <Editor
+                x:Name="NoteEditor"
+                Placeholder="选填，例如：午饭"
+                AutoSize="TextChanges"
+                HeightRequest="72"/>
+
+            <!-- ============ 保存（只写本地） ============ -->
+            <Button
+                x:Name="SaveBtn"
+                Text="保存到本地"
+                Clicked="OnSaveClicked"
+                HorizontalOptions="Fill"
+                Margin="0,4,0,0"/>
+
+            <Label
+                x:Name="StatusLabel"
+                Text=""
+                LineBreakMode="WordWrap"/>
+
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,10"/>
+
+            <!-- ============ 今日账单（读本地） ============ -->
+            <Label
+                Text="今日已录入"
+                Style="{StaticResource SubHeadline}"/>
+
+            <CollectionView x:Name="TodayList" HeightRequest="300">
+                <CollectionView.EmptyView>
+                    <Label Text="今天还没有记录" HorizontalOptions="Center" Margin="0,20"/>
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnDefinitions="*,Auto" Padding="0,8">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="{Binding Title}" FontSize="14" LineBreakMode="TailTruncation"/>
+                                <HorizontalStackLayout Spacing="8">
+                                    <Label Text="{Binding Time}" FontSize="12" TextColor="{StaticResource Gray500}"/>
+                                    <Label Text="{Binding SyncText}" FontSize="12" TextColor="{Binding SyncColor}"/>
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                            <Label
+                                Grid.Column="1"
+                                Text="{Binding Amount}"
+                                FontSize="14"
+                                VerticalOptions="Center"/>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

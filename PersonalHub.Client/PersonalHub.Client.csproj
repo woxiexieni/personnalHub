@@ -39,6 +39,43 @@
 		<WindowsPackageType>None</WindowsPackageType>
 	</PropertyGroup>
 
+	<!--
+	  Release 配置：官方推荐的「裁剪 + assembly store」组合，体积最小。
+	  这里直接用现成的调试签名库签 Release 包 —— 免去自建 keystore，
+	  且与已安装的 Debug 包同一签名，可直接覆盖升级、不用先卸载。
+	-->
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net8.0-android|AnyCPU'">
+		<AndroidPackageFormat>apk</AndroidPackageFormat>
+		<AndroidKeyStore>true</AndroidKeyStore>
+		<AndroidSigningKeyStore>$(LocalAppData)\Xamarin\Mono for Android\debug.keystore</AndroidSigningKeyStore>
+		<AndroidSigningStorePass>android</AndroidSigningStorePass>
+		<AndroidSigningKeyAlias>androiddebugkey</AndroidSigningKeyAlias>
+		<AndroidSigningKeyPass>android</AndroidSigningKeyPass>
+	</PropertyGroup>
+
+	<!--
+	  ===== Android 打包配置：既要「能独立安装」，又要「体积压得住」 =====
+	  1) 能独立安装 —— Debug 下 .NET Android 默认启用 Fast Deployment：程序集(dll)不打进 APK，
+	     而是由 IDE/VS 部署时用 adb 单独推送到设备。这种"空壳 APK"手动拷到手机安装，
+	     CLR 找不到程序集，一启动就闪退。EmbedAssembliesIntoApk=true 会把程序集内嵌进 APK。
+	  2) 压体积 —— 只打 arm64、剔除 .pdb；裁剪交给 Release（见上）。
+	  踩过的坑（.NET 8 Android SDK 34.0.154）：
+	  - 裁剪(AndroidLinkMode) 与 AndroidUseAssemblyStore=true 同开 → XABLD7009
+	    "Assembly store generator did not generate any stores"；
+	  - 只开 AndroidLinkMode 而关掉 assembly store → 程序集反而不内嵌了，得到 10 MB 空壳包。
+	  结论：Debug 不裁剪（用 assembly store 压缩，改动最小最稳）；要小体积就出 Release。
+	-->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+		<RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
+		<AndroidIncludeDebugSymbols>false</AndroidIncludeDebugSymbols>
+	</PropertyGroup>
+
+	<!-- Debug 专用：不裁剪，用 assembly store 压缩程序集。 -->
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<AndroidUseAssemblyStore>true</AndroidUseAssemblyStore>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<!-- App Icon -->
 		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
@@ -61,6 +98,7 @@
 		<Protobuf Include="..\protos\personalHub.proto" GrpcServices="Client" Link="protos\personalHub.proto" />
 	</ItemGroup>
 	<ItemGroup>
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 		<PackageReference Include="Google.Protobuf" Version="3.36.2" />
 		<PackageReference Include="Grpc.Net.Client" Version="2.84.0" />
 		<PackageReference Include="Grpc.Tools" Version="2.84.0">
@@ -70,6 +108,8 @@
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
+		<!-- 离线优先：本地账单库。自带 SQLitePCLRaw.bundle_green，Windows/Android 均可用。 -->
+		<PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
 		
 	</ItemGroup>
 
@@ -83,8 +123,6 @@
 	  一次，因此原先挂在 BeforeCompile 上的挂钩不会重复执行、也不会产生重复编译项。
 	  Android/iOS/MacCatalyst 无 XamlPreCompile，此目标不会触发，行为不变。
 	-->
-	<Target Name="PH_Protobuf_CompileBeforeXamlPreCompile"
-	        BeforeTargets="XamlPreCompile;MarkupCompilePass1"
-	        DependsOnTargets="_Protobuf_Compile_BeforeCsCompile" />
+	<Target Name="PH_Protobuf_CompileBeforeXamlPreCompile" BeforeTargets="XamlPreCompile;MarkupCompilePass1" DependsOnTargets="_Protobuf_Compile_BeforeCsCompile" />
 
 </Project>

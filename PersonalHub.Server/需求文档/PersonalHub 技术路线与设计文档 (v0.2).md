@@ -220,3 +220,49 @@ namespace PersonalHub.Server
 > - `Grpc.Tools`（编译工具，核心！包装`protoc`+grpc csharp 插件，编译时自动跑）
 >
 >   另外它还是编译时生
+>
+>   > #### 1.Kestrel [ASP.NET](https://link.wtturl.cn/?target=https%3A%2F%2FASP.NET&scene=im&aid=582478&lang=zh) Core 默认 Web 服务器
+>   >
+>   > 我理解就是它就是一个服务器框架类似于房间，或者网络快递站点。我的grpc server就是房间里面要进行的服务。
+>   >
+>   > ##### 如何使用呢？服务端：`WebApplication`（`Program.cs`）
+>   >
+>   > | 行号  | 代码                                      | 作用                                                         |
+>   > | :---- | :---------------------------------------- | :----------------------------------------------------------- |
+>   > | 16    | `WebApplication.CreateBuilder(args)`      | 建建造者，**自动装好 4 件套**（Kestrel/DI/配置/日志）        |
+>   > | 19    | `builder.Services.AddGrpc()`              | 登记 gRPC 全家桶，不写这行 `MapGrpcService` 就用不了         |
+>   > | 23–26 | `ConfigureKestrel(...)`                   | **配置 Kestrel 这个宿主**：`ListenAnyIP(5001)` 绑所有网卡 + 强制 `Http2` |
+>   > | 29    | `var app = builder.Build()`               | 冻结！之后**不能再往 Services 里加东西**                     |
+>   > | 35    | `app.MapGrpcService<SystemServiceImpl>()` | 挂路由，把服务类接到门牌号上                                 |
+>   > | 37    | `app.Run()`                               | 启动监听，**阻塞在这行**直到进程被杀                         |
+>   
+>   > 客户端：看的不是很懂呀。
+>   >
+>   > | 号   | 代码                                                         | 作用                                                         |
+>   > | :--- | :----------------------------------------------------------- | :----------------------------------------------------------- |
+>   > |      | MauiApp.CreateBuilder();                                     | 建建造者，                                                   |
+>   > |      | builder.Services.AddSingleton<Channel>()                     | 创建grpc的服务通道，这样子理解吧，这个Services就相当于一个DI容器，需要给他配置内容 |
+>   > |      | Services.AddSingleton(sp =><br/>                new Personalhub.System.SystemClient(sp.GetRequiredService<GrpcChannel>())); | 注册gRPC 客户端                                              |
+>   > |      | builder.Services.AddTransient<MainPage>();                   | 因为我的界面需要人家grpc服务，所以也要把这个界面也要注册     |
+>   > |      | builder.Build();                                             | 冻结，之后**不能再往 Services 里加东西**                     |
+>   
+>   > ##### 依赖注入这个概念DI:
+>   >
+>   > 是什么：就是：自己不要手动 `new` 对象，交给一个「容器」帮你创建、管理对象，并且自动把需要的对象 “送进来” 给你用。
+>   >
+>   > 不管了，好复杂呀。我根本看不懂这个DI注入是什么鬼？
+>   > 大概理解了，就是这个依赖注入本质上是为了给我们减负重。
+>   
+>   > ##### 服务端和客户端的初始化区别：
+>   >
+>   > 客户端仅仅把构建玩build就结束了。服务端还得run().
+>
+
+
+
+
+
+
+
+
+

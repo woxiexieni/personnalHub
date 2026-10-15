@@ -485,3 +485,7 @@ $RECYCLE.BIN/
 
 # 自己加
 .workbuddy/
+# 服务端 SQLite 数据库（含 WAL/SHM 附属文件），属本地数据不入库
+personalhub.db3
+personalhub.db3-wal
+personalhub.db3-shm

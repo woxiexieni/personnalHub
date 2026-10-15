@@ -7,9 +7,15 @@
     Shell.FlyoutBehavior="Disabled"
     Title="PersonalHub.Client">
 
-    <ShellContent
-        Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
-        Route="MainPage" />
+    <TabBar>
+        <ShellContent
+            Title="状态"
+            ContentTemplate="{DataTemplate local:MainPage}"
+            Route="MainPage" />
+        <ShellContent
+            Title="记一笔"
+            ContentTemplate="{DataTemplate local:RecordEntryPage}"
+            Route="RecordEntryPage" />
+    </TabBar>
 
 </Shell>

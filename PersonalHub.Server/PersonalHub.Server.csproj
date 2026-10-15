@@ -11,11 +11,14 @@
   
     <ItemGroup>
     <!-- 1. 引入工具包 -->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.84.0" />
     <PackageReference Include="Grpc.Tools" Version="2.84.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <!-- 账单落盘：与服务端「换 SQLite」目标一致。自带 SQLitePCLRaw.bundle_green，Windows x64 直接可用。 -->
+    <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
   </ItemGroup>
 
   <ItemGroup>
