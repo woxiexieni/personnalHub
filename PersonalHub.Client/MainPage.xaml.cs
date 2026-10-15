@@ -1,5 +1,4 @@
-﻿
-//using Personalhub;
+﻿using Personalhub;
 
 namespace PersonalHub.Client
 {
@@ -7,7 +6,7 @@ namespace PersonalHub.Client
     {
         int count = 0;
 
-        //private readonly Personalhub.System.SystemClient _client;
+        // private readonly Personalhub.System.SystemClient _client;
         //Personalhub.System.SystemClient client
 
         public MainPage()
@@ -37,11 +36,11 @@ namespace PersonalHub.Client
             {
                 System.Diagnostics.Debug.WriteLine("开始尝试连接服务器...");
 
-               // 实例化请求
-                //var request = new Personalhub.PingRequest();
+                //实例化请求
+               // var request = new Personalhub.PingRequest();
 
 
-              //  var response = await _client.PingAsync(request);
+               // var response = await _client.PingAsync(request);
 
                 //System.Diagnostics.Debug.WriteLine($"Ping 成功！ok: {response.Ok}");
                 //System.Diagnostics.Debug.WriteLine($"server_version: {response.ServerVersion}");
