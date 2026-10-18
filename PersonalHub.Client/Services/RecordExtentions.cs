@@ -26,6 +26,30 @@ namespace Personalhub
             SpentAt = r.SpentAt,
             PayMethod = r.PayMethod ?? string.Empty,
             CreatedAt = r.CreatedAt,
+            Direction = r.Direction,
+            UpdatedAt = r.UpdatedAt,
+            Deleted = r.Deleted,
+        };
+
+        /// <summary>
+        /// proto Record → 本地账单（镜像同步用）。
+        ///
+        /// 这里**不设 Synced**：调用方（MergeServerWindowAsync）负责补同步标记，
+        /// 因为"从服务端来的"和"本地新记的"在同步状态上语义完全不同，
+        /// 让映射函数顺手改同步状态，是以后排查"为什么明明传上去了还是待同步"的经典坑。
+        /// </summary>
+        public static LocalRecord ToLocalRecord(this Record p) => new()
+        {
+            Id = p.Id,
+            Amount = p.Amount,
+            CategoryId = p.CategoryId,
+            Note = p.Note ?? string.Empty,
+            SpentAt = p.SpentAt,
+            PayMethod = p.PayMethod ?? string.Empty,
+            CreatedAt = p.CreatedAt,
+            Direction = p.Direction,
+            UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
+            Deleted = p.Deleted,
         };
 
         /// <summary>本地事件反思 → proto Thing。</summary>

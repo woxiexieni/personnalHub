@@ -36,6 +36,9 @@ message Category {
     optional string icon = 3;
     optional int32 sort_order = 4 [default = 0];
     optional bool enabled = 5 [default = true];
+    // 0 = 支出，1 = 收入。分类自己带方向，录入页才能分组显示 chips，
+    // 服务端也才能校验「支出记录不许引用收入分类」。
+    optional int32 direction = 6 [default = 0];
 }
 
 message CategoryList {
@@ -55,6 +58,17 @@ service RecordService {
     rpc UploadRecords (UploadRecordsRequest) returns (UploadRecordsResponse);
     rpc GetTodayRecords (Empty) returns (RecordList);
     rpc GetExpenseTrend (TrendRequest) returns (TrendResponse);
+
+    // ---- R1 新增：镜像查询与管理端单条操作 ----
+    // ListRecords：手机端拉「最近 30 天」做镜像覆盖；管理端做列表筛选。
+    // include_deleted 默认 false —— 默认值必须是「安全值」：忘了传参的调用方只会少拿到墓碑，
+    // 不会把已删记录当成正常记录展示出来。镜像同步要显式传 true。
+    rpc ListRecords (ListRecordsRequest) returns (RecordList);
+
+    // SaveRecord / DeleteRecord：给电脑端管理界面用（在线、要立刻生效、要人话错误文案）。
+    // 手机端的编辑不走这两个，而是把改动塞进下一次 UploadRecords —— 因为手机要能离线改。
+    rpc SaveRecord (SaveRecordRequest) returns (SaveRecordResponse);
+    rpc DeleteRecord (DeleteRecordRequest) returns (OpResult);
 }
 
 //传输的最基本单元：消费单元
@@ -66,6 +80,11 @@ message Record {
     optional int64 spent_at = 5;
     optional string pay_method = 6;
     optional int64 created_at = 7;
+
+    // ---- R1 新增（老客户端不传时按默认值处理，老数据零迁移）----
+    optional int32 direction = 8 [default = 0];     // 0 支出 / 1 收入
+    optional int64 updated_at = 9;                  // 最后修改时间（Unix 毫秒）；0 = 未知版本，服务端直接接受
+    optional bool deleted = 10 [default = false];   // 上传时置 true = 软删（不校验业务字段）
 }
 
 //上传账单表格
@@ -82,6 +101,55 @@ message UploadRecordsResponse {
 
 message RecordList {
     repeated Record records = 1;
+}
+
+// ---- R1 新增：区间查询 ----
+// 时间语义统一为「左闭右开」：[from, to)
+message ListRecordsRequest {
+    optional int64 from = 1;                            // 含（Unix 毫秒）
+    optional int64 to = 2;                              // 不含（Unix 毫秒）
+    optional int32 direction = 3 [default = -1];        // -1 全部 / 0 支出 / 1 收入
+    optional bool include_deleted = 4 [default = false]; // 镜像同步必须显式传 true（要拿墓碑删本地副本）
+    optional int32 limit = 5 [default = 0];             // 0 = 不限
+}
+
+message SaveRecordRequest {
+    optional Record record = 1;
+}
+
+message SaveRecordResponse {
+    optional bool ok = 1;
+    optional Record record = 2;     // 服务端补齐 id / created_at / updated_at 后的最终版本
+    optional string error_msg = 3;  // 直接可展示的中文原因（"分类已停用"）
+}
+
+message DeleteRecordRequest {
+    optional string id = 1;
+}
+
+message OpResult {
+    optional bool ok = 1;
+    optional string error_msg = 2;
+}
+
+// =====================
+// 分析服务
+// =====================
+// 统计口径的唯一来源在服务端（固定 UTC+8、左闭右开、整数分累加）。
+// 客户端绝不用自己的时区算"今天"，否则手机和服务端会永远差一笔。
+service AnalysisService {
+    // 今日汇总：手机端「今日总额」的校正值。
+    // 手机先用本地数据渲染即时值（0ms、含未同步），这个接口回来后直接覆盖。
+    rpc GetTodaySummary (Empty) returns (TodaySummaryResponse);
+}
+
+message TodaySummaryResponse {
+    optional int64 range_start = 1;    // 今天 00:00（UTC+8），Unix 毫秒
+    optional int64 range_end = 2;      // 明天 00:00，Unix 毫秒（左闭右开）
+    optional int64 expense_cents = 3;  // 支出合计（分）
+    optional int64 income_cents = 4;   // 收入合计（分）
+    optional int32 expense_count = 5;  // 支出笔数
+    optional int64 generated_at = 6;
 }
 
 // =====================

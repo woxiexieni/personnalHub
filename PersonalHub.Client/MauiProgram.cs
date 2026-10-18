@@ -41,6 +41,10 @@ namespace PersonalHub.Client
             builder.Services.AddSingleton<RecordSyncService<LocalRecord>>();
             builder.Services.AddSingleton<RecordSyncService<ThingRecord>>();
 
+            // ===== 缓存层：最近 30 天镜像 + 今日汇总 + 分类 =====
+            // 只负责"从服务端拉下来把本地副本对齐"，上传仍然归 RecordSyncService。
+            builder.Services.AddSingleton<LocalCacheService>();
+
             // 注册页面：让 Shell 通过 DI 创建页面，从而把依赖注入构造函数。
             // 不注册的话，Shell 会退回 Activator.CreateInstance 找无参构造 → MissingMethodException 启动崩溃。
             builder.Services.AddTransient<MainPage>();

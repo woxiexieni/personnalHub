@@ -50,5 +50,15 @@ namespace personalHub.Server.Data
         /// <summary>客户端创建时间（Unix 毫秒）。</summary>
         [Column("created_at")]
         public long CreatedAt { get; set; }
+
+        // ---------------- R1 新增列（与 records 对称） ----------------
+
+        /// <summary>最后修改时间（Unix 毫秒）。</summary>
+        [Column("updated_at")]
+        public long UpdatedAt { get; set; }
+
+        /// <summary>软删除标记：0 = 正常，1 = 已删除。</summary>
+        [Column("deleted")]
+        public int Deleted { get; set; }
     }
 }

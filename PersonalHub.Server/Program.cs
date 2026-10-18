@@ -76,9 +76,15 @@ namespace PersonHub.Server
             // 1. 注册 gRPC 服务
             builder.Services.AddGrpc();
 
-            // 账单存储（SQLite 落盘实现，单例）。
+            // 数据库连接：全进程唯一一个 SQLite 连接，records / things / categories 同库。
             // 库文件默认在仓库根目录 personalhub.db3，可用环境变量 PERSONALHUB_DB 覆盖。
-            // 进程重启、关掉服务端都不丢数据。
+            // 结构迁移（补列 / 建索引 / 灌分类）在 Db 构造里完成，幂等，可重复执行。
+            builder.Services.AddSingleton<Db>();
+
+            // 分类（做录入页 chips + 写入校验 + 统计名称来源）
+            builder.Services.AddSingleton<CategoryStore>();
+
+            // 账单存储（SQLite 落盘实现，单例）。
             builder.Services.AddSingleton<RecordStore>();
 
             // 事件反思存储（同一库文件、独立 things 表）。
@@ -99,8 +105,15 @@ namespace PersonHub.Server
             app.MapGrpcService<RecordServiceImpl>();
             app.MapGrpcService<ThingServiceImpl>();
             app.MapGrpcService<SystemServiceImpl>();
+            app.MapGrpcService<CategoryServiceImpl>();
+            app.MapGrpcService<AnalysisServiceImpl>();
 
             // 启动前打印可连接的地址，方便手机侧排查。
+            // 这里主动解析一次 Db：让"表结构迁移"在启动时就跑完。
+            // 否则迁移要等到第一个手机请求进来才执行，出错时你只会在手机上看到一个 gRPC 错误码。
+            var db = app.Services.GetRequiredService<Db>();
+            Console.WriteLine($"[OK] 数据库: {db.Path}");
+
             app.Start();
             PrintBanner(port);
             Console.WriteLine("[OK] 服务端已启动，等待手机连接...");

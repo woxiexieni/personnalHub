@@ -1,78 +1,31 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Personalhub;
-using SQLite;
+using personalHub.Server.Analysis;
 
 namespace personalHub.Server.Data
 {
     /// <summary>
-    /// 事件反思存储层 —— SQLite 落盘实现，结构与 <see cref="RecordStore"/> 对称。
+    /// 事件反思存储层 —— 与 <see cref="RecordStore"/> 对称，共用同一个 <see cref="Db"/> 连接（同一个库文件）。
     ///
-    /// 独立一张表（things）、独立一个库连接，但**指向同一个库文件**：
     /// 账单和事件反思是同一个人仓库里的两类数据，备份/迁移时希望是一个文件带走。
-    ///
-    /// 线程安全：gRPC 并发进来，SQLiteConnection 不是线程安全的，这里用锁串行化。
+    /// R1 只加了 updated_at / deleted 两列（为将来"电脑端改反思"留位），
+    /// 查询已经过滤软删，所以以后补编辑功能不需要再改表。
     /// </summary>
-    public class ThingStore
+    public sealed class ThingStore
     {
-        private readonly SQLiteConnection _db;
-        private readonly object _lock = new();
+        private readonly Db _db;
 
-        public ThingStore() : this(ResolveDefaultDbPath())
+        public ThingStore(Db db)
         {
+            _db = db;
         }
 
-        /// <summary>指定库文件路径（测试/迁移用）。</summary>
-        public ThingStore(string dbPath)
-        {
-            string? dir = Path.GetDirectoryName(dbPath);
-            if (!string.IsNullOrEmpty(dir))
-            {
-                Directory.CreateDirectory(dir);
-            }
-
-            _db = new SQLiteConnection(
-                dbPath,
-                SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.FullMutex);
-
-            _db.CreateTable<ThingRow>();
-            _db.ExecuteScalar<string>("PRAGMA journal_mode=WAL;");
-
-            DbPath = dbPath;
-            Console.WriteLine($"[ThingStore] SQLite 已就绪: {dbPath}");
-        }
-
-        /// <summary>当前使用的库文件绝对路径（排查用）。</summary>
-        public string DbPath { get; }
-
-        private static string ResolveDefaultDbPath()
-        {
-            // 与 RecordStore 用同一环境变量/同一默认路径，保证两类数据同库。
-            string? custom = Environment.GetEnvironmentVariable("PERSONALHUB_DB");
-            if (!string.IsNullOrWhiteSpace(custom))
-            {
-                return custom;
-            }
-
-            string baseDir = AppContext.BaseDirectory;
-            string root = FindSolutionRoot(baseDir) ?? baseDir;
-            return Path.Combine(root, "personalhub.db3");
-        }
-
-        private static string? FindSolutionRoot(string startDir)
-        {
-            var dir = new DirectoryInfo(startDir);
-            while (dir != null)
-            {
-                if (dir.GetFiles("*.sln").Length > 0)
-                {
-                    return dir.FullName;
-                }
-                dir = dir.Parent;
-            }
-            return null;
-        }
+        public string DbPath => _db.Path;
 
         /// <summary>
-        /// 幂等写入：同 id 已存在则覆盖，否则新增。返回处理条数。
+        /// 幂等写入：同 id 覆盖。返回处理条数。
         /// 客户端同步会被重复触发（切前台、网络恢复），靠这里保证不会写重。
         /// </summary>
         public int Upsert(IEnumerable<Thing> things)
@@ -80,13 +33,22 @@ namespace personalHub.Server.Data
             var list = things as IList<Thing> ?? things.ToList();
             if (list.Count == 0) return 0;
 
-            lock (_lock)
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            lock (_db.Sync)
             {
-                _db.RunInTransaction(() =>
+                _db.Conn.RunInTransaction(() =>
                 {
                     foreach (var t in list)
                     {
-                        _db.InsertOrReplace(ToRow(t));
+                        var row = ToRow(t);
+                        if (row.UpdatedAt == 0) row.UpdatedAt = now;
+
+                        // 已软删的反思，不允许被重复上传"复活"
+                        var old = _db.Conn.Find<ThingRow>(row.Id);
+                        if (old is not null) row.Deleted = old.Deleted;
+
+                        _db.Conn.InsertOrReplace(row);
                     }
                 });
             }
@@ -94,28 +56,30 @@ namespace personalHub.Server.Data
             return list.Count;
         }
 
-        /// <summary>取出全部事件反思。</summary>
+        /// <summary>全部未删除的事件反思。</summary>
         public IReadOnlyList<Thing> All()
         {
-            lock (_lock)
+            lock (_db.Sync)
             {
-                return _db.Table<ThingRow>()
+                return _db.Conn.Table<ThingRow>()
+                    .Where(t => t.Deleted == 0)
                     .ToList()
                     .Select(ToProto)
                     .ToList();
             }
         }
 
-        /// <summary>取出某个自然日（服务器本地时区）的事件反思，按发生时间倒序。</summary>
-        public IReadOnlyList<Thing> ByDay(DateTime localDate)
+        /// <summary>某个自然日（固定 UTC+8，与统计口径一致）的事件反思，按发生时间倒序。</summary>
+        public IReadOnlyList<Thing> ByDay(DateTimeOffset day)
         {
-            long startMs = new DateTimeOffset(localDate.Date).ToUnixTimeMilliseconds();
-            long endMs = startMs + 24L * 60 * 60 * 1000;
+            var start = Period.StartOfDay(day);
+            long startMs = start.ToUnixTimeMilliseconds();
+            long endMs = start.AddDays(1).ToUnixTimeMilliseconds();
 
-            lock (_lock)
+            lock (_db.Sync)
             {
-                return _db.Table<ThingRow>()
-                    .Where(t => t.OccurredAt >= startMs && t.OccurredAt < endMs)
+                return _db.Conn.Table<ThingRow>()
+                    .Where(t => t.Deleted == 0 && t.OccurredAt >= startMs && t.OccurredAt < endMs)
                     .ToList()
                     .OrderByDescending(t => t.OccurredAt)
                     .Select(ToProto)

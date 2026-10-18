@@ -70,11 +70,11 @@ namespace personalHub.Server.Services
             return Task.FromResult(response);
         }
 
-        /// <summary>取服务器本地时区"今天"的事件反思。</summary>
+        /// <summary>取「今天」的事件反思（固定 UTC+8，与统计口径一致）。</summary>
         public override Task<ThingList> GetTodayThings(Empty request, ServerCallContext context)
         {
             var list = new ThingList();
-            list.Things.AddRange(_store.ByDay(DateTime.Now));
+            list.Things.AddRange(_store.ByDay(DateTimeOffset.UtcNow));
 
             _logger.LogInformation("GetTodayThings: 返回 {Count} 条", list.Things.Count);
             return Task.FromResult(list);

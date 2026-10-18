@@ -161,6 +161,20 @@ namespace PersonalHub.Client.Services
                     {
                         var outcome = await _uploader.UploadAsync(batch, ct).ConfigureAwait(false);
 
+                        // === 版本冲突：不要重试 ===
+                        // 服务端已有一条更新的版本（多半是你在电脑上改过）。本地这份是旧的，
+                        // 重试永远会被拒 —— 只会变成死循环 + 每次同步都白跑一趟。
+                        // 正确做法：承认过期，标记已同步，等随后的镜像同步把服务端版本拉回来覆盖本地。
+                        if (outcome.ErrorMsg != null &&
+                            outcome.ErrorMsg.Contains("conflict", StringComparison.OrdinalIgnoreCase))
+                        {
+                            await _store
+                                .MarkSyncedAsync(batch.Select(x => x.Id).ToList(), DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+                                .ConfigureAwait(false);
+                            notes.Add($"{group.Key}: 有记录在服务端已被修改，已采用服务端版本");
+                            continue;
+                        }
+
                         // 只有服务端确认接收的 id 才标记为已同步；被拒的继续留本地。
                         var failed = new HashSet<string>(outcome.FailedIds, StringComparer.Ordinal);
                         var okIds = batch

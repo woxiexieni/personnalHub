@@ -23,6 +23,17 @@ namespace PersonalHub.Client.Data
         /// </summary>
         public abstract long Timestamp { get; }
 
+        /// <summary>
+        /// 用于"归属到哪一天"的时间戳（Unix 毫秒）。
+        ///
+        /// 为什么要和 <see cref="Timestamp"/> 分开：
+        /// 账单的 Timestamp 是**创建时间**（本地列表按它排序），但归属日期必须用**消费时间**。
+        /// 昨晚 23:50 的账今早补记，应该算昨天 —— 用创建时间去归天就会算成今天，
+        /// 于是"今日总额"和趋势图会集体偏一天。
+        /// </summary>
+        [Ignore]
+        public abstract long DayTimestamp { get; }
+
         /// <summary>本地自然日 yyyy-MM-dd，仅用于"按天分组"，不入库。
         ///
         /// 默认用 <see cref="Timestamp"/> 换算；如果"分组用的时间"和"排序用的时间"不是同一个字段
@@ -63,6 +74,23 @@ namespace PersonalHub.Client.Data
         /// <summary>本地创建时间（Unix 毫秒）。</summary>
         public long CreatedAt { get; set; }
 
+        // ---------------- R1 新增（对应 proto 的 8 / 9 / 10 号字段）----------------
+
+        /// <summary>0 = 支出，1 = 收入。老数据由迁移补 0。</summary>
+        public int Direction { get; set; }
+
+        /// <summary>最后修改时间（Unix 毫秒）。服务端靠它判断"谁更新"，避免旧副本覆盖新数据。</summary>
+        public long UpdatedAt { get; set; }
+
+        /// <summary>
+        /// 软删标记。true = 这条已被删掉，等下次上传时告诉服务端。
+        ///
+        /// 为什么不直接从本地 table 里删掉：
+        /// 已同步的记录如果只在本地删，服务端并不知道，下次镜像同步又会被拉回来 —— 删了个寂寞。
+        /// 所以"已同步的删除"必须留一个墓碑，上传成功后才能清掉。
+        /// </summary>
+        public bool Deleted { get; set; }
+
         /// <summary>是否已同步到服务端。false = 待同步。</summary>
         public override bool Synced { get; set; }
 
@@ -82,8 +110,9 @@ namespace PersonalHub.Client.Data
 
         public override long Timestamp => CreatedAt;
 
-
-
+        /// <summary>归天用消费时间，排序用创建时间。</summary>
+        [Ignore]
+        public override long DayTimestamp => SpentAt;
     }
 
 
@@ -183,8 +212,18 @@ namespace PersonalHub.Client.Data
         /// </summary>
         public long CreatedTimestamp { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
+        /// <summary>最后修改时间（Unix 毫秒）。R1 起与账单表对齐，为将来"电脑端改反思"留位。</summary>
+        public long UpdatedAt { get; set; }
+
+        /// <summary>软删标记。查询默认过滤。</summary>
+        public bool Deleted { get; set; }
+
         // 分组时间 = 事件发生时间（基类 DayKey 会用 Timestamp 换算，这里不需要再写一遍）
         public override long Timestamp => OccurredAt;
+
+        /// <summary>归天用事件发生时间。</summary>
+        [Ignore]
+        public override long DayTimestamp => OccurredAt;
     }
 
 }

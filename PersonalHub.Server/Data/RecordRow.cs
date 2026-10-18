@@ -35,5 +35,19 @@ namespace personalHub.Server.Data
         /// <summary>Unix 毫秒时间戳。</summary>
         [Column("created_at")]
         public long CreatedAt { get; set; }
+
+        // ---------------- R1 新增列 ----------------
+
+        /// <summary>0 = 支出，1 = 收入。老数据默认 0（迁移时 ALTER 带 DEFAULT 0）。</summary>
+        [Column("direction")]
+        public int Direction { get; set; }
+
+        /// <summary>最后修改时间（Unix 毫秒）。用于「谁更新」的比较，避免旧客户端覆盖新数据。</summary>
+        [Column("updated_at")]
+        public long UpdatedAt { get; set; }
+
+        /// <summary>软删除标记：0 = 正常，1 = 已删除。所有查询默认过滤 1。</summary>
+        [Column("deleted")]
+        public int Deleted { get; set; }
     }
 }

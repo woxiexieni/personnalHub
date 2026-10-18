@@ -281,7 +281,7 @@ namespace PersonalHub.Server
 >
 > #### 4我现在注册的了解也加深了，就是你需要用这个IRecordUploader的时候，就去找RecordUploader
 >
-> 
+> ##### 5服务器那边我还没写呢，害，我感觉以后全vibe coding得了。ai出现，就是降低门槛得，没必要去擅长自己不擅长得事情呀。
 
 
 

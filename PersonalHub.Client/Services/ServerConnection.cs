@@ -44,6 +44,12 @@ namespace PersonalHub.Client.Services
         // 事件反思服务（ThingService）
         public Personalhub.ThingService.ThingServiceClient NewThingClient() => new(Channel);
 
+        // 分类（录入页 chips 的数据来源）
+        public Personalhub.CategoryService.CategoryServiceClient NewCategoryClient() => new(Channel);
+
+        // 分析（今日总额的"校正值"）
+        public Personalhub.AnalysisService.AnalysisServiceClient NewAnalysisClient() => new(Channel);
+
         /// <summary>
         /// 确保已定位到服务端并建好通道。
         /// force=false：已有通道就直接复用；
