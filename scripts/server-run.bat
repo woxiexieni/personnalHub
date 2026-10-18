@@ -17,9 +17,14 @@ set "PORT=5000"
 if not "%~1"=="" set "PORT=%~1"
 if defined PERSONALHUB_PORT set "PORT=%PERSONALHUB_PORT%"
 
+REM ---- Admin UI port = gRPC port + 1 (browsers speak HTTP/1.1, gRPC needs HTTP/2) ----
+set /a WEBPORT=PORT+1
+if defined PERSONALHUB_WEB_PORT set "WEBPORT=%PERSONALHUB_WEB_PORT%"
+
 echo ============================================================
 echo  PersonalHub Server - starting...
-echo  Port: %PORT%
+echo  gRPC  (phone) : %PORT%
+echo  Admin (browser): %WEBPORT%
 echo ============================================================
 echo.
 

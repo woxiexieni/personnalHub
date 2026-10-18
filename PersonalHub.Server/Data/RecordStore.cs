@@ -29,6 +29,9 @@ namespace personalHub.Server.Data
             new() { Conflict = true, Error = "版本冲突：服务端已有更新的数据", Record = current };
     }
 
+    /// <summary>管理端列表的一页（含总数，页面要显示"共 N 条"）。</summary>
+    public sealed record PagedRecords(IReadOnlyList<Record> Items, int Total);
+
     /// <summary>
     /// 账单存储层 —— SQLite 落盘实现。
     ///
@@ -199,6 +202,81 @@ namespace personalHub.Server.Data
             {
                 var row = _db.Conn.Find<RecordRow>(id);
                 return row is null ? null : ToProto(row);
+            }
+        }
+
+        /// <summary>各分类下的记录条数（分类页展示用）。分类停用后历史仍在，所以这里含已删的排除、不含已删的。</summary>
+        public IReadOnlyDictionary<int, int> CountByCategory()
+        {
+            lock (_db.Sync)
+            {
+                var rows = _db.Conn.Query<CategoryCount>(
+                    "SELECT category_id AS id, COUNT(*) AS cnt FROM records WHERE deleted = 0 GROUP BY category_id");
+                return rows.ToDictionary(r => r.id, r => r.cnt);
+            }
+        }
+
+        private sealed class CategoryCount
+        {
+            public int id { get; set; }
+            public int cnt { get; set; }
+        }
+
+
+        /// <summary>
+        /// 管理端列表：区间 + 方向 + 分类 + 关键字 + 是否含已删，分页返回。
+        ///
+        /// 单独一个方法而不是给 <see cref="ListRows"/> 堆参数，是因为它的分页要返回总数
+        /// （页面要显示"共 128 条 / 3 页"），而 ListRows 是给同步镜像用的、不能有分页语义。
+        /// </summary>
+        public PagedRecords Search(
+            long from, long to,
+            int direction = -1,
+            int categoryId = -1,
+            string? keyword = null,
+            bool includeDeleted = false,
+            int page = 1,
+            int pageSize = 50)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 50;
+            if (pageSize > 500) pageSize = 500;
+
+            var where = new StringBuilder(" WHERE spent_at >= ? AND spent_at < ?");
+            var args = new List<object> { from, to };
+
+            if (!includeDeleted) where.Append(" AND deleted = 0");
+            if (direction >= 0)
+            {
+                where.Append(" AND direction = ?");
+                args.Add(direction);
+            }
+            if (categoryId > 0)
+            {
+                where.Append(" AND category_id = ?");
+                args.Add(categoryId);
+            }
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                // 关键字同时匹配备注与支付方式，方便查"那笔 25 块午饭"
+                where.Append(" AND (IFNULL(note,'') LIKE ? OR IFNULL(pay_method,'') LIKE ?)");
+                string like = "%" + keyword.Trim() + "%";
+                args.Add(like);
+                args.Add(like);
+            }
+
+            string filter = where.ToString();
+
+            lock (_db.Sync)
+            {
+                int total = _db.Conn.ExecuteScalar<int>("SELECT COUNT(*) FROM records" + filter, args.ToArray());
+
+                var pageArgs = new List<object>(args) { pageSize, (page - 1) * pageSize };
+                var rows = _db.Conn.Query<RecordRow>(
+                    "SELECT * FROM records" + filter + " ORDER BY spent_at DESC, created_at DESC LIMIT ? OFFSET ?",
+                    pageArgs.ToArray());
+
+                return new PagedRecords(rows.Select(ToProto).ToList(), total);
             }
         }
 

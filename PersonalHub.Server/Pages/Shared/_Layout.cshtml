@@ -1,0 +1,44 @@
+@using System.Reflection
+@{
+    var asm = typeof(personalHub.Server.Services.RecordServiceImpl).Assembly;
+    var ver = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+              ?? asm.GetName().Version?.ToString(3) ?? "?";
+    int plus = ver.IndexOf('+');
+    if (plus > 0) ver = ver.Substring(0, plus);
+}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] · PersonalHub</title>
+    <link rel="stylesheet" href="~/site.css" />
+</head>
+<body>
+<div class="wrap">
+    <header class="topbar">
+        <a class="brand" href="/">PersonalHub<span>管理端</span></a>
+        <nav class="nav">
+            <a href="/">概览</a>
+            <a href="/records">账单</a>
+            <a href="/records/edit">补录</a>
+            <a href="/categories">分类</a>
+        </nav>
+        <span class="ver">v@(ver)</span>
+    </header>
+
+    @* 这不是装饰性提示：Kestrel 监听的是 0.0.0.0，同一 Wi-Fi 下任何设备都能打开这个页面并改账。 *@
+    <div class="warn">
+        本页面没有登录校验，仅供家庭局域网使用。请不要在公共 Wi-Fi / 公司网络下开启服务端。
+    </div>
+
+    <main>
+        @RenderBody()
+    </main>
+
+    <footer class="foot">
+        PersonalHub · 服务端是唯一数据源，手机端只缓存最近 30 天
+    </footer>
+</div>
+</body>
+</html>

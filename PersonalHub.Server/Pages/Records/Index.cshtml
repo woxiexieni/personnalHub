@@ -1,0 +1,140 @@
+@page
+@model PersonalHub.Server.Pages.Records.IndexModel
+@{
+    ViewData["Title"] = "账单";
+    string returnUrl = Request.Path + Request.QueryString;
+}
+
+@if (TempData["Ok"] is string ok)
+{
+    <div class="ok">@ok</div>
+}
+@if (TempData["Err"] is string err)
+{
+    <div class="err">@err</div>
+}
+
+<div class="card">
+    <form method="get" action="/records">
+        <div class="filters">
+            <div class="field">
+                <label>从</label>
+                <input type="date" name="from" value="@Model.From" />
+            </div>
+            <div class="field">
+                <label>到</label>
+                <input type="date" name="to" value="@Model.To" />
+            </div>
+            <div class="field">
+                <label>收支</label>
+                <select name="direction">
+                    <option value="-1" selected="@(Model.Direction == -1)">全部</option>
+                    <option value="0" selected="@(Model.Direction == 0)">支出</option>
+                    <option value="1" selected="@(Model.Direction == 1)">收入</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>分类</label>
+                <select name="categoryId">
+                    <option value="-1" selected="@(Model.CategoryId == -1)">全部</option>
+                    @foreach (var c in Model.Categories)
+                    {
+                        <option value="@c.Id" selected="@(Model.CategoryId == c.Id)">
+                            @(c.Direction == 1 ? "收入 · " : "")@c.Name
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label>关键字</label>
+                <input type="text" name="q" value="@Model.Q" placeholder="备注 / 支付方式" />
+            </div>
+            <div class="field">
+                <label>&nbsp;</label>
+                <label class="hint" style="display:flex;align-items:center;gap:6px;min-height:36px">
+                    <input type="checkbox" name="deleted" value="true" checked="@Model.Deleted" />
+                    显示已删除
+                </label>
+            </div>
+            <button class="btn primary" type="submit">筛选</button>
+            <a class="btn" href="/records">重置</a>
+            <a class="btn" href="/records/edit">补录</a>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2>共 @Model.Total 条 · 第 @Model.PageNumber / @Model.TotalPages 页</h2>
+        <span class="hint">点「编辑」可改金额/分类/时间；「删除」是软删，可恢复</span>
+    </div>
+
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty">这个条件下没有记录。</div>
+    }
+    else
+    {
+        <table class="grid">
+            <thead>
+            <tr>
+                <th>时间</th>
+                <th>类型</th>
+                <th>分类</th>
+                <th>支付</th>
+                <th>备注</th>
+                <th class="num">金额</th>
+                <th>状态</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.Items)
+            {
+                <tr class="@(r.Deleted ? "deleted" : "")">
+                    <td>@Fmt.DateTimeText(r.SpentAt)</td>
+                    <td><span class="tag @(r.Direction == 1 ? "income" : "")">@Fmt.Direction(r.Direction)</span></td>
+                    <td>@Model.CategoryName(r.CategoryId)</td>
+                    <td>@r.PayMethod</td>
+                    <td>@r.Note</td>
+                    <td class="num">@Fmt.Amount(r.Amount)</td>
+                    <td>
+                        @if (r.Deleted)
+                        {
+                            <span class="tag deleted">已删除</span>
+                        }
+                        else
+                        {
+                            <span class="tag">正常</span>
+                        }
+                    </td>
+                    <td style="white-space:nowrap">
+                        @if (!r.Deleted)
+                        {
+                            <a class="btn sm" href="/records/edit?id=@r.Id">编辑</a>
+                            <form method="post" asp-page-handler="Delete" style="display:inline"
+                                  onsubmit="return confirm('删除这条记录？软删，可在「显示已删除」里找回');">
+                                <input type="hidden" name="id" value="@r.Id" />
+                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+
+        <div class="pager">
+            @if (Model.PageNumber > 1)
+            {
+                <a class="btn sm" href="@Model.PageUrl(Model.PageNumber - 1)">← 上一页</a>
+            }
+            <span>第 @Model.PageNumber / @Model.TotalPages 页 · 每页 50 条</span>
+            @if (Model.PageNumber < Model.TotalPages)
+            {
+                <a class="btn sm" href="@Model.PageUrl(Model.PageNumber + 1)">下一页 →</a>
+            }
+        </div>
+    }
+</div>

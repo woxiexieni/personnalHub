@@ -1,0 +1,108 @@
+@page
+@model PersonalHub.Server.Pages.Records.EditModel
+@{
+    ViewData["Title"] = Model.IsNew ? "补录一笔" : "编辑记录";
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>@(Model.IsNew ? "补录一笔" : "编辑记录")</h2>
+        <a class="btn sm" href="/records">返回列表</a>
+    </div>
+
+    <div asp-validation-summary="ModelOnly" class="err"></div>
+
+    <form method="post">
+        <input type="hidden" asp-for="Input.Id" />
+
+        <div class="form-grid">
+            <div class="field">
+                <label>收支方向</label>
+                <select asp-for="Input.Direction">
+                    <option value="0">支出</option>
+                    <option value="1">收入</option>
+                </select>
+                <span class="hint">切换后分类会自动只显示同方向的可选项</span>
+            </div>
+
+            <div class="field">
+                <label>金额（元）</label>
+                <input asp-for="Input.Amount" type="number" step="0.01" min="0.01" placeholder="0.00" />
+                <span class="hint">最多两位小数。多于两位会被服务端拒收，不会静默改数。</span>
+                <span asp-validation-for="Input.Amount" class="err" style="padding:2px 8px"></span>
+            </div>
+
+            <div class="field">
+                <label>分类</label>
+                <select asp-for="Input.CategoryId">
+                    @foreach (var c in Model.Categories)
+                    {
+                        <option value="@c.Id" data-direction="@c.Direction">
+                            @(c.Direction == 1 ? "收入 · " : "")@c.Name
+                        </option>
+                    }
+                </select>
+                <span class="hint">分类 id 与手机端一致；停用的分类不会出现在手机录入页</span>
+            </div>
+
+            <div class="field">
+                <label>消费时间</label>
+                <input asp-for="Input.SpentAt" type="datetime-local" />
+                <span class="hint">按东八区解释。归属哪一天由这个字段决定，不是创建时间。</span>
+                <span asp-validation-for="Input.SpentAt" class="err" style="padding:2px 8px"></span>
+            </div>
+
+            <div class="field">
+                <label>支付方式</label>
+                <select asp-for="Input.PayMethod">
+                    <option value="微信">微信</option>
+                    <option value="支付宝">支付宝</option>
+                    <option value="现金">现金</option>
+                    <option value="银行卡">银行卡</option>
+                    <option value="其他">其他</option>
+                    <option value="">未填写</option>
+                </select>
+            </div>
+
+            <div class="field full">
+                <label>备注</label>
+                <textarea asp-for="Input.Note" maxlength="200" placeholder="可空，最多 200 字"></textarea>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn primary" type="submit">保存</button>
+            <a class="btn" href="/records">取消</a>
+            @if (!Model.IsNew)
+            {
+                <span class="hint">编辑后手机端下次同步会拿到这个新版本</span>
+            }
+        </div>
+    </form>
+</div>
+
+<script>
+    (function () {
+        var dir = document.querySelector('[name="Input.Direction"]');
+        var cat = document.querySelector('[name="Input.CategoryId"]');
+        if (!dir || !cat) return;
+
+        function sync() {
+            var d = dir.value;
+            var first = null;
+            Array.prototype.forEach.call(cat.options, function (o) {
+                var od = o.getAttribute('data-direction');
+                if (od === null) return;
+                var show = od === d;
+                o.hidden = !show;
+                o.disabled = !show;
+                if (show && first === null) first = o;
+            });
+            var cur = cat.options[cat.selectedIndex];
+            if (cur && cur.disabled && first) cat.value = first.value;
+        }
+
+        dir.addEventListener('change', sync);
+        sync();
+    })();
+</script>

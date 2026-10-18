@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 
   <PropertyGroup>
@@ -24,6 +24,13 @@
     <!-- 2. 指定 Proto 文件路径 -->
     <!-- GrpcServices="Server" 表示生成服务端基类；如果是客户端则填 "Client" -->
     <Protobuf Include="..\protos\personalHub.proto" GrpcServices="Server" Link="protos\personalHub.proto" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 管理端的静态资源（site.css）必须跟着 exe 走：
+         Web SDK 默认只把它复制到 publish 目录，Debug 直接跑 bin 里的 exe 时 wwwroot 不存在，
+         结果是页面能打开但没样式（不报错，很容易以为是"CSS 写错了"）。 -->
+    <Content Update="wwwroot\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

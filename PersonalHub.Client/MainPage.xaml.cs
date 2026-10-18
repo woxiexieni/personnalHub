@@ -3,86 +3,298 @@ using PersonalHub.Client.Services;
 namespace PersonalHub.Client
 {
     /// <summary>
-    /// 「状态」页：Ping 服务端并显示连接情况。
+    /// 「统计」页：四个档位（今日/本周/本月/本年）的支出结构。
     ///
-    /// 地址不是写死的：先复用已定位的通道；连不上就强制重新扫描局域网再试一次
-    /// （PC 换 IP、手机从 4G 回到家 Wi-Fi 都能自动适应）。见 ServerConnection / ServerLocator。
+    /// 数据全部来自服务端 <c>GetSpendingStructure</c>，**客户端不自己算区间、不自己聚合**：
+    /// 本地只有最近 30 天的副本，拿它算"本月"必然缺数据，一旦允许本地算，
+    /// 就会出现"手机说 3200、网页说 3100"，而且两边都能自圆其说。
+    ///
+    /// 失败时的行为是明确的：有上次结果就显示上次结果 + 「离线」标识，没有就显示空态，
+    /// 不会假装数据是最新的。
     /// </summary>
     public partial class MainPage : ContentPage
     {
-        private readonly ServerConnection _conn;
+        private static readonly Color ActiveBg = Color.FromArgb("#185FA5");
+        private static readonly Color InactiveBg = Color.FromArgb("#F1EFE8");
+        private static readonly Color ChipText = Color.FromArgb("#2C2C2A");
+        private static readonly Color Muted = Color.FromArgb("#78766E");
+        private static readonly Color ExpenseColor = Color.FromArgb("#B3261E");
+        private static readonly Color IncomeColor = Color.FromArgb("#1C7C54");
+        private static readonly Color PayColor = Color.FromArgb("#6B5CA5");
 
-        public MainPage(ServerConnection conn)
+        private readonly StatsService _stats;
+
+        private string _period = "today";
+        private bool _busy;
+
+        public MainPage(StatsService stats)
         {
             InitializeComponent();
-            _conn = conn;
+            _stats = stats;
+
+            StylePeriodButtons();
         }
 
-        // 页面显示时自动 Ping
         protected override async void OnAppearing()
         {
             base.OnAppearing();
-            await PingServerAsync();
+            await LoadAsync();
         }
 
-        // 手动重连
-        private async void OnReconnectClicked(object sender, EventArgs e)
+        // ============================================================
+        // 档位切换
+        // ============================================================
+
+        private async void OnPeriodClicked(object? sender, EventArgs e)
         {
-            await PingServerAsync();
+            if (sender is not Button b || b.CommandParameter is not string p) return;
+            if (p == _period) return;
+
+            _period = p;
+            StylePeriodButtons();
+            await LoadAsync();
         }
 
-        private async Task PingServerAsync()
+        private void StylePeriodButtons()
         {
-            SetStatus("正在查找服务端...");
-
-            if (await TryPingAsync(force: false))
+            foreach (var (btn, key) in new[]
+                     {
+                         (TodayBtn, "today"), (WeekBtn, "week"), (MonthBtn, "month"), (YearBtn, "year"),
+                     })
             {
-                return;
+                bool active = key == _period;
+                btn.BackgroundColor = active ? ActiveBg : InactiveBg;
+                btn.TextColor = active ? Colors.White : ChipText;
+            }
+        }
+
+        // ============================================================
+        // 取数 + 渲染
+        // ============================================================
+
+        private async void OnRefreshClicked(object sender, EventArgs e) => await LoadAsync(force: true);
+
+        private async void OnRefreshing(object sender, EventArgs e)
+        {
+            await LoadAsync(force: true);
+            Refresher.IsRefreshing = false;
+        }
+
+        private async Task LoadAsync(bool force = false)
+        {
+            if (_busy) return;
+            _busy = true;
+            RefreshBtn.IsEnabled = false;
+            RefreshBtn.Text = "刷新中…";
+            ConnLabel.Text = "连接中…";
+
+            try
+            {
+                var fetch = await _stats.GetAsync(_period, force);
+
+                if (fetch.Data is null)
+                {
+                    ShowEmpty("连不上服务端：" + (fetch.Error ?? "未知原因"));
+                    ConnLabel.Text = "离线";
+                    FooterLabel.Text = "检查：手机与电脑同一 Wi-Fi？服务端窗口还开着？";
+                    return;
+                }
+
+                Render(fetch.Data, fetch.IsStale, fetch.Error);
+            }
+            finally
+            {
+                _busy = false;
+                RefreshBtn.IsEnabled = true;
+                RefreshBtn.Text = "刷新";
+            }
+        }
+
+        private void Render(StructureDto d, bool stale, string? error)
+        {
+            // ---- 大数字 ----
+            AmountLabel.Text = Money(d.ExpenseCents);
+            IncomeLabel.Text = Money(d.IncomeCents);
+
+            long balance = d.IncomeCents - d.ExpenseCents;
+            BalanceLabel.Text = (balance < 0 ? "−" : string.Empty) + Money(Math.Abs(balance));
+            BalanceLabel.TextColor = balance < 0 ? ExpenseColor : Colors.Black;
+
+            // ---- 环比：没有上期数据时显示「—」，不显示「↑100%」----
+            if (d.HasPrev)
+            {
+                DeltaLabel.Text = "较上期同期 " + Delta(d.DeltaRatio) + "（上期 " + Money(d.PrevExpenseCents) + "）";
+                // 支出涨 = 红，跌 = 绿（中式习惯）
+                DeltaLabel.TextColor = d.DeltaRatio >= 0 ? ExpenseColor : IncomeColor;
+            }
+            else
+            {
+                DeltaLabel.Text = "较上期同期 —（上期无支出）";
+                DeltaLabel.TextColor = Muted;
             }
 
-            // 连不上：强制重新扫描一遍局域网再试（换 IP / 换网络的情况）
-            SetStatus("未连通，正在重新扫描局域网...");
-            if (await TryPingAsync(force: true))
+            RangeLabel.Text = RangeText(d) + $" · {d.ExpenseCount} 笔 · 日均 {Money(d.DailyAvgCents)}";
+
+            // ---- 分类 / 支付方式 ----
+            CategoryRows.Children.Clear();
+            CategorySection.IsVisible = d.Categories.Count > 0;
+            CategoryHint.Text = d.Categories.Count > 0
+                ? $"共 {d.Categories.Count} 类"
+                : string.Empty;
+
+            long total = Math.Max(1, d.ExpenseCents);
+            foreach (var c in d.Categories)
             {
-                return;
+                string? delta = c.HasPrev ? "较上期 " + Delta(c.DeltaRatio) : null;
+                var deltaColor = c.HasPrev
+                    ? (c.DeltaRatio >= 0 ? ExpenseColor : IncomeColor)
+                    : Muted;
+
+                CategoryRows.Children.Add(BuildRow(c.Name, c.AmountCents, c.AmountCents / (double)total, ExpenseColor, delta, deltaColor));
             }
 
-            SetStatus(
-                "与服务器连接状态：失败\n" +
-                $"已尝试的地址：{_conn.Address ?? "未定位到任何服务端"}\n\n" +
-                "排查建议：\n" +
-                "1）手机和电脑是否连同一个 Wi-Fi\n" +
-                "2）手机关掉「WLAN+/智能网络切换」，别让流量走 4G/5G\n" +
-                "3）电脑上服务端窗口是否还开着（双击 start-server.bat）");
+            PayRows.Children.Clear();
+            PaySection.IsVisible = d.PayMethods.Count > 0;
+            foreach (var p in d.PayMethods)
+            {
+                PayRows.Children.Add(BuildRow(p.Name, p.AmountCents, p.AmountCents / (double)total, PayColor, null, Muted));
+            }
+
+            EmptySection.IsVisible = d.ExpenseCount == 0 && d.IncomeCents == 0;
+
+            // ---- 状态行 ----
+            if (stale)
+            {
+                ConnLabel.Text = "离线 · 上次结果";
+                FooterLabel.Text = $"没连上服务端（{error}），下面是上次拿到的数据，不是最新的。";
+            }
+            else
+            {
+                ConnLabel.Text = string.IsNullOrEmpty(_stats.Address) ? "已连接" : "已连接 " + HostOf(_stats.Address!);
+                FooterLabel.Text = "数据截至 " + TimeText(d.GeneratedAt) + " · 统计口径由服务端统一计算";
+            }
         }
 
-        /// <summary>发一次 Ping；force=true 时先强制重新定位地址。</summary>
-        private async Task<bool> TryPingAsync(bool force)
+        private void ShowEmpty(string text)
+        {
+            AmountLabel.Text = Money(0);
+            IncomeLabel.Text = Money(0);
+            BalanceLabel.Text = Money(0);
+            DeltaLabel.Text = " ";
+            RangeLabel.Text = " ";
+            CategorySection.IsVisible = false;
+            PaySection.IsVisible = false;
+            EmptySection.IsVisible = true;
+            EmptyLabel.Text = text;
+        }
+
+        // ============================================================
+        // 单行「名称 + 金额 + 占比 + 进度条」
+        // ============================================================
+
+        private static View BuildRow(string name, long cents, double ratio, Color color, string? delta, Color deltaColor)
+        {
+            var head = new Grid
+            {
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(new GridLength(46)),
+                },
+                ColumnSpacing = 8,
+            };
+
+            var nameLabel = new Label
+            {
+                Text = name,
+                FontSize = 13,
+                VerticalOptions = LayoutOptions.Center,
+                LineBreakMode = LineBreakMode.TailTruncation,
+            };
+            var amountLabel = new Label
+            {
+                Text = Money(cents),
+                FontSize = 13,
+                HorizontalTextAlignment = TextAlignment.End,
+                VerticalOptions = LayoutOptions.Center,
+            };
+            var pctLabel = new Label
+            {
+                Text = $"{ratio * 100:F0}%",
+                FontSize = 11,
+                TextColor = Muted,
+                HorizontalTextAlignment = TextAlignment.End,
+                VerticalOptions = LayoutOptions.Center,
+            };
+
+            Grid.SetColumn(amountLabel, 1);
+            Grid.SetColumn(pctLabel, 2);
+            head.Children.Add(nameLabel);
+            head.Children.Add(amountLabel);
+            head.Children.Add(pctLabel);
+
+            var bar = new ProgressBar
+            {
+                Progress = Math.Clamp(ratio, 0, 1),
+                ProgressColor = color,
+                HeightRequest = 4,
+            };
+
+            var stack = new VerticalStackLayout { Spacing = 4 };
+            stack.Children.Add(head);
+            stack.Children.Add(bar);
+
+            if (delta is not null)
+            {
+                stack.Children.Add(new Label { Text = delta, FontSize = 11, TextColor = deltaColor });
+            }
+
+            return stack;
+        }
+
+        // ============================================================
+        // 格式化
+        // ============================================================
+
+        private static string Money(long cents) => "¥ " + (cents / 100.0).ToString("N2");
+
+        private static string Delta(double ratio) => (ratio >= 0 ? "+" : string.Empty) + (ratio * 100).ToString("F1") + "%";
+
+        private static string TimeText(long unixMs)
+            => DateTimeOffset.FromUnixTimeMilliseconds(unixMs).ToOffset(Period.Cst).ToString("MM-dd HH:mm");
+
+        private static string RangeText(StructureDto d)
+        {
+            var s = DateTimeOffset.FromUnixTimeMilliseconds(d.RangeStart).ToOffset(Period.Cst);
+            var e = DateTimeOffset.FromUnixTimeMilliseconds(d.RangeEnd).ToOffset(Period.Cst).AddDays(-1); // 右开 → 回退一天
+
+            return d.Period switch
+            {
+                "today" => s.ToString("yyyy-MM-dd") + "（今天）",
+                "year" => s.ToString("yyyy-MM-dd") + " ~ " + e.ToString("yyyy-MM-dd"),
+                _ => s.ToString("MM-dd") + " ~ " + e.ToString("MM-dd"),
+            };
+        }
+
+        private async void OnGoRecordClicked(object sender, EventArgs e)
         {
             try
             {
-                if (!await _conn.EnsureAsync(force))
-                {
-                    return false;
-                }
-
-                var resp = await _conn.NewSystemClient()
-                    .PingAsync(new Personalhub.PingRequest(), deadline: DateTime.UtcNow.AddSeconds(3));
-
-                SetStatus(
-                    "与服务器连接状态：成功\n" +
-                    $"服务器：{_conn.Address}\n" +
-                    $"ServerVersion = \"{resp.ServerVersion}\"");
-                return true;
+                await Shell.Current.GoToAsync("//RecordEntryPage");
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"[Ping] 失败: {ex.Message}");
-                return false;
+                // 路由名变了就退化成提示，不让页面崩
+                FooterLabel.Text = "没找到录入页，请点底部「记一笔」";
             }
         }
 
-        private void SetStatus(string text) =>
-            MainThread.BeginInvokeOnMainThread(() => StatusLabel.Text = text);
+        private static string HostOf(string url)
+        {
+            var s = url.Replace("http://", string.Empty).Replace("https://", string.Empty);
+            int idx = s.LastIndexOf(':');
+            return idx > 0 ? s.Substring(0, idx) : s;
+        }
     }
 }

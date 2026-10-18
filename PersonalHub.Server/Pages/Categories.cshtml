@@ -1,0 +1,52 @@
+@page
+@model CategoriesModel
+@{
+    ViewData["Title"] = "分类";
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>分类（共 @Model.Categories.Count 个）</h2>
+        <span class="hint">本轮只读；改名/停用属于 P1，需要配套「历史记录归并」策略</span>
+    </div>
+
+    <table class="grid">
+        <thead>
+        <tr>
+            <th class="num">id</th>
+            <th>名称</th>
+            <th>方向</th>
+            <th>状态</th>
+            <th class="num">排序</th>
+            <th class="num">记录数</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var c in Model.Categories)
+        {
+            <tr>
+                <td class="num">@c.Id</td>
+                <td>@c.Name</td>
+                <td><span class="tag @(c.Direction == 1 ? "income" : "")">@Fmt.Direction(c.Direction)</span></td>
+                <td>
+                    @if (c.Enabled == 0)
+                    {
+                        <span class="tag deleted">已停用</span>
+                    }
+                    else
+                    {
+                        <span class="tag">启用</span>
+                    }
+                </td>
+                <td class="num">@c.SortOrder</td>
+                <td class="num">@Model.CountOf(c.Id)</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+
+    <p class="hint" style="margin-top:14px">
+        id 分段：支出 1~99，收入 101~199。手机上录入时用的就是这里的 id，
+        所以「停用」不会影响历史统计（历史仍按原 id 聚合），只会让它不再出现在录入页。
+    </p>
+</div>

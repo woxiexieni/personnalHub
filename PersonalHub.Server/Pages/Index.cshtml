@@ -1,0 +1,158 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "概览";
+    var month = Model.Month;
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>今日 · @Fmt.ShortDate(Model.Today.From)</h2>
+        <a class="btn sm" href="/records/edit">补录一笔</a>
+    </div>
+    <div class="kpis">
+        <div class="kpi">
+            <div class="label">支出</div>
+            <div class="num expense">@Fmt.Yuan(Model.Today.ExpenseCents)</div>
+            <div class="sub">@Model.Today.ExpenseCount 笔</div>
+        </div>
+        <div class="kpi">
+            <div class="label">收入</div>
+            <div class="num income">@Fmt.Yuan(Model.Today.IncomeCents)</div>
+            <div class="sub">今天收到的</div>
+        </div>
+        <div class="kpi">
+            <div class="label">结余</div>
+            <div class="num balance">@Fmt.Yuan(Model.Today.IncomeCents - Model.Today.ExpenseCents)</div>
+            <div class="sub">收入 − 支出</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2>本月 · @Fmt.ShortDate(month.Range.From) 起</h2>
+        <span class="hint">
+            @if (month.HasPrev)
+            {
+                <span class="@(month.DeltaRatio >= 0 ? "up" : "down")">较上月同期 @Fmt.Delta(month.DeltaRatio)</span>
+            }
+            else
+            {
+                <span class="flat">较上月同期 —（无数据）</span>
+            }
+        </span>
+    </div>
+    <div class="kpis">
+        <div class="kpi">
+            <div class="label">支出</div>
+            <div class="num expense">@Fmt.Yuan(month.ExpenseCents)</div>
+            <div class="sub">@month.ExpenseCount 笔 · 日均 @Fmt.Yuan(month.DailyAvgCents)</div>
+        </div>
+        <div class="kpi">
+            <div class="label">收入</div>
+            <div class="num income">@Fmt.Yuan(month.IncomeCents)</div>
+            <div class="sub">本月累计</div>
+        </div>
+        <div class="kpi">
+            <div class="label">结余</div>
+            <div class="num balance">@Fmt.Yuan(month.IncomeCents - month.ExpenseCents)</div>
+            <div class="sub">上期支出 @Fmt.Yuan(month.PrevExpenseCents)</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2>本月支出结构</h2>
+        <span class="hint">按分类，占比分母是本月全部支出</span>
+    </div>
+
+    @if (month.Categories.Count == 0)
+    {
+        <div class="empty">本月还没有支出记录。<a href="/records/edit">补录一笔 →</a></div>
+    }
+    else
+    {
+        <div class="rows">
+            @foreach (var c in month.Categories)
+            {
+                <div class="row">
+                    <div class="name" title="@c.Name">@c.Name</div>
+                    <div class="bar"><i style="width:@(Fmt.Pct(c.Cents / (double)Math.Max(1, month.ExpenseCents)))%"></i></div>
+                    <div class="amt">
+                        @Fmt.Yuan(c.Cents)
+                        @if (c.HasPrev)
+                        {
+                            <span class="hint @(c.DeltaRatio >= 0 ? "up" : "down")">@Fmt.Delta(c.DeltaRatio)</span>
+                        }
+                    </div>
+                    <div class="ratio">@Fmt.Pct(c.Cents / (double)Math.Max(1, month.ExpenseCents))%</div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@if (month.PayMethods.Count > 0)
+{
+    <div class="card">
+        <div class="card-head">
+            <h2>支付方式</h2>
+            <span class="hint">老数据已按「微信/支付宝/现金/银行卡」归一化</span>
+        </div>
+        <div class="rows">
+            @foreach (var p in month.PayMethods)
+            {
+                <div class="row">
+                    <div class="name" title="@p.Name">@p.Name</div>
+                    <div class="bar pay"><i style="width:@(Fmt.Pct(p.Cents / (double)Math.Max(1, month.ExpenseCents)))%"></i></div>
+                    <div class="amt">@Fmt.Yuan(p.Cents)</div>
+                    <div class="ratio">@Fmt.Pct(p.Cents / (double)Math.Max(1, month.ExpenseCents))%</div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>最近记录</h2>
+        <a class="btn sm" href="/records">全部账单 →</a>
+    </div>
+
+    @if (Model.Recent.Count == 0)
+    {
+        <div class="empty">还没有任何记录。</div>
+    }
+    else
+    {
+        <table class="grid">
+            <thead>
+            <tr>
+                <th>时间</th>
+                <th>类型</th>
+                <th>分类</th>
+                <th>支付</th>
+                <th>备注</th>
+                <th class="num">金额</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.Recent.Take(5))
+            {
+                <tr>
+                    <td>@Fmt.DateTimeText(r.SpentAt)</td>
+                    <td><span class="tag @(r.Direction == 1 ? "income" : "")">@Fmt.Direction(r.Direction)</span></td>
+                    <td>@Model.CategoryName(r.CategoryId)</td>
+                    <td>@r.PayMethod</td>
+                    <td>@r.Note</td>
+                    <td class="num">@Fmt.Amount(r.Amount)</td>
+                    <td><a class="btn sm" href="/records/edit?id=@r.Id">编辑</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>

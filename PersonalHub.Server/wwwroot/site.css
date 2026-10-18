@@ -1,0 +1,141 @@
+/* 管理端样式：无外部依赖、无 CDN。断网/局域网环境下也必须能正常显示。 */
+:root {
+    --bg: #f6f5f1;
+    --panel: #ffffff;
+    --line: #e3e0d8;
+    --text: #23231f;
+    --muted: #78766e;
+    --accent: #185fa5;
+    --expense: #b3261e;
+    --income: #1c7c54;
+    --chip: #f1efe8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px 48px; }
+
+/* ---------- 顶部 ---------- */
+.topbar {
+    display: flex; align-items: center; gap: 24px;
+    padding: 18px 0 14px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 14px;
+}
+.brand { font-size: 18px; font-weight: 700; color: var(--text); text-decoration: none; letter-spacing: .2px; }
+.brand span { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+.nav { display: flex; gap: 4px; flex: 1; }
+.nav a {
+    color: var(--muted); text-decoration: none; padding: 6px 12px;
+    border-radius: 999px; font-size: 14px;
+}
+.nav a:hover { background: var(--chip); color: var(--text); }
+.ver { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.warn {
+    background: #fff4e5; border: 1px solid #f0d3aa; color: #8a5200;
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 18px;
+}
+
+/* ---------- 卡片 ---------- */
+.card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 20px; margin-bottom: 16px;
+}
+.card h2 {
+    font-size: 14px; font-weight: 600; color: var(--muted);
+    margin: 0 0 14px; letter-spacing: .3px;
+}
+.card-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.card-head h2 { margin: 0; }
+
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.kpi .label { font-size: 12px; color: var(--muted); }
+.kpi .num {
+    font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums;
+    letter-spacing: -.5px; margin: 2px 0 2px;
+}
+.kpi .sub { font-size: 12px; color: var(--muted); }
+.num.expense { color: var(--expense); }
+.num.income { color: var(--income); }
+.num.balance { color: var(--text); }
+
+.up { color: var(--expense); }
+.down { color: var(--income); }
+.flat { color: var(--muted); }
+
+/* ---------- 占比条 ---------- */
+.rows { display: flex; flex-direction: column; gap: 12px; }
+.row { display: grid; grid-template-columns: 78px 1fr 92px 54px; gap: 10px; align-items: center; }
+.row .name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .amt { text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+.row .ratio { text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { background: var(--chip); border-radius: 999px; height: 8px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.bar.pay > i { background: #6b5ca5; }
+
+/* ---------- 表格 ---------- */
+table.grid { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.grid th, table.grid td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+table.grid th { font-size: 12px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+table.grid td.num, table.grid th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.grid tr:last-child td { border-bottom: none; }
+table.grid tr.deleted td { color: #a3a09a; text-decoration: line-through; }
+table.grid tr:hover td { background: #faf9f5; }
+tr.deleted td { color: #a3a09a; }
+
+.tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; background: var(--chip); color: var(--muted); }
+.tag.income { background: #e6f4ec; color: var(--income); }
+.tag.deleted { background: #fdeceb; color: var(--expense); }
+
+/* ---------- 表单 ---------- */
+.filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 12px; color: var(--muted); }
+input[type=text], input[type=date], input[type=datetime-local], input[type=number], select, textarea {
+    border: 1px solid var(--line); background: #fff; color: var(--text);
+    border-radius: 8px; padding: 7px 10px; font-size: 14px; font-family: inherit; min-height: 36px;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid #cfe0f2; border-color: var(--accent); }
+textarea { min-height: 68px; resize: vertical; }
+
+.btn {
+    display: inline-block; border: 1px solid var(--line); background: #fff; color: var(--text);
+    border-radius: 8px; padding: 7px 14px; font-size: 14px; cursor: pointer; text-decoration: none;
+    line-height: 1.4;
+}
+.btn:hover { background: var(--chip); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: #134b82; }
+.btn.danger { color: var(--expense); border-color: #e7c3c0; background: #fff; }
+.btn.danger:hover { background: #fdeceb; }
+.btn.sm { padding: 4px 10px; font-size: 12px; }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+.form-grid .full { grid-column: 1 / -1; }
+.actions { display: flex; gap: 10px; align-items: center; margin-top: 18px; }
+
+.err { background: #fdeceb; border: 1px solid #f3c9c6; color: var(--expense); padding: 8px 12px; border-radius: 8px; margin-bottom: 14px; font-size: 13px; }
+.ok { background: #e6f4ec; border: 1px solid #bfe3d0; color: var(--income); padding: 8px 12px; border-radius: 8px; margin-bottom: 14px; font-size: 13px; }
+.hint { color: var(--muted); font-size: 12px; }
+.empty { color: var(--muted); font-size: 13px; padding: 18px 0; text-align: center; }
+
+.pager { display: flex; gap: 12px; align-items: center; margin-top: 14px; font-size: 13px; color: var(--muted); }
+.foot { margin-top: 28px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 14px; }
+
+@media (max-width: 720px) {
+    .kpis { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+    .row { grid-template-columns: 64px 1fr 78px 44px; gap: 8px; }
+    .topbar { flex-wrap: wrap; gap: 12px; }
+}

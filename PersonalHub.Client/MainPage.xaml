@@ -1,33 +1,140 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="PersonalHub.Client.MainPage">
+             x:Class="PersonalHub.Client.MainPage"
+             Title="状态">
 
-    <ScrollView>
-        <VerticalStackLayout
-            Padding="30,30"
-            Spacing="20">
+    <RefreshView x:Name="Refresher" Refreshing="OnRefreshing">
+        <ScrollView>
+            <VerticalStackLayout Padding="20,16" Spacing="14">
 
-            <Label
-                Text="PersonalHub 服务器连接状态"
-                Style="{StaticResource Headline}"
-                SemanticProperties.HeadingLevel="Level1"/>
+                <!-- ============ 标题 + 连接状态（出问题时才有内容感） ============ -->
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label
+                        Text="统计"
+                        FontSize="20"
+                        FontAttributes="Bold"
+                        VerticalOptions="Center"/>
+                    <Label
+                        x:Name="ConnLabel"
+                        Grid.Column="1"
+                        Text="连接中…"
+                        FontSize="11"
+                        TextColor="{StaticResource Gray500}"
+                        VerticalOptions="Center"/>
+                </Grid>
 
-            <!-- 核心：状态文本框，x:Name="StatusLabel"，后台C#代码修改这个Text -->
-            <Label
-                x:Name="StatusLabel"
-                Text="正在尝试连接服务器..."
-                Style="{StaticResource SubHeadline}"
-                LineBreakMode="WordWrap"/>
+                <!-- ============ 四个固定档位（不做日历区间，v1 只做到这层） ============ -->
+                <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="6">
+                    <Button x:Name="TodayBtn" Text="今日" FontSize="13" Padding="0" HeightRequest="34"
+                            Clicked="OnPeriodClicked" CommandParameter="today"/>
+                    <Button x:Name="WeekBtn" Grid.Column="1" Text="本周" FontSize="13" Padding="0" HeightRequest="34"
+                            Clicked="OnPeriodClicked" CommandParameter="week"/>
+                    <Button x:Name="MonthBtn" Grid.Column="2" Text="本月" FontSize="13" Padding="0" HeightRequest="34"
+                            Clicked="OnPeriodClicked" CommandParameter="month"/>
+                    <Button x:Name="YearBtn" Grid.Column="3" Text="本年" FontSize="13" Padding="0" HeightRequest="34"
+                            Clicked="OnPeriodClicked" CommandParameter="year"/>
+                </Grid>
 
-            <!-- 可选：增加手动重连按钮，方便调试 -->
-            <Button
-                x:Name="ReConnectBtn"
-                Text="重新Ping服务器"
-                Clicked="OnReconnectClicked"
-                HorizontalOptions="Fill"/>
+                <!-- ============ 大数字：总支出 + 环比 ============ -->
+                <Border Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="16,14">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="支出" FontSize="12" TextColor="{StaticResource Gray500}"/>
+                        <Label
+                            x:Name="AmountLabel"
+                            Text="¥ 0.00"
+                            FontSize="34"
+                            FontAttributes="Bold"/>
+                        <Label
+                            x:Name="DeltaLabel"
+                            Text=" "
+                            FontSize="12"
+                            TextColor="{StaticResource Gray500}"/>
+                        <Label
+                            x:Name="RangeLabel"
+                            Text=" "
+                            FontSize="12"
+                            TextColor="{StaticResource Gray500}"
+                            Margin="0,4,0,0"/>
+                    </VerticalStackLayout>
+                </Border>
 
-        </VerticalStackLayout>
-    </ScrollView>
+                <!-- ============ 收入 / 结余 ============ -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Border Grid.Column="0" Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="14,10">
+                        <VerticalStackLayout Spacing="1">
+                            <Label Text="收入" FontSize="12" TextColor="{StaticResource Gray500}"/>
+                            <Label x:Name="IncomeLabel" Text="¥ 0.00" FontSize="18" FontAttributes="Bold"/>
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Grid.Column="1" Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="14,10">
+                        <VerticalStackLayout Spacing="1">
+                            <Label Text="结余" FontSize="12" TextColor="{StaticResource Gray500}"/>
+                            <Label x:Name="BalanceLabel" Text="¥ 0.00" FontSize="18" FontAttributes="Bold"/>
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <!-- ============ 分类构成（行由后台生成） ============ -->
+                <VerticalStackLayout x:Name="CategorySection" Spacing="10" IsVisible="False">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="钱花在哪" Style="{StaticResource SubHeadline}" VerticalOptions="Center"/>
+                        <Label
+                            x:Name="CategoryHint"
+                            Grid.Column="1"
+                            Text=""
+                            FontSize="11"
+                            TextColor="{StaticResource Gray500}"
+                            VerticalOptions="Center"/>
+                    </Grid>
+                    <VerticalStackLayout x:Name="CategoryRows" Spacing="10"/>
+                </VerticalStackLayout>
+
+                <!-- ============ 支付方式 ============ -->
+                <VerticalStackLayout x:Name="PaySection" Spacing="10" IsVisible="False">
+                    <Label Text="支付方式" Style="{StaticResource SubHeadline}"/>
+                    <VerticalStackLayout x:Name="PayRows" Spacing="8"/>
+                </VerticalStackLayout>
+
+                <!-- ============ 空态 / 离线 ============ -->
+                <VerticalStackLayout x:Name="EmptySection" Spacing="8" IsVisible="False">
+                    <Label
+                        x:Name="EmptyLabel"
+                        Text="这段时间还没有支出"
+                        HorizontalOptions="Center"
+                        TextColor="{StaticResource Gray500}"/>
+                    <Button
+                        Text="去记一笔"
+                        FontSize="13"
+                        HorizontalOptions="Center"
+                        Padding="18,0"
+                        HeightRequest="34"
+                        Clicked="OnGoRecordClicked"/>
+                </VerticalStackLayout>
+
+                <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,4"/>
+
+                <!-- ============ 底部：数据截至 / 刷新 ============ -->
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label
+                        x:Name="FooterLabel"
+                        Text=" "
+                        FontSize="11"
+                        TextColor="{StaticResource Gray500}"
+                        LineBreakMode="WordWrap"
+                        VerticalOptions="Center"/>
+                    <Button
+                        x:Name="RefreshBtn"
+                        Grid.Column="1"
+                        Text="刷新"
+                        FontSize="12"
+                        Padding="14,0"
+                        HeightRequest="32"
+                        Clicked="OnRefreshClicked"/>
+                </Grid>
+
+            </VerticalStackLayout>
+        </ScrollView>
+    </RefreshView>
 
 </ContentPage>

@@ -45,6 +45,10 @@ namespace PersonalHub.Client
             // 只负责"从服务端拉下来把本地副本对齐"，上传仍然归 RecordSyncService。
             builder.Services.AddSingleton<LocalCacheService>();
 
+            // ===== 统计：状态页的数据来源（档位 → 服务端算好的结构结果）=====
+            // 不做本地聚合：本地只有 30 天副本，拿它算"本月/本年"必然缺数据。
+            builder.Services.AddSingleton<StatsService>();
+
             // 注册页面：让 Shell 通过 DI 创建页面，从而把依赖注入构造函数。
             // 不注册的话，Shell 会退回 Activator.CreateInstance 找无参构造 → MissingMethodException 启动崩溃。
             builder.Services.AddTransient<MainPage>();

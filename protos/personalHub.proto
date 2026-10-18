@@ -141,6 +141,56 @@ service AnalysisService {
     // 今日汇总：手机端「今日总额」的校正值。
     // 手机先用本地数据渲染即时值（0ms、含未同步），这个接口回来后直接覆盖。
     rpc GetTodaySummary (Empty) returns (TodaySummaryResponse);
+
+    // 结构分析：状态页整页数据，一次 RPC 取全。
+    // 客户端只传档位（today/week/month/year），**区间由服务端算**并回传 —— 否则两端各算一遍，
+    // 迟早出现"手机说本月 3200、网页说 3100"，而且查起来极痛苦。
+    rpc GetSpendingStructure (StructureRequest) returns (StructureResponse);
+}
+
+message StructureRequest {
+    // today | week | month | year（空/无法识别时按 today 处理）
+    optional string period = 1;
+}
+
+// 一个分类的构成。金额一律用整数「分」：浮点累加会让各占比加起来是 99.98%，用户一眼就看出来。
+message CategorySlice {
+    optional int32  category_id       = 1;
+    optional string name              = 2;  // 服务端补齐；查不到分类时是「未分类」
+    optional string icon              = 3;
+    optional int64  amount_cents      = 4;
+    optional double ratio             = 5;  // 0~1，分母是区间内全部支出
+    optional int32  count             = 6;
+    optional int64  prev_amount_cents = 7;  // 上一周期同期
+    optional double delta_ratio       = 8;  // 0.23 = +23%
+    optional bool   has_prev          = 9;  // false 时客户端显示「—」，不要显示「↑100%」
+}
+
+// 支付方式构成。老数据是自由文本（"微信"/"微信支付"/"wx"），服务端做归一化后再聚合，
+// 否则同一渠道会被拆成三份，占比图永远是错的。
+message PayMethodSlice {
+    optional string name         = 1;
+    optional int64  amount_cents = 2;
+    optional double ratio        = 3;
+    optional int32  count        = 4;
+}
+
+message StructureResponse {
+    optional string period            = 1;
+    optional int64  range_start       = 2;  // 实际统计区间（左闭右开），客户端显示"10-01 ~ 10-18"
+    optional int64  range_end         = 3;
+    optional int64  expense_cents     = 4;
+    optional int64  income_cents      = 5;
+    optional int32  expense_count     = 6;
+    optional int64  daily_avg_cents   = 7;  // 按"已过天数"算，不是按整月天数
+    optional int64  prev_expense_cents = 8;
+    optional double delta_ratio       = 9;
+    optional bool   has_prev          = 10;
+    optional int64  prev_range_start  = 11;
+    optional int64  prev_range_end    = 12;
+    repeated CategorySlice  categories  = 13;
+    repeated PayMethodSlice pay_methods = 14;
+    optional int64  generated_at      = 15;
 }
 
 message TodaySummaryResponse {
