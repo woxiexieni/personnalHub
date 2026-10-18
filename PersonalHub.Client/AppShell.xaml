@@ -16,6 +16,11 @@
             Title="记一笔"
             ContentTemplate="{DataTemplate local:RecordEntryPage}"
             Route="RecordEntryPage" />
+        <ShellContent
+            Title="事件反思"
+            ContentTemplate="{DataTemplate local:RecordDothingPage}"
+            Route="RecordDothingPage" />
+        
     </TabBar>
 
 </Shell>

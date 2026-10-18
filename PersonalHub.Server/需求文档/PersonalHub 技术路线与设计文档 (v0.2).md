@@ -260,7 +260,28 @@ namespace PersonalHub.Server
 
 
 
-
+> ## 1018 今天主要是搞了Ptoto的后续新功能接入问题，
+>
+> ### 1.新加入了事件反思录入功能。
+>
+> ### 2.遇到的问题：
+>
+> 在想利用模板类T实现同步功能SyncAsync的过程中遇到的困难是，同一个service下，定义rpc函数，因为它的入参和出参都是messgage定义不可能都是一样的，所有这条路从根本上就是走不通的，我就i一直卡在了这里，不过也是学到了东西，对proto生成的代码有了更深入的了解。比如RecordSevice这个proto定义对应到客户端，他就给我生成了一个client的类，下面有很多函数，分别对应的是那些rpc方法，其他一个rpc函数还会重载两个吧。
+>
+> ### 3.ai如何解决的：
+>
+> 它看到这一点后，就直接定义了一个同步器。先是定义一个接口：两个属性：分别是名称和同步函数。然后搞了两个同步器。以事件同步器为例子，这个类实现了自动同步后。
+>
+> 在D:\leetcode\personnalHub\PersonalHub.Client\Services\RecordSyncService.cs 这个本地数据同步到服务器的类中，定义了一个IRecordUploader<T> _uploader 一个同步器接口，RecordSyncService的同步函数还是正常使用接口的同步函数。接下来就是我举得比较厉害的。
+>
+> 现在不是有两个界面嘛，其中每个界面的cs文件都有一个RecordSyncService<T>它在这里进行分流：ThingPage继承的是ThingRecord.
+> 还有一个就是DI注册的地方，需要在program.cs进行注册：            
+> builder.Services.AddSingleton<IRecordUploader<LocalRecord>, RecordUploader>();
+>             builder.Services.AddSingleton<IRecordUploader<ThingRecord>, ThingUploader>();
+>
+> #### 4我现在注册的了解也加深了，就是你需要用这个IRecordUploader的时候，就去找RecordUploader
+>
+> 
 
 
 

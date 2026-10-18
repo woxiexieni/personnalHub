@@ -15,8 +15,8 @@ namespace PersonalHub.Client
     /// </summary>
     public partial class RecordEntryPage : ContentPage
     {
-        private readonly LocalRecordStore _store;
-        private readonly RecordSyncService _sync;
+        private readonly LocalRecordStore<LocalRecord> _store;
+        private readonly RecordSyncService<LocalRecord> _sync;
 
         // 分类目前写死在客户端；将来接 CategoryService.GetCategories 后换成服务端下发。
         private static readonly (int Id, string Name)[] Categories =
@@ -35,7 +35,7 @@ namespace PersonalHub.Client
         private static readonly Color PendingColor = Color.FromArgb("#D97706");
         private static readonly Color SyncedColor = Color.FromArgb("#8A8A8E");
 
-        public RecordEntryPage(LocalRecordStore store, RecordSyncService sync)
+        public RecordEntryPage(LocalRecordStore<LocalRecord> store, RecordSyncService<LocalRecord> sync)
         {
             InitializeComponent();
             _store = store;

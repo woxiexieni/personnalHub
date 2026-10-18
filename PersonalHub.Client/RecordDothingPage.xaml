@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.RecordDothingPage"
+             Title="事件反思记录">
+    <ScrollView>
+        <VerticalStackLayout Padding="24,20" Spacing="12">
+            <Label
+                Text="事件反思记录"
+                Style="{StaticResource Headline}"
+                SemanticProperties.HeadingLevel="Level1"/>
+            <!-- ============ 同步状态条【完全复用原有逻辑】 ============ -->
+            <Border
+                Stroke="{StaticResource Gray300}"
+                StrokeThickness="1"
+                Padding="12,8">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
+                        <Label
+                            x:Name="SyncTitleLabel"
+                            Text="本地保存"
+                            FontSize="14"/>
+                        <Label
+                            x:Name="SyncInfoLabel"
+                            Text="尚未同步过"
+                            FontSize="12"
+                            TextColor="{StaticResource Gray500}"/>
+                    </VerticalStackLayout>
+                    <Button
+                        Grid.Column="1"
+                        x:Name="SyncBtn"
+                        Text="同步"
+                        Clicked="OnSyncClicked"
+                        Padding="14,0"
+                        HeightRequest="36"
+                        VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- ============ 1.事件标题（单行必填） ============ -->
+            <Label Text="事件标题" Style="{StaticResource SubHeadline}"/>
+            <Entry
+                x:Name="TitleEntry"
+                Placeholder="一句话概括这件事（必填）"
+                ClearButtonVisibility="WhileEditing"/>
+
+            <!-- ============ 2.事件标签（分类Picker，单选） ============ -->
+            <Label Text="事件标签" Style="{StaticResource SubHeadline}"/>
+            <Picker x:Name="TagPicker" Title="请选择标签（必填）"/>
+
+            <!-- ============ 3.当时情绪（情绪下拉Picker） ============ -->
+            <Label Text="事发时情绪" Style="{StaticResource SubHeadline}"/>
+            <Picker x:Name="EmotionPicker" Title="请选择情绪（必填）"/>
+
+            <!-- ============ 4.事件发生时间 日期+时间 ============ -->
+            <Label Text="事件发生时间" Style="{StaticResource SubHeadline}"/>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                <DatePicker x:Name="EventDatePicker" Grid.Column="0" Format="yyyy-MM-dd"/>
+                <TimePicker x:Name="EventTimePicker" Grid.Column="1" Format="HH:mm"/>
+            </Grid>
+
+            <!-- ============ 5.事件简述【客观事实，多行】 ============ -->
+            <Label Text="事件简述（只写客观事实）" Style="{StaticResource SubHeadline}"/>
+            <Editor
+                x:Name="FactEditor"
+                Placeholder="客观描述发生了什么，不带主观评价（必填）"
+                AutoSize="TextChanges"
+                HeightRequest="80"/>
+
+            <!-- ============ 6.事发当时想法 ============ -->
+            <Label Text="事发那一刻的想法" Style="{StaticResource SubHeadline}"/>
+            <Editor
+                x:Name="ThoughtEditor"
+                Placeholder="当时脑子里是怎么想的（必填）"
+                AutoSize="TextChanges"
+                HeightRequest="80"/>
+
+            <!-- ============ 7.你采取的行动 ============ -->
+            <Label Text="当时采取的行动" Style="{StaticResource SubHeadline}"/>
+            <Editor
+                x:Name="ActionEditor"
+                Placeholder="这件事里你做了哪些行为（必填）"
+                AutoSize="TextChanges"
+                HeightRequest="80"/>
+
+            <!-- ============ 8.事件最终结果 ============ -->
+            <Label Text="事件最终结果" Style="{StaticResource SubHeadline}"/>
+            <Editor
+                x:Name="ResultEditor"
+                Placeholder="这件事最后走向、带来的后果（必填）"
+                AutoSize="TextChanges"
+                HeightRequest="80"/>
+
+            <!-- ============ 9.复盘反思 ============ -->
+            <Label Text="复盘反思：优点与不足" Style="{StaticResource SubHeadline}"/>
+            <Editor
+                x:Name="ReviewEditor"
+                Placeholder="回头看，哪些做得好，哪些存在不足（必填）"
+                AutoSize="TextChanges"
+                HeightRequest="100"/>
+
+            <!-- ============ 10.后续行动计划 ============ -->
+            <Label Text="后续行动计划" Style="{StaticResource SubHeadline}"/>
+            <Editor
+                x:Name="PlanEditor"
+                Placeholder="下次遇到同类场景，准备怎么处理（必填）"
+                AutoSize="TextChanges"
+                HeightRequest="100"/>
+
+            <!-- ============ 保存按钮、状态提示 ============ -->
+            <Button
+                x:Name="SaveBtn"
+                Text="保存到本地"
+                Clicked="OnSaveClicked"
+                HorizontalOptions="Fill"
+                Margin="0,4,0,0"/>
+            <Label
+                x:Name="StatusLabel"
+                Text=""
+                LineBreakMode="WordWrap"/>
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,10"/>
+
+            <!-- ============ 底部列表：今日反思记录 ============ -->
+            <Label
+                Text="今日反思记录"
+                Style="{StaticResource SubHeadline}"/>
+            <CollectionView x:Name="TodayReflectList" HeightRequest="300">
+                <CollectionView.EmptyView>
+                    <Label Text="今天还没有反思记录" HorizontalOptions="Center" Margin="0,20"/>
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnDefinitions="*,Auto" Padding="0,8">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="{Binding Title}" FontSize="14" LineBreakMode="TailTruncation"/>
+                                <HorizontalStackLayout Spacing="8">
+                                    <Label Text="{Binding EventTime}" FontSize="12" TextColor="{StaticResource Gray500}"/>
+                                    <Label Text="{Binding SyncText}" FontSize="12" TextColor="{Binding SyncColor}"/>
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                            <Label
+                                Grid.Column="1"
+                                Text="{Binding Tag}"
+                                FontSize="14"
+                                VerticalOptions="Center"/>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

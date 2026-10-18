@@ -1,6 +1,9 @@
 @echo off
+setlocal
 chcp 65001 >nul
 title PersonalHub Server
+call "%~dp0_common.bat"
+if errorlevel 1 goto :abort
 
 REM  NOTE: this file is deliberately 100% ASCII (no Chinese/CJK text).
 REM  cmd.exe reads .bat files using the console code page (GBK by default on
@@ -9,7 +12,7 @@ REM  some of which are shell metacharacters - that shreds the commands and
 REM  produces errors like "'rver' is not recognized". ASCII is code page proof.
 REM  All Chinese output is printed by the server program itself.
 
-set "EXE=%~dp0PersonalHub.Server\bin\Debug\net8.0\PersonalHub.Server.exe"
+set "EXE=%PH_ROOT%\PersonalHub.Server\bin\Debug\net8.0\PersonalHub.Server.exe"
 set "PORT=5000"
 if not "%~1"=="" set "PORT=%~1"
 if defined PERSONALHUB_PORT set "PORT=%PERSONALHUB_PORT%"
@@ -52,7 +55,7 @@ ping -n 3 127.0.0.1 >nul
 if exist "%EXE%" goto run
 
 echo [!] Server exe not found. Building...
-dotnet build "%~dp0PersonalHub.Server\PersonalHub.Server.csproj" -c Debug
+dotnet build "%PH_ROOT%\PersonalHub.Server\PersonalHub.Server.csproj" -c Debug
 if exist "%EXE%" goto run
 
 echo [!] Build failed. Aborting.
@@ -76,3 +79,8 @@ echo.
 echo Server stopped.
 pause
 exit /b 0
+
+:abort
+echo.
+pause
+exit /b 1

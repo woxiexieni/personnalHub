@@ -489,3 +489,6 @@ $RECYCLE.BIN/
 personalhub.db3
 personalhub.db3-wal
 personalhub.db3-shm
+
+# 发布产物（scripts 里 *-release / *-publish 的输出目录：服务端 exe、安卓 apk），不入库
+out/

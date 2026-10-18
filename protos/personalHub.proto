@@ -49,7 +49,8 @@ message CategoryList {
 
 //1.同步账单
 //2.手机下拉消费单元
-//3.
+//可扩展，以后可以往里面加自己定义好的服务，如何事件记录上传。
+//
 service RecordService {
     rpc UploadRecords (UploadRecordsRequest) returns (UploadRecordsResponse);
     rpc GetTodayRecords (Empty) returns (RecordList);
@@ -81,6 +82,51 @@ message UploadRecordsResponse {
 
 message RecordList {
     repeated Record records = 1;
+}
+
+// =====================
+// 事件反思服务（RecordDothingPage）
+// =====================
+// 与记账完全独立的第二类「可同步记录」：
+//   记账 = 结构化短字段（金额/分类）
+//   事件反思 = 长文本（10 个字段，多行）
+// 之所以不复用 Record，是因为字段维度完全不同（见 personalHub.proto 顶部的设计说明）。
+service ThingService {
+    rpc UploadThings (UploadThingsRequest) returns (UploadThingsResponse);
+    rpc GetTodayThings (Empty) returns (ThingList);
+}
+
+// 传输的最基本单元：事件反思单元
+// 命名对应本地 ThingRecord，字段一一对齐
+message Thing {
+    optional string id = 1;
+    optional string title = 2;                  // 事件标题
+    optional string tag = 3;                    // 事件标签（工作/人际/…）
+    optional string emotion = 4;                // 事发时情绪
+    optional int64 occurred_at = 5;             // 事件发生时间（Unix 毫秒）
+    optional string objective_description = 6;  // 事件简述（只写客观事实）
+    optional string initial_thought = 7;        // 事发那一刻的想法
+    optional string action_taken = 8;           // 当时采取的行动
+    optional string final_result = 9;           // 事件最终结果
+    optional string reflection = 10;            // 复盘反思
+    optional string action_plan = 11;           // 后续行动计划
+    optional int64 created_at = 12;             // 本地创建时间（Unix 毫秒）
+}
+
+// 上传事件反思表格
+message UploadThingsRequest {
+    repeated Thing things = 1;
+}
+
+// 服务器回复手机消息
+message UploadThingsResponse {
+    optional int32 accepted_count = 1 [default = 0];
+    repeated string failed_ids = 2;
+    optional string error_msg = 3;
+}
+
+message ThingList {
+    repeated Thing things = 1;
 }
 
 // =====================

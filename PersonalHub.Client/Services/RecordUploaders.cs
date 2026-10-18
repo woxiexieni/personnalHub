@@ -1,0 +1,88 @@
+using Personalhub;
+using PersonalHub.Client.Data;
+
+namespace PersonalHub.Client.Services
+{
+    /// <summary>
+    /// 账单上传器：LocalRecord 列表 → UploadRecordsRequest → RecordService.UploadRecords。
+    ///
+    /// 这里就是「不同 proto 定义带来的差异」的全部所在地。
+    /// 再加一类记录，只是再写一个长得差不多的类，同步流程完全不动。
+    /// </summary>
+    public sealed class RecordUploader : IRecordUploader<LocalRecord>
+    {
+        /// <summary>单次上传的超时。局域网内正常是毫秒级，10 秒足够兜住"Wi-Fi 假连通"。</summary>
+        private static readonly TimeSpan UploadTimeout = TimeSpan.FromSeconds(10);
+
+        private readonly ServerConnection _conn;
+
+        public RecordUploader(ServerConnection conn) => _conn = conn;
+
+        public string DisplayName => "账单";
+
+        public async Task<UploadOutcome> UploadAsync(IReadOnlyList<LocalRecord> items, CancellationToken ct = default)
+        {
+            if (items.Count == 0) return UploadOutcome.Empty;
+
+            // 通道可能因为换网络失效，这里确保一下（EnsureAsync 内部有锁，重复调用很便宜）。
+            await _conn.EnsureAsync().ConfigureAwait(false);
+
+            var request = new UploadRecordsRequest();
+            request.Records.AddRange(items.Select(x => x.ToProto()));
+
+            // gRPC 客户端必须**每次从当前通道新建**，不能缓存单例（通道换了客户端就指向旧地址）。
+            var resp = await _conn.NewRecordClient()
+                .UploadRecordsAsync(
+                    request,
+                    deadline: DateTime.UtcNow.Add(UploadTimeout),
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            return new UploadOutcome
+            {
+                Accepted = resp.AcceptedCount,
+                FailedIds = resp.FailedIds.ToArray(),
+                ErrorMsg = string.IsNullOrEmpty(resp.ErrorMsg) ? null : resp.ErrorMsg,
+            };
+        }
+    }
+
+    /// <summary>
+    /// 事件反思上传器：ThingRecord 列表 → UploadThingsRequest → ThingService.UploadThings。
+    /// 与 <see cref="RecordUploader"/> 结构完全对称，只有字段和 RPC 名字不同。
+    /// </summary>
+    public sealed class ThingUploader : IRecordUploader<ThingRecord>
+    {
+        private static readonly TimeSpan UploadTimeout = TimeSpan.FromSeconds(10);
+
+        private readonly ServerConnection _conn;
+
+        public ThingUploader(ServerConnection conn) => _conn = conn;
+
+        public string DisplayName => "事件";
+
+        public async Task<UploadOutcome> UploadAsync(IReadOnlyList<ThingRecord> items, CancellationToken ct = default)
+        {
+            if (items.Count == 0) return UploadOutcome.Empty;
+
+            await _conn.EnsureAsync().ConfigureAwait(false);
+
+            var request = new UploadThingsRequest();
+            request.Things.AddRange(items.Select(x => x.ToProto()));
+
+            var resp = await _conn.NewThingClient()
+                .UploadThingsAsync(
+                    request,
+                    deadline: DateTime.UtcNow.Add(UploadTimeout),
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            return new UploadOutcome
+            {
+                Accepted = resp.AcceptedCount,
+                FailedIds = resp.FailedIds.ToArray(),
+                ErrorMsg = string.IsNullOrEmpty(resp.ErrorMsg) ? null : resp.ErrorMsg,
+            };
+        }
+    }
+}

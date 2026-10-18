@@ -1,6 +1,3 @@
-using Grpc.Core;
-using Microsoft.Maui.Networking;
-using Microsoft.Maui.Storage;
 using PersonalHub.Client.Data;
 
 namespace PersonalHub.Client.Services
@@ -22,32 +19,46 @@ namespace PersonalHub.Client.Services
     }
 
     /// <summary>
-    /// 同步器：把本地"待同步"的账单按天打包，逐天推送到服务端。
+    /// 同步器：把本地"待同步"的记录按天打包，逐天推送到服务端。
     ///
     /// 触发时机（仅 App 前台场景）：
-    ///   1. 记账页出现时（启动 / 切回该 Tab）；
+    ///   1. 记录页出现时（启动 / 切回该 Tab）；
     ///   2. 网络状态恢复时（Connectivity.ConnectivityChanged）；
     ///   3. 用户手动点"同步"。
     ///
     /// "到家了"如何判定：**可达即同步** —— 直接 Ping 服务端，通了就传。
     /// 不判断 SSID/网段，跨平台统一，将来接公网/Tailscale 也不用改。
     ///
-    /// 幂等前提：服务端按 id 去重（见服务端 RecordStore.Upsert）。
-    /// 因此本服务重复触发、同一天重复上传，都不会导致账单翻倍。
+    /// 幂等前提：服务端按 id 去重（见服务端 RecordStore / ThingStore 的 Upsert）。
+    /// 因此本服务重复触发、同一天重复上传，都不会导致记录翻倍。
+    ///
+    /// ===== 泛型为什么只剩一个参数 =====
+    /// 原来的写法是 <c>RecordSyncService&lt;T, TProto&gt;</c>，想让同步器自己拼 proto 请求；
+    /// 但不同 message 生成的类互相没有关系，请求类型和 RPC 名也各不相同，泛型参数在
+    /// SyncAsync 里用不上（只能靠类型判断，等于没抽象）。
+    ///
+    /// 现在把「proto 相关的部分」整体交给 <see cref="IRecordUploader{T}"/>，
+    /// 同步器只依赖本地模型的公共基类 <see cref="LocalRecordBase"/>，
+    /// 于是 **一套 SyncAsync 能同时服务账单和事件反思**，将来第三类记录也不用改这里。
     /// </summary>
-    public class RecordSyncService
+    public class    RecordSyncService<T> where T : LocalRecordBase, new()
     {
-        private const string LastSyncKey = "ph.lastSyncAtMs";
+        /// <summary>上一次同步时间的偏好项键名。**按记录类型分开存**，
+        /// 否则账单同步完会把事件的"最后同步时间"也一起盖掉。</summary>
+        private static readonly string LastSyncKey = $"ph.lastSyncAtMs.{typeof(T).Name}";
 
-        private readonly LocalRecordStore _store;
+        private readonly LocalRecordStore<T> _store;
         private readonly ServerConnection _conn;
+        private readonly IRecordUploader<T> _uploader;
         private readonly SemaphoreSlim _gate = new(1, 1);
+
         private bool _connectivityHooked;
 
-        public RecordSyncService(LocalRecordStore store, ServerConnection conn)
+        public RecordSyncService(LocalRecordStore<T> store, ServerConnection conn, IRecordUploader<T> uploader)
         {
             _store = store;
             _conn = conn;
+            _uploader = uploader;
         }
 
         /// <summary>上一次同步成功的时间（Unix 毫秒），0 = 从未同步。</summary>
@@ -56,6 +67,9 @@ namespace PersonalHub.Client.Services
             get => Preferences.Default.Get(LastSyncKey, 0L);
             private set => Preferences.Default.Set(LastSyncKey, value);
         }
+
+        /// <summary>这一类记录在界面上的名字（"账单"/"事件"）。</summary>
+        public string DisplayName => _uploader.DisplayName;
 
         /// <summary>
         /// 订阅网络恢复事件（幂等，只会挂一次）。由 App 启动时调用。
@@ -87,10 +101,10 @@ namespace PersonalHub.Client.Services
         /// <summary>
         /// 执行一次同步。可被并发调用，内部用信号量保证同一时刻只有一次真正在跑。
         /// </summary>
-        public async Task<SyncResult> SyncAsync()
+        public async Task<SyncResult> SyncAsync(CancellationToken ct = default)
         {
             // 拿不到锁 → 已有同步在跑，直接返回，不排队。
-            if (!await _gate.WaitAsync(0).ConfigureAwait(false))
+            if (!await _gate.WaitAsync(0, ct).ConfigureAwait(false))
             {
                 return new SyncResult { Reachable = true, Message = "已有同步任务正在进行" };
             }
@@ -109,10 +123,10 @@ namespace PersonalHub.Client.Services
                 // 先确保有通道；连不上就强制重新定位一次（PC 换 IP / 手机换网络都会让老地址失效）。
                 await _conn.EnsureAsync().ConfigureAwait(false);
 
-                var err = await TryPingAsync().ConfigureAwait(false);
+                var err = await TryPingAsync(ct).ConfigureAwait(false);
                 if (err != null && await _conn.EnsureAsync(force: true).ConfigureAwait(false))
                 {
-                    err = await TryPingAsync().ConfigureAwait(false);
+                    err = await TryPingAsync(ct).ConfigureAwait(false);
                 }
 
                 if (err != null)
@@ -132,30 +146,26 @@ namespace PersonalHub.Client.Services
                     .OrderBy(g => g.Key, StringComparer.Ordinal)
                     .ToList();
 
-                var client = _conn.NewRecordClient();
                 int uploadedRecords = 0;
                 int uploadedDays = 0;
                 var notes = new List<string>();
 
                 // === 第三步：逐天打包上传（一天一个请求）===
+                // 注意这里**看不到任何 proto 类型**：映射、拼请求、调哪个 RPC 都在 _uploader 里。
                 foreach (var group in groups)
                 {
-                    var request = new Personalhub.UploadRecordsRequest();
-                    foreach (var local in group)
-                    {
-                        request.Records.Add(ToProto(local));
-                    }
+                    ct.ThrowIfCancellationRequested();
 
+                    var batch = group.ToList();
                     try
                     {
-                        var resp = await client
-                            .UploadRecordsAsync(request, deadline: DateTime.UtcNow.AddSeconds(10))
-                            .ConfigureAwait(false);
+                        var outcome = await _uploader.UploadAsync(batch, ct).ConfigureAwait(false);
 
                         // 只有服务端确认接收的 id 才标记为已同步；被拒的继续留本地。
-                        var okIds = group
+                        var failed = new HashSet<string>(outcome.FailedIds, StringComparer.Ordinal);
+                        var okIds = batch
                             .Select(x => x.Id)
-                            .Where(id => !resp.FailedIds.Contains(id))
+                            .Where(id => !failed.Contains(id))
                             .ToList();
 
                         if (okIds.Count > 0)
@@ -167,10 +177,18 @@ namespace PersonalHub.Client.Services
                             uploadedDays++;
                         }
 
-                        if (resp.FailedIds.Count > 0)
+                        if (failed.Count > 0)
                         {
-                            notes.Add($"{group.Key} 有 {resp.FailedIds.Count} 条被服务端拒绝");
+                            notes.Add($"{group.Key} 有 {failed.Count} 条被服务端拒绝");
                         }
+                        if (outcome.ErrorMsg != null)
+                        {
+                            notes.Add($"{group.Key}: {outcome.ErrorMsg}");
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
                     }
                     catch (Exception ex)
                     {
@@ -184,7 +202,7 @@ namespace PersonalHub.Client.Services
                 }
 
                 string message = uploadedRecords > 0
-                    ? $"已同步 {uploadedDays} 天 / {uploadedRecords} 条"
+                    ? $"已同步 {uploadedDays} 天 / {uploadedRecords} 条{_uploader.DisplayName}"
                     : "本次没有成功同步的记录";
 
                 if (notes.Count > 0)
@@ -207,30 +225,26 @@ namespace PersonalHub.Client.Services
         }
 
         /// <summary>对当前通道发一次短超时 Ping；成功返回 null，失败返回异常。</summary>
-        private async Task<Exception?> TryPingAsync()
+        private async Task<Exception?> TryPingAsync(CancellationToken ct)
         {
             try
             {
                 await _conn.NewSystemClient()
-                    .PingAsync(new Personalhub.PingRequest(), deadline: DateTime.UtcNow.AddSeconds(2))
+                    .PingAsync(
+                        new Personalhub.PingRequest(),
+                        deadline: DateTime.UtcNow.AddSeconds(2),
+                        cancellationToken: ct)
                     .ConfigureAwait(false);
                 return null;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 return ex;
             }
         }
-
-        private static Personalhub.Record ToProto(LocalRecord r) => new Personalhub.Record
-        {
-            Id = r.Id,
-            Amount = r.Amount,
-            CategoryId = r.CategoryId,
-            Note = r.Note,
-            SpentAt = r.SpentAt,
-            PayMethod = r.PayMethod,
-            CreatedAt = r.CreatedAt,
-        };
     }
 }

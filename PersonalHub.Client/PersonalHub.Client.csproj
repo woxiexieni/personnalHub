@@ -26,9 +26,15 @@
 		<!-- App Identifier -->
 		<ApplicationId>com.companyname.personalhub.client</ApplicationId>
 
-		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>1</ApplicationVersion>
+		<!--
+		  Versions —— 不要在这里写死数字。
+		  PhVersion / PhVersionCode 来自仓库根目录的 version.txt（见 Directory.Build.props）：
+		    ApplicationDisplayVersion -> 安卓 versionName，给人看的，如 1.4.2
+		    ApplicationVersion        -> 安卓 versionCode，整数，必须只增不减，由 1.4.2 自动算成 10402
+		  改版本号请改 version.txt，或执行 scripts\version-bump.bat patch
+		-->
+		<ApplicationDisplayVersion>$(PhVersion)</ApplicationDisplayVersion>
+		<ApplicationVersion>$(PhVersionCode)</ApplicationVersion>
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">11.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">13.1</SupportedOSPlatformVersion>
@@ -93,6 +99,7 @@
 		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
+
 	<ItemGroup>
 		<!-- proto 生成配置：与服务端保持完全一致（单文件、不设 OutputDir）。 -->
 		<Protobuf Include="..\protos\personalHub.proto" GrpcServices="Client" Link="protos\personalHub.proto" />

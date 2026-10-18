@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using Grpc.Net.Client;
-
+using Personalhub;
 namespace PersonalHub.Client.Services
 {
     /// <summary>
@@ -25,6 +25,8 @@ namespace PersonalHub.Client.Services
         private readonly SemaphoreSlim _gate = new(1, 1);
         private GrpcChannel? _channel;
 
+
+
         /// <summary>当前使用的服务端基地址（形如 http://192.168.11.168:5000）；尚未定位时为 null。</summary>
         public string? Address { get; private set; }
 
@@ -32,9 +34,15 @@ namespace PersonalHub.Client.Services
         public GrpcChannel Channel =>
             _channel ?? throw new InvalidOperationException("尚未定位到服务端地址");
 
+        //对应proto 的service,
+        
         public Personalhub.System.SystemClient NewSystemClient() => new(Channel);
 
+        //对应Rpc方法
         public Personalhub.RecordService.RecordServiceClient NewRecordClient() => new(Channel);
+
+        // 事件反思服务（ThingService）
+        public Personalhub.ThingService.ThingServiceClient NewThingClient() => new(Channel);
 
         /// <summary>
         /// 确保已定位到服务端并建好通道。
@@ -135,5 +143,8 @@ namespace PersonalHub.Client.Services
             var idx = s.LastIndexOf(':');
             return idx > 0 ? s.Substring(0, idx) : s;
         }
+
+
+
     }
 }

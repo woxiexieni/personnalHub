@@ -1,0 +1,55 @@
+<Project>
+
+  <!--
+    ==========================================================================
+     全仓库「唯一」的版本号来源：仓库根目录的 version.txt（内容形如 1.4.2）
+    ==========================================================================
+
+     MSBuild 会从项目所在目录逐级向上找 Directory.Build.props，找到第一个就用它，
+     所以这个文件自动对 PersonalHub.Client / PersonalHub.Server 同时生效，
+     不用在每个 csproj 里各写一遍版本号（那样迟早会写岔）。
+
+     想改版本号，不要手改这个文件，改 version.txt 即可（或用 scripts\version-bump.bat）。
+
+     为什么是两个数：
+       Android 安装包里有 versionName（给人看的，如 1.4.2）
+       和 versionCode（给系统看的整数，只能一直变大，用来判断"能不能覆盖升级"）。
+       versionCode 交给人手填，迟早会出现"忘了 +1"，装上去提示"应用未安装"。
+       这里由 versionName 自动算出来，省掉一类低级事故。
+  -->
+
+  <PropertyGroup>
+    <PhVersionFile>$(MSBuildThisFileDirectory)version.txt</PhVersionFile>
+
+    <!-- 优先级：命令行 -p:PhVersion=1.4.2  >  version.txt  >  兜底 1.0.0 -->
+    <PhVersion Condition="'$(PhVersion)' == '' and Exists('$(PhVersionFile)')">$([System.IO.File]::ReadAllText('$(PhVersionFile)').Trim())</PhVersion>
+    <PhVersion Condition="'$(PhVersion)' == ''">1.0.0</PhVersion>
+
+    <PhVersionMajor>$([System.Version]::Parse('$(PhVersion)').Major)</PhVersionMajor>
+    <PhVersionMinor>$([System.Version]::Parse('$(PhVersion)').Minor)</PhVersionMinor>
+    <!-- 写成 1.4（两段）时 Build 会是 -1，当成 0 处理 -->
+    <PhVersionPatch>$([System.Version]::Parse('$(PhVersion)').Build)</PhVersionPatch>
+    <PhVersionPatch Condition="$(PhVersionPatch) &lt; 0">0</PhVersionPatch>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--
+      Android 的 versionCode：主 * 10000 + 次 * 100 + 修订
+        1.0.0 -> 10000
+        1.4.2 -> 10402
+        2.0.0 -> 20000      （一定比 1.x 大，覆盖安装不会失败）
+      限制：次、修订各 0~99；主版本号上限很大，这辈子用不完。
+      特例：某次只想重发一个包、不想动显示版本时，可以
+          dotnet publish ... -p:PhVersionCode=10403
+    -->
+    <PhVersionCode Condition="'$(PhVersionCode)' == ''">$([MSBuild]::Add($([MSBuild]::Add($([MSBuild]::Multiply($(PhVersionMajor), 10000)), $([MSBuild]::Multiply($(PhVersionMinor), 100)))), $(PhVersionPatch)))</PhVersionCode>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- 让两个项目的程序集也带上版本：右键 exe/dll 属性 -> 详细信息里能看到 -->
+    <Version>$(PhVersion)</Version>
+    <AssemblyVersion>$(PhVersionMajor).$(PhVersionMinor).$(PhVersionPatch).0</AssemblyVersion>
+    <FileVersion>$(PhVersionMajor).$(PhVersionMinor).$(PhVersionPatch).0</FileVersion>
+  </PropertyGroup>
+
+</Project>

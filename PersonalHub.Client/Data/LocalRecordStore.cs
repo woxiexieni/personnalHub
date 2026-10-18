@@ -10,7 +10,10 @@ namespace PersonalHub.Client.Data
     ///
     /// 懒初始化（首次访问才建表），避免 App 启动时做 IO。
     /// </summary>
-    public class LocalRecordStore
+    /// 
+
+
+    public class LocalRecordStore<T> where T : LocalRecordBase, new()  
     {
         private readonly SQLiteAsyncConnection _db;
         private readonly SemaphoreSlim _initGate = new(1, 1);
@@ -33,7 +36,7 @@ namespace PersonalHub.Client.Data
             {
                 if (!_ready)
                 {
-                    await _db.CreateTableAsync<LocalRecord>().ConfigureAwait(false);
+                    await _db.CreateTableAsync<T>().ConfigureAwait(false);
                     _ready = true;
                 }
             }
@@ -44,34 +47,38 @@ namespace PersonalHub.Client.Data
         }
 
         /// <summary>写入一条本地记录。返回受影响行数（1 = 成功）。</summary>
-        public async Task<int> InsertAsync(LocalRecord record)
+        public async Task<int> InsertAsync(T record)
         {
             await EnsureReadyAsync().ConfigureAwait(false);
             return await _db.InsertAsync(record).ConfigureAwait(false);
         }
 
         /// <summary>取某个自然日（本地时区）的记录，按时间倒序。</summary>
-        public async Task<List<LocalRecord>> GetByLocalDateAsync(DateTime localDate)
+        public async Task<List<T>> GetByLocalDateAsync(DateTime localDate) 
         {
             await EnsureReadyAsync().ConfigureAwait(false);
 
             long startMs = new DateTimeOffset(localDate.Date).ToUnixTimeMilliseconds();
             long endMs = startMs + 24L * 60 * 60 * 1000;
+            var list = await _db.Table<T>().ToListAsync().ConfigureAwait(false);
 
-            var list = await _db.Table<LocalRecord>()
-                .Where(r => r.SpentAt >= startMs && r.SpentAt < endMs)
-                .ToListAsync()
-                .ConfigureAwait(false);
+            var filtered = list .Where(r =>
+        {
+            long ts = r.Timestamp;
+            return ts >= startMs && ts < endMs;
+        })
+                 .OrderByDescending(r => r.Timestamp)
+              .ToList();
 
-            list.Sort((a, b) => b.SpentAt.CompareTo(a.SpentAt));
-            return list;
+         return filtered;
+          
         }
 
         /// <summary>取所有待同步（Synced=false）的记录。</summary>
-        public async Task<List<LocalRecord>> GetUnsyncedAsync()
+        public async Task<List<T>> GetUnsyncedAsync()
         {
-            await EnsureReadyAsync().ConfigureAwait(false);
-            return await _db.Table<LocalRecord>()
+            await EnsureReadyAsync().ConfigureAwait(false);//确保数据库OK
+            return await _db.Table<T>()
                 .Where(r => r.Synced == false)
                 .ToListAsync()
                 .ConfigureAwait(false);
@@ -81,7 +88,7 @@ namespace PersonalHub.Client.Data
         public async Task<int> CountUnsyncedAsync()
         {
             await EnsureReadyAsync().ConfigureAwait(false);
-            return await _db.Table<LocalRecord>()
+            return await _db.Table<T>()
                 .Where(r => r.Synced == false)
                 .CountAsync()
                 .ConfigureAwait(false);
@@ -94,7 +101,7 @@ namespace PersonalHub.Client.Data
 
             foreach (var id in ids)
             {
-                var row = await _db.FindAsync<LocalRecord>(id).ConfigureAwait(false);
+                var row = await _db.FindAsync<T>(id).ConfigureAwait(false);
                 if (row == null) continue;
 
                 row.Synced = true;

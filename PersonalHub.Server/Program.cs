@@ -21,6 +21,14 @@ namespace PersonHub.Server
             // 保证中文提示不变成乱码）。可能被重定向/无控制台，失败就忽略。
             try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { }
 
+            // ===== 版本号：来自仓库根目录 version.txt（Directory.Build.props 烧进程序集）=====
+            // 用途：确认手机上连的、你启动的到底是哪一版。--version 只打印版本就退出。
+            if (Array.Exists(args, a => a is "--version" or "-v"))
+            {
+                Console.WriteLine($"{AppVersion()}");
+                return;
+            }
+
             // ===== 端口：默认 5000，可用环境变量 PERSONALHUB_PORT 或命令行 --port 覆盖 =====
             int port = 5000;
             string? envPort = Environment.GetEnvironmentVariable("PERSONALHUB_PORT");
@@ -73,6 +81,9 @@ namespace PersonHub.Server
             // 进程重启、关掉服务端都不丢数据。
             builder.Services.AddSingleton<RecordStore>();
 
+            // 事件反思存储（同一库文件、独立 things 表）。
+            builder.Services.AddSingleton<ThingStore>();
+
             // 监听所有网卡（0.0.0.0，含局域网 IP），强制 HTTP/2（gRPC 必需）。
             // 原 ListenLocalhost 只绑 127.0.0.1，局域网/手机连不上，且未指定协议会默认 HTTP/1.1。
             builder.WebHost.ConfigureKestrel(options =>
@@ -86,6 +97,7 @@ namespace PersonHub.Server
 
             //3. 将我们的服务类映射到路由
             app.MapGrpcService<RecordServiceImpl>();
+            app.MapGrpcService<ThingServiceImpl>();
             app.MapGrpcService<SystemServiceImpl>();
 
             // 启动前打印可连接的地址，方便手机侧排查。
@@ -100,12 +112,29 @@ namespace PersonHub.Server
             app.WaitForShutdown();
         }
 
+        /// <summary>
+        /// 程序集版本号，形如 "1.0.0"。
+        /// InformationalVersion 会带上 git 提交短哈希（如 1.0.0+6597edd...），
+        /// 这里只取 + 前面那段，界面上好看一些。
+        /// </summary>
+        private static string AppVersion()
+        {
+            var asm = typeof(Progrom).Assembly;
+            var info = asm.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+                          .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+                          .FirstOrDefault()?.InformationalVersion;
+            if (string.IsNullOrWhiteSpace(info))
+                info = asm.GetName().Version?.ToString(3) ?? "0.0.0";
+            int plus = info.IndexOf('+');
+            return plus > 0 ? info.Substring(0, plus) : info;
+        }
+
         /// <summary>打印本机的可用连接地址（本机 + 各网卡局域网 IP）。</summary>
         private static void PrintBanner(int port)
         {
             Console.WriteLine();
             Console.WriteLine("============================================================");
-            Console.WriteLine($" PersonalHub Server  (端口 {port}, gRPC / HTTP2)");
+            Console.WriteLine($" PersonalHub Server  v{AppVersion()}  (端口 {port}, gRPC / HTTP2)");
             Console.WriteLine("------------------------------------------------------------");
             Console.WriteLine($"   本机:        http://127.0.0.1:{port}");
             foreach (string ip in GetLanAddresses())

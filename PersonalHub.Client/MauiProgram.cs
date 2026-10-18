@@ -26,29 +26,41 @@ namespace PersonalHub.Client
             // 这里只注册管理器，真正定位放到后台做，避免拖慢启动。
             builder.Services.AddSingleton<ServerConnection>();
 
-            // ===== 离线优先：本地 SQLite 库 + 同步器 =====
+            // ===== 离线优先：本地 SQLite 库 =====
+            // 两个记录类型共用一个库文件（表名不同：records / ThingsRecords）。
+            // sqlite-net 的异步连接按"路径+标志"共享同一底层连接，所以两个 Store 不会互相锁死。
             string dbPath = Path.Combine(FileSystem.AppDataDirectory, "personalhub.db3");
-            builder.Services.AddSingleton(new LocalRecordStore(dbPath));
-            builder.Services.AddSingleton<RecordSyncService>();
+            builder.Services.AddSingleton(new LocalRecordStore<LocalRecord>(dbPath));
+            builder.Services.AddSingleton(new LocalRecordStore<ThingRecord>(dbPath));
+
+            // ===== 上传器：每类记录一个（proto 差异全部关在这里）=====
+            builder.Services.AddSingleton<IRecordUploader<LocalRecord>, RecordUploader>();
+            builder.Services.AddSingleton<IRecordUploader<ThingRecord>, ThingUploader>();
+
+            // ===== 同步器：泛型只吃本地模型，所以一个类服务两种记录 =====
+            builder.Services.AddSingleton<RecordSyncService<LocalRecord>>();
+            builder.Services.AddSingleton<RecordSyncService<ThingRecord>>();
 
             // 注册页面：让 Shell 通过 DI 创建页面，从而把依赖注入构造函数。
             // 不注册的话，Shell 会退回 Activator.CreateInstance 找无参构造 → MissingMethodException 启动崩溃。
             builder.Services.AddTransient<MainPage>();
             builder.Services.AddTransient<RecordEntryPage>();
+            builder.Services.AddTransient<RecordDothingPage>();
 
             var app = builder.Build();
 
             // 启动即后台预热一次地址探测，让首次「Ping / 同步」更快。
             var connection = app.Services.GetRequiredService<ServerConnection>();
+
             _ = Task.Run(async () =>
             {
                 try { await connection.EnsureAsync().ConfigureAwait(false); }
                 catch { /* 探测失败不影响启动，页面/同步触发时会重试 */ }
             });
 
-            // 订阅网络恢复事件：回家连上 Wi-Fi 时自动触发一次同步。
-            // 即使这里订阅失败，页面 OnAppearing 仍会触发同步，不影响主流程。
-            app.Services.GetRequiredService<RecordSyncService>().Start();
+            // 网络恢复时自动同步（两类记录各挂一次；Start() 内部幂等，只会订阅一次）。
+            app.Services.GetRequiredService<RecordSyncService<LocalRecord>>().Start();
+            app.Services.GetRequiredService<RecordSyncService<ThingRecord>>().Start();
 
             return app;
         }
