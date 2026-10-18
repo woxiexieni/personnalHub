@@ -51,9 +51,10 @@ namespace PersonalHub.Client
 
             // 注册页面：让 Shell 通过 DI 创建页面，从而把依赖注入构造函数。
             // 不注册的话，Shell 会退回 Activator.CreateInstance 找无参构造 → MissingMethodException 启动崩溃。
-            builder.Services.AddTransient<MainPage>();
-            builder.Services.AddTransient<RecordEntryPage>();
-            builder.Services.AddTransient<RecordDothingPage>();
+            builder.Services.AddTransient<MainPage>();       // Tab 1：概览
+            builder.Services.AddTransient<RecordHubPage>();  // Tab 2：记录目录
+            builder.Services.AddTransient<RecordEntryPage>();   // 目录 → 账单
+            builder.Services.AddTransient<RecordDothingPage>(); // 目录 → 事件反思
 
             var app = builder.Build();
 

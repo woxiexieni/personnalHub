@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:svc="clr-namespace:PersonalHub.Client.Services"
+             x:Class="PersonalHub.Client.RecordHubPage"
+             Title="记录">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20,16" Spacing="14">
+
+            <!-- ============ 提示 + 同步状态 ============
+                 大标题没有再写一遍"记录"：导航栏已经是这个名字了，
+                 同屏出现两次同名字最容易被当成没加载完。 -->
+            <Grid ColumnDefinitions="*,Auto">
+                <Label
+                    Text="选择要记录的内容"
+                    FontSize="12"
+                    TextColor="{StaticResource Gray500}"
+                    VerticalOptions="Center"/>
+                <Label
+                    x:Name="SyncLabel"
+                    Grid.Column="1"
+                    Text=""
+                    FontSize="11"
+                    TextColor="{StaticResource Gray500}"
+                    VerticalOptions="Center"/>
+            </Grid>
+
+            <!-- ============ 类型目录（项由后台按 RecordCatalog 生成） ============ -->
+            <VerticalStackLayout x:Name="TypeRows" Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="svc:RecordTypeItem">
+                        <Border
+                            Stroke="{StaticResource Gray300}"
+                            StrokeThickness="1"
+                            Padding="14,12">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnTypeTapped"/>
+                            </Border.GestureRecognizers>
+
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                <Border
+                                    Grid.Column="0"
+                                    WidthRequest="42"
+                                    HeightRequest="42"
+                                    StrokeThickness="0"
+                                    BackgroundColor="{StaticResource Gray100}"
+                                    StrokeShape="RoundRectangle 21"
+                                    VerticalOptions="Center">
+                                    <Label
+                                        Text="{Binding Icon}"
+                                        FontSize="20"
+                                        HorizontalOptions="Center"
+                                        VerticalOptions="Center"/>
+                                </Border>
+
+                                <VerticalStackLayout
+                                    Grid.Column="1"
+                                    Spacing="2"
+                                    VerticalOptions="Center">
+                                    <Label
+                                        Text="{Binding Title}"
+                                        FontSize="16"
+                                        FontAttributes="Bold"/>
+                                    <Label
+                                        Text="{Binding Subtitle}"
+                                        FontSize="12"
+                                        TextColor="{StaticResource Gray500}"
+                                        LineBreakMode="WordWrap"/>
+                                    <Label
+                                        Text="{Binding SummaryText}"
+                                        IsVisible="{Binding HasSummary}"
+                                        FontSize="11"
+                                        Margin="0,2,0,0"/>
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout
+                                    Grid.Column="2"
+                                    Spacing="0"
+                                    HorizontalOptions="End"
+                                    VerticalOptions="Center">
+                                    <Label
+                                        Text="{Binding BadgeText}"
+                                        IsVisible="{Binding HasBadge}"
+                                        FontSize="10"
+                                        TextColor="{StaticResource Gray600}"
+                                        HorizontalOptions="End"/>
+                                    <Label
+                                        Text="&gt;"
+                                        FontSize="20"
+                                        TextColor="{StaticResource Gray400}"
+                                        HorizontalOptions="End"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+            <!-- ============ 说明：这段是给"三个月后的自己"看的 ============ -->
+            <Label
+                Text="以后要加新类型（习惯、体重、阅读…），都挂在这个目录里，底部导航不用改。"
+                FontSize="11"
+                TextColor="{StaticResource Gray500}"
+                LineBreakMode="WordWrap"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

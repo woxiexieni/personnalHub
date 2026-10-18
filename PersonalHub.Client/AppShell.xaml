@@ -5,22 +5,27 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:PersonalHub.Client"
     Shell.FlyoutBehavior="Disabled"
-    Title="PersonalHub.Client">
+    Title="PersonalHub">
 
+    <!--
+        底部只有两项，按「读 / 写」分工，不按记录类型分：
+
+          概览  → 看数据（统计、趋势、复盘）
+          记录  → 往库里写（里面是"记录类型目录"，点进去才是具体录入页）
+
+        各类录入页不再挂在这里，而是用 Routing.RegisterRoute 注册成
+        "从目录推进来的页面"（见 AppShell.xaml.cs）。这样加一种新记录类型
+        不用动导航，底部也永远不会被撑爆。
+    -->
     <TabBar>
         <ShellContent
-            Title="状态"
+            Title="概览"
             ContentTemplate="{DataTemplate local:MainPage}"
-            Route="MainPage" />
+            Route="overview" />
         <ShellContent
-            Title="记一笔"
-            ContentTemplate="{DataTemplate local:RecordEntryPage}"
-            Route="RecordEntryPage" />
-        <ShellContent
-            Title="事件反思"
-            ContentTemplate="{DataTemplate local:RecordDothingPage}"
-            Route="RecordDothingPage" />
-        
+            Title="记录"
+            ContentTemplate="{DataTemplate local:RecordHubPage}"
+            Route="record" />
     </TabBar>
 
 </Shell>

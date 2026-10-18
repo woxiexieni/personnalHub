@@ -281,12 +281,14 @@ namespace PersonalHub.Client
         {
             try
             {
-                await Shell.Current.GoToAsync("//RecordEntryPage");
+                // 去「记录」Tab 的目录，而不是直接跳账单页：
+                // 以后会有多种记录类型，这一跳不该替用户决定记哪种。
+                await Shell.Current.GoToAsync("//record");
             }
             catch
             {
                 // 路由名变了就退化成提示，不让页面崩
-                FooterLabel.Text = "没找到录入页，请点底部「记一笔」";
+                FooterLabel.Text = "没找到记录页，请点底部「记录」";
             }
         }
 
