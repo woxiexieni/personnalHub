@@ -28,9 +28,43 @@ namespace PersonalHub.Client
                 RecordCatalog.ExpenseRoute,
                 new ServiceRouteFactory(typeof(RecordEntryPage)));
 
+            // 目标回顾（三个数 + 该砍的）与「行为模式」：都不做成 Tab，只从目录里进
+            Routing.RegisterRoute(
+                RecordCatalog.QuarterReviewRoute,
+                new ServiceRouteFactory(typeof(QuarterReviewPage)));
+            Routing.RegisterRoute(
+                RecordCatalog.PatternRoute,
+                new ServiceRouteFactory(typeof(PatternListPage)));
+            Routing.RegisterRoute(
+                RecordCatalog.PatternDetailRoute,
+                new ServiceRouteFactory(typeof(PatternDetailPage)));
+
             Routing.RegisterRoute(
                 RecordCatalog.ThingRoute,
                 new ServiceRouteFactory(typeof(RecordDothingPage)));
+
+            // R2：时间块 + 目标
+            Routing.RegisterRoute(
+                RecordCatalog.BlockRoute,
+                new ServiceRouteFactory(typeof(BlockEntryPage)));
+
+            Routing.RegisterRoute(
+                RecordCatalog.GoalRoute,
+                new ServiceRouteFactory(typeof(GoalListPage)));
+
+            // 带 ?id= 的详情页。Shell 用 [QueryProperty] 把 id 塞进页面属性。
+            Routing.RegisterRoute(
+                RecordCatalog.GoalDetailRoute,
+                new ServiceRouteFactory(typeof(GoalDetailPage)));
+
+            // 「概览」目录里的页
+            Routing.RegisterRoute(
+                OverviewCatalog.SpendingRoute,
+                new ServiceRouteFactory(typeof(MainPage)));
+
+            Routing.RegisterRoute(
+                OverviewCatalog.TimeRoute,
+                new ServiceRouteFactory(typeof(TimeOverviewPage)));
         }
     }
 
@@ -55,10 +89,21 @@ namespace PersonalHub.Client
         {
             services ??= IPlatformApplication.Current?.Services;
 
-            object? page = services?.GetService(_pageType) ?? Activator.CreateInstance(_pageType);
+            object? page = services?.GetService(_pageType);
+
+            if (page is null)
+            {
+                // 只有真的有无参构造时才兜底。否则别让 Activator 抛 MissingMethodException ——
+                // 那个异常只说"没有无参构造"，不说"你忘了注册"，排查要绕一大圈。
+                page = _pageType.GetConstructor(Type.EmptyTypes) is not null
+                    ? Activator.CreateInstance(_pageType)
+                    : null;
+            }
 
             return page as Element
-                ?? throw new InvalidOperationException($"无法创建页面 {_pageType.Name}，请检查 MauiProgram 里是否注册了它。");
+                ?? throw new InvalidOperationException(
+                    $"页面 {_pageType.Name} 打不开：它需要依赖注入，但 MauiProgram 里没有注册。" +
+                    $"在 MauiProgram.cs 里加一行 builder.Services.AddTransient<{_pageType.Name}>(); 即可。");
         }
     }
 }

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.PatternDetailPage"
+             Title="模式详情">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20,12" Spacing="12">
+
+            <Label x:Name="TitleLabel" Text="" FontSize="22" FontAttributes="Bold"/>
+            <Label x:Name="StateLabel" Text="" FontSize="12" TextColor="{StaticResource Gray500}"/>
+
+            <!-- 四段拆解 -->
+            <Border Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="14,10">
+                <VerticalStackLayout Spacing="8">
+                    <VerticalStackLayout Spacing="1">
+                        <Label Text="触发" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="TriggerLabel" Text="—" FontSize="13" LineBreakMode="WordWrap"/>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Spacing="1">
+                        <Label Text="旧反应" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="OldLabel" Text="—" FontSize="13" LineBreakMode="WordWrap"/>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Spacing="1">
+                        <Label Text="新反应（要练的动作）" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="NewLabel" Text="—" FontSize="13" TextColor="#185FA5"
+                               LineBreakMode="WordWrap"/>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Spacing="1">
+                        <Label Text="保留的回报" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="RewardLabel" Text="—" FontSize="13" LineBreakMode="WordWrap"/>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- 三个数：全部是次数，没有比率 -->
+            <Border Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="14,10">
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                    <VerticalStackLayout Grid.Column="0" Spacing="1">
+                        <Label Text="30 天守住" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="GoodLabel" Text="0" FontSize="20" FontAttributes="Bold"/>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1" Spacing="1">
+                        <Label Text="又回去" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="BackLabel" Text="0" FontSize="20" FontAttributes="Bold"/>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="2" Spacing="1">
+                        <Label Text="连续周" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="StreakLabel" Text="0" FontSize="20" FontAttributes="Bold"/>
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+
+            <Label x:Name="StageLabel" Text="" FontSize="12" TextColor="{StaticResource Gray500}"/>
+
+            <!-- 归因：你说的"关联"就在这里 -->
+            <Border x:Name="InsightCard" IsVisible="False"
+                    Stroke="#C9D8EA" StrokeThickness="1" Padding="14,10">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="一个可能没人告诉过你的事" FontSize="11"
+                           TextColor="{StaticResource Gray500}"/>
+                    <Label x:Name="InsightLabel" Text="" FontSize="13" LineBreakMode="WordWrap"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <Label Text="练习记录" Style="{StaticResource SubHeadline}"/>
+            <Label Text="只给次数，不给成功率 —— 有比率就会开始不记失败那次。"
+                   FontSize="11" TextColor="{StaticResource Gray500}"/>
+            <VerticalStackLayout x:Name="PracticePanel" Spacing="0"/>
+
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}"/>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Grid.Column="0" Text="编辑四段" HeightRequest="38"
+                        BackgroundColor="Transparent" BorderWidth="1"
+                        BorderColor="{StaticResource Gray300}" TextColor="{StaticResource Gray500}"
+                        Clicked="OnEditClicked"/>
+                <Button Grid.Column="1" x:Name="PauseBtn" Text="暂停" HeightRequest="38"
+                        BackgroundColor="Transparent" BorderWidth="1"
+                        BorderColor="{StaticResource Gray300}" TextColor="{StaticResource Gray500}"
+                        Clicked="OnPauseClicked"/>
+            </Grid>
+
+            <Button Text="删除这个模式" HeightRequest="38"
+                    BackgroundColor="Transparent" BorderWidth="1"
+                    BorderColor="#F0C0C0" TextColor="#A32D2D"
+                    Clicked="OnDeleteClicked"/>
+            <Label Text="删除只删模式本身，已有的练习记录会保留。"
+                   FontSize="11" TextColor="{StaticResource Gray500}"/>
+
+            <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

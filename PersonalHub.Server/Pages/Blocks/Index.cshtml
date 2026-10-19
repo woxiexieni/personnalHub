@@ -1,0 +1,241 @@
+@page
+@model PersonalHub.Server.Pages.Blocks.IndexModel
+@using personalHub.Server.Data
+@{
+    ViewData["Title"] = "时间块";
+    string returnUrl = Request.Path + Request.QueryString;
+}
+
+@if (TempData["Ok"] is string ok)
+{
+    <div class="ok">@ok</div>
+}
+@if (TempData["Err"] is string err)
+{
+    <div class="err">@err</div>
+}
+
+<div class="card">
+    <form method="get" action="/blocks">
+        <div class="filters">
+            <div class="field">
+                <label>从</label>
+                <input type="date" name="from" value="@Model.From" />
+            </div>
+            <div class="field">
+                <label>到</label>
+                <input type="date" name="to" value="@Model.To" />
+            </div>
+            <div class="field">
+                <label>事情片</label>
+                <select name="pieceCode">
+                    <option value="">全部</option>
+                    @foreach (var g in Pieces.GroupOrder)
+                    {
+                        <optgroup label="@g">
+                            @foreach (var p in Pieces.All.Where(x => x.Group == g))
+                            {
+                                <option value="@p.Code" selected="@(Model.PieceCode == p.Code)">@p.Name</option>
+                            }
+                        </optgroup>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label>目标</label>
+                <select name="goalId">
+                    <option value="">全部</option>
+                    @foreach (var g in Model.Goals)
+                    {
+                        <option value="@g.Id" selected="@(Model.GoalId == g.Id)">@g.Title</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label>&nbsp;</label>
+                <label class="hint" style="display:flex;align-items:center;gap:6px;min-height:36px">
+                    <input type="checkbox" name="deleted" value="true" checked="@Model.Deleted" />
+                    显示已删除
+                </label>
+            </div>
+            <button class="btn primary" type="submit">筛选</button>
+            <a class="btn" href="/blocks">重置</a>
+            <a class="btn" href="/blocks/edit">补录</a>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2>@Fmt.ShortDate(Fmt.ParseLocal(Model.From, dateOnly: true)) ~ @Fmt.ShortDate(Fmt.ParseLocal(Model.To, dateOnly: true))</h2>
+        <span class="hint">未记录 = 已经过去的时间 − 已记录，未来的时间不算漏记（含睡眠与没记的部分）</span>
+    </div>
+    <div class="kpis">
+        <div class="kpi">
+            <div class="label">已记录</div>
+            <div class="num balance">@Pieces.Minutes(Model.RecordedMinutes)</div>
+            <div class="sub">@Model.LiveCount 条 · 日均 @Pieces.Minutes(Model.DailyAvgMinutes)</div>
+        </div>
+        <div class="kpi">
+            <div class="label">未记录</div>
+            <div class="num expense">@Pieces.Minutes(Model.UnrecordedMinutes)</div>
+            <div class="sub">已过去 @Pieces.Minutes(Model.ElapsedMinutes)</div>
+        </div>
+        <div class="kpi">
+            <div class="label">覆盖率</div>
+            <div class="num income">@Model.PctOfElapsed(Model.RecordedMinutes)%</div>
+            <div class="sub">已记录 ÷ 已过去</div>
+        </div>
+    </div>
+</div>
+
+@if (Model.TodayPlans.Count > 0)
+{
+    <div class="card">
+        <div class="card-head">
+            <h2>今天计划 vs 实际</h2>
+            <span class="hint">实际 = 今天同一事情片的分钟数之和，不要求绑定具体哪条块</span>
+        </div>
+        <div class="rows">
+            @foreach (var p in Model.TodayPlans)
+            {
+                <div class="row">
+                    <div class="name">@Model.PieceName(p.PieceCode)</div>
+                    <div class="bar">
+                        <i style="width:@(p.Budget > 0 ? Math.Min(100, (int)Math.Round(p.Actual * 100.0 / p.Budget)) : 0)%"></i>
+                    </div>
+                    <div class="amt">@Pieces.Minutes(p.Actual) / @(p.Budget > 0 ? Pieces.Minutes(p.Budget) : "未设预算")</div>
+                    <div class="ratio"><span class="tag @p.StatusClass">@p.Status</span></div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>时间去哪了</h2>
+        <span class="hint">按事情片，占比分母是本区间已记录时间</span>
+    </div>
+
+    @if (Model.ByPiece.Count == 0)
+    {
+        <div class="empty">这个区间还没有时间块。<a href="/blocks/edit">补录一条 →</a></div>
+    }
+    else
+    {
+        <div class="rows">
+            @foreach (var p in Model.ByPiece)
+            {
+                <div class="row">
+                    <div class="name" title="@Model.PieceName(p.Code)">@Model.PieceName(p.Code)</div>
+                    <div class="bar">
+                        <i style="width:@(Model.RecordedMinutes > 0 ? Fmt.Pct(p.Minutes / (double)Model.RecordedMinutes) : "0")%"></i>
+                    </div>
+                    <div class="amt">@Pieces.Minutes(p.Minutes)</div>
+                    <div class="ratio">@(Model.RecordedMinutes > 0 ? Fmt.Pct(p.Minutes / (double)Model.RecordedMinutes) : "0")%</div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@if (Model.ByGoal.Count > 0)
+{
+    <div class="card">
+        <div class="card-head">
+            <h2>目标投入</h2>
+            <span class="hint">只算本区间 · 累计投入请看目标列表（那是全量的）</span>
+        </div>
+        <div class="rows">
+            @foreach (var g in Model.ByGoal)
+            {
+                <div class="row">
+                    <div class="name" title="@g.Title">@g.Title</div>
+                    <div class="bar pay">
+                        <i style="width:@(Model.RecordedMinutes > 0 ? Fmt.Pct(g.Minutes / (double)Model.RecordedMinutes) : "0")%"></i>
+                    </div>
+                    <div class="amt">@Pieces.Minutes(g.Minutes)</div>
+                    <div class="ratio">@g.Count 条</div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>共 @Model.Total 条 · 第 @Model.PageNumber / @Model.TotalPages 页</h2>
+        <span class="hint">「编辑」可改时间 / 片 / 时长 / 目标；「删除」是软删，可回看</span>
+    </div>
+
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty">这个条件下没有时间块。</div>
+    }
+    else
+    {
+        <table class="grid">
+            <thead>
+            <tr>
+                <th>时间</th>
+                <th>事情片</th>
+                <th class="num">时长</th>
+                <th>目标</th>
+                <th>备注</th>
+                <th>状态</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var b in Model.Items)
+            {
+                <tr class="@(b.Deleted ? "deleted" : "")">
+                    <td>@Fmt.DateTimeText(b.OccurredAt)</td>
+                    <td>
+                        <span class="hint">@Pieces.Emoji(b.PieceCode)</span>
+                        @Model.PieceName(b.PieceCode)
+                    </td>
+                    <td class="num">@(b.DurationMin > 0 ? Pieces.Minutes(b.DurationMin) : "未填")</td>
+                    <td>@Model.GoalTitle(b.GoalId)</td>
+                    <td>@b.Note</td>
+                    <td>
+                        @if (b.Deleted)
+                        {
+                            <span class="tag deleted">已删除</span>
+                        }
+                        else
+                        {
+                            <span class="tag">正常</span>
+                        }
+                    </td>
+                    <td style="white-space:nowrap">
+                        @if (!b.Deleted)
+                        {
+                            <a class="btn sm" href="/blocks/edit?id=@b.Id">编辑</a>
+                            <form method="post" asp-page-handler="Delete" style="display:inline"
+                                  onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');">
+                                <input type="hidden" name="id" value="@b.Id" />
+                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+
+        <div class="pager">
+            @if (Model.PageNumber > 1)
+            {
+                <a class="btn sm" href="@Model.PageUrl(Model.PageNumber - 1)">← 上一页</a>
+            }
+            <span>第 @Model.PageNumber / @Model.TotalPages 页 · 每页 50 条</span>
+            @if (Model.PageNumber < Model.TotalPages)
+            {
+                <a class="btn sm" href="@Model.PageUrl(Model.PageNumber + 1)">下一页 →</a>
+            }
+        </div>
+    }
+</div>

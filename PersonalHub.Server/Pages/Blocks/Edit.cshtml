@@ -1,0 +1,85 @@
+@page
+@model PersonalHub.Server.Pages.Blocks.EditModel
+@using personalHub.Server.Data
+@{
+    ViewData["Title"] = Model.IsNew ? "补录时间块" : "编辑时间块";
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>@(Model.IsNew ? "补录时间块" : "编辑时间块")</h2>
+        <a class="btn sm" href="/blocks">返回列表</a>
+    </div>
+
+    <div asp-validation-summary="ModelOnly" class="err"></div>
+
+    <form method="post">
+        <input type="hidden" asp-for="Input.Id" />
+
+        <div class="form-grid">
+            <div class="field">
+                <label>事情片</label>
+                <select asp-for="Input.PieceCode">
+                    @foreach (var g in Pieces.GroupOrder)
+                    {
+                        <optgroup label="@g">
+                            @foreach (var p in Pieces.All.Where(x => x.Group == g))
+                            {
+                                <option value="@p.Code">@p.Emoji @p.Name</option>
+                            }
+                        </optgroup>
+                    }
+                </select>
+                <span class="hint">只有这一项必填，和手机端一致</span>
+                <span asp-validation-for="Input.PieceCode" class="err" style="padding:2px 8px"></span>
+            </div>
+
+            <div class="field">
+                <label>时间</label>
+                <input asp-for="Input.OccurredAt" type="datetime-local" />
+                <span class="hint">按东八区解释。算哪一天由这个字段决定，不是创建时间。</span>
+                <span asp-validation-for="Input.OccurredAt" class="err" style="padding:2px 8px"></span>
+            </div>
+
+            <div class="field">
+                <label>时长（分钟）</label>
+                <input asp-for="Input.DurationMin" type="number" min="0" max="1440" step="5" />
+                <span class="hint">
+                    0 表示先不填，也合法（半条记录）。常用档：
+                    @foreach (var d in Pieces.Durations)
+                    {
+                        <a href="#" onclick="document.querySelector('[name=&quot;Input.DurationMin&quot;]').value=@d;return false;">@d</a>
+                        @if (d != Pieces.Durations[^1]) { <text> · </text> }
+                    }
+                </span>
+                <span asp-validation-for="Input.DurationMin" class="err" style="padding:2px 8px"></span>
+            </div>
+
+            <div class="field">
+                <label>目标</label>
+                <select asp-for="Input.GoalId">
+                    <option value="">不归任何目标</option>
+                    @foreach (var g in Model.Goals)
+                    {
+                        <option value="@g.Id">@g.Title@(g.IsCurrent ? "（当前）" : "")</option>
+                    }
+                </select>
+                <span class="hint">不归目标不报错，只是不进入目标累计</span>
+            </div>
+
+            <div class="field full">
+                <label>备注</label>
+                <textarea asp-for="Input.Note" maxlength="200" placeholder="可空。这里不写想法和反思 —— 那是「事件反思」的事"></textarea>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn primary" type="submit">保存</button>
+            <a class="btn" href="/blocks">取消</a>
+            @if (!Model.IsNew)
+            {
+                <span class="hint">保存后手机端下次同步会拿到这个新版本（同一个 id，版本号更新）</span>
+            }
+        </div>
+    </form>
+</div>

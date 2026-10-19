@@ -57,10 +57,12 @@ for /f "tokens=5" %%p in ('netstat -ano ^| findstr /C:":%PORT% " ^| findstr /C:"
 ping -n 3 127.0.0.1 >nul
 
 :start
-if exist "%EXE%" goto run
-
-echo [!] Server exe not found. Building...
-dotnet build "%PH_ROOT%\PersonalHub.Server\PersonalHub.Server.csproj" -c Debug
+REM  Always build before run. The previous version only built when the exe was
+REM  missing, so after a code change you could keep launching a stale binary and
+REM  wonder why the UI did not change. Port is free at this point, so the build
+REM  cannot be blocked by a running instance.
+echo [*] Building latest code...
+dotnet build "%PH_ROOT%\PersonalHub.Server\PersonalHub.Server.csproj" -c Debug --nologo -v q
 if exist "%EXE%" goto run
 
 echo [!] Build failed. Aborting.

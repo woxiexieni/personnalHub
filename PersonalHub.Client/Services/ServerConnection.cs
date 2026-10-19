@@ -50,6 +50,18 @@ namespace PersonalHub.Client.Services
         // 分析（今日总额的"校正值"）
         public Personalhub.AnalysisService.AnalysisServiceClient NewAnalysisClient() => new(Channel);
 
+        // 时间块（R2）
+        public Personalhub.BlockService.BlockServiceClient NewBlockClient() => new(Channel);
+
+        // 目标（R2）
+        public Personalhub.GoalService.GoalServiceClient NewGoalClient() => new(Channel);
+
+        // 每日计划（R4）
+        public Personalhub.PlanService.PlanServiceClient NewPlanClient() => new(Channel);
+
+        // 行为模式 / 练习（R5）
+        public Personalhub.PatternService.PatternServiceClient NewPatternClient() => new(Channel);
+
         /// <summary>
         /// 确保已定位到服务端并建好通道。
         /// force=false：已有通道就直接复用；

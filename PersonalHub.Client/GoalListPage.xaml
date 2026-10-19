@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.GoalListPage"
+             Title="目标">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20,12" Spacing="12">
+
+            <Label Text="目标不是待办。它只回答一件事：这条线还在不在动。"
+                   FontSize="12" TextColor="{StaticResource Gray500}"/>
+
+            <Button Text="回顾：三个数 + 该砍的"
+                    FontSize="12" HeightRequest="34" Padding="14,0"
+                    BackgroundColor="Transparent" TextColor="#185FA5"
+                    BorderWidth="1" BorderColor="#C9D8EA"
+                    HorizontalOptions="Start"
+                    Clicked="OnReviewClicked"/>
+
+            <!-- ============ 新建 ============ -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Entry x:Name="NewGoalEntry" Grid.Column="0" Placeholder="比如：做完 PersonalHub"/>
+                <Button Grid.Column="1" Text="建" WidthRequest="60" HeightRequest="38"
+                        Clicked="OnCreateClicked"/>
+            </Grid>
+
+            <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
+
+            <!-- ============ 在推进 ============ -->
+            <Label Text="在推进" Style="{StaticResource SubHeadline}"/>
+            <VerticalStackLayout x:Name="ActivePanel" Spacing="8"/>
+
+            <!-- ============ 停滞（14 天没有块，自动折叠） ============ -->
+            <Button x:Name="StalledHeader"
+                    Text="停滞 ▾"
+                    FontSize="12"
+                    HeightRequest="34"
+                    BackgroundColor="Transparent"
+                    TextColor="{StaticResource Gray500}"
+                    BorderWidth="1"
+                    BorderColor="{StaticResource Gray300}"
+                    HorizontalOptions="Start"
+                    Padding="14,0"
+                    IsVisible="False"
+                    Clicked="OnToggleStalledClicked"/>
+
+            <VerticalStackLayout x:Name="StalledPanel" Spacing="8" IsVisible="False"/>
+
+            <Label x:Name="EmptyLabel" Text="" FontSize="12"
+                   TextColor="{StaticResource Gray500}" IsVisible="False"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

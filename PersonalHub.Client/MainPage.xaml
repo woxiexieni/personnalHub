@@ -2,19 +2,16 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="PersonalHub.Client.MainPage"
-             Title="概览">
+             Title="支出概览">
 
     <RefreshView x:Name="Refresher" Refreshing="OnRefreshing">
         <ScrollView>
             <VerticalStackLayout Padding="20,16" Spacing="14">
 
-                <!-- ============ 标题 + 连接状态（出问题时才有内容感） ============ -->
+                <!-- ============ 连接状态（正常时几乎看不见，出问题才有内容） ============
+                     标题不再写在这里：这一页现在是从「概览」目录推进来的，
+                     导航栏已经显示"支出概览"，同屏写两遍会像没加载完。 -->
                 <Grid ColumnDefinitions="*,Auto">
-                    <Label
-                        Text="支出概览"
-                        FontSize="20"
-                        FontAttributes="Bold"
-                        VerticalOptions="Center"/>
                     <Label
                         x:Name="ConnLabel"
                         Grid.Column="1"

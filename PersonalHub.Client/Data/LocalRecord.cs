@@ -17,6 +17,15 @@ namespace PersonalHub.Client.Data
         /// <summary>同步成功时间（Unix 毫秒），0 表示从未同步。</summary>
         public abstract long SyncedAt { get; set; }
 
+        /// <summary>
+        /// 软删标记。true = 这条已被删掉，等下次上传时告诉服务端。
+        ///
+        /// 提到基类上是因为 <see cref="LocalRecordStore{T}"/> 的通用查询要过滤墓碑，
+        /// 原来是一个 switch 判断具体类型 —— 加一类记录就得记得加一个 case，
+        /// 忘了的后果是"删掉的记录又出现在列表里"，而且不报错。
+        /// </summary>
+        public abstract bool Deleted { get; set; }
+
         /// <summary>用于按天分组的时间戳（Unix 毫秒）。子类必须指定自己的时间字段。
         /// LocalRecordStore的按天查询功能
         /// 
@@ -89,7 +98,7 @@ namespace PersonalHub.Client.Data
         /// 已同步的记录如果只在本地删，服务端并不知道，下次镜像同步又会被拉回来 —— 删了个寂寞。
         /// 所以"已同步的删除"必须留一个墓碑，上传成功后才能清掉。
         /// </summary>
-        public bool Deleted { get; set; }
+        public override bool Deleted { get; set; }
 
         /// <summary>是否已同步到服务端。false = 待同步。</summary>
         public override bool Synced { get; set; }
@@ -216,7 +225,7 @@ namespace PersonalHub.Client.Data
         public long UpdatedAt { get; set; }
 
         /// <summary>软删标记。查询默认过滤。</summary>
-        public bool Deleted { get; set; }
+        public override bool Deleted { get; set; }
 
         // 分组时间 = 事件发生时间（基类 DayKey 会用 Timestamp 换算，这里不需要再写一遍）
         public override long Timestamp => OccurredAt;
@@ -224,6 +233,114 @@ namespace PersonalHub.Client.Data
         /// <summary>归天用事件发生时间。</summary>
         [Ignore]
         public override long DayTimestamp => OccurredAt;
+    }
+
+    /// <summary>
+    /// 本地时间块（R2 新增的第三类可同步记录）。
+    ///
+    /// 与账单 / 事件反思最关键的区别：**除 PieceCode 外全部可空**。
+    /// 时长可以没填、目标可以没归、备注可以不写 —— 半条记录必须能存下,
+    /// 否则又会回到"全必填表单没人用"的老路上。
+    ///
+    /// 字段一次建全（worth / lesson / planId / anomaly / mood / startedAt / endedAt），
+    /// R2.5 的计时、R3 的复盘、R4 的计划都只用界面 + 接口，不再动表。
+    /// </summary>
+    [Table("blocks")]
+    public class LocalBlock : LocalRecordBase
+    {
+        [PrimaryKey]
+        public override string Id { get; set; } = string.Empty;
+
+        /// <summary>事情片代号（code 冻结，显示名可改）。</summary>
+        public string PieceCode { get; set; } = string.Empty;
+
+        /// <summary>归属时刻（Unix 毫秒）。决定它算哪一天。</summary>
+        public long OccurredAt { get; set; }
+
+        /// <summary>时长（分钟）。0 = 没填，合法。</summary>
+        public int DurationMin { get; set; }
+
+        /// <summary>归属目标；空 = 没归（不报错）。</summary>
+        public string GoalId { get; set; } = string.Empty;
+
+        public string Note { get; set; } = string.Empty;
+
+        /// <summary>0 未评 / 1 值得 / 2 一般 / 3 别做（R3）。</summary>
+        public int Worth { get; set; }
+
+        /// <summary>只在「值得」时问的那一句话（R3）。</summary>
+        public string Lesson { get; set; } = string.Empty;
+
+        /// <summary>R4 的计划关联。</summary>
+        public string PlanId { get; set; } = string.Empty;
+
+        /// <summary>0 正常 / 1 跨天或超长待确认（R2.5 计时）。</summary>
+        public int Anomaly { get; set; }
+
+        /// <summary>本版不采集，恒 0（与 worth 重复，省一次决策）。</summary>
+        public int Mood { get; set; }
+
+        public long StartedAt { get; set; }
+
+        public long EndedAt { get; set; }
+
+        public long CreatedAt { get; set; }
+
+        public long UpdatedAt { get; set; }
+
+        public override bool Deleted { get; set; }
+
+        public override bool Synced { get; set; }
+
+        public override long SyncedAt { get; set; }
+
+        /// <summary>排序用归属时刻。</summary>
+        public override long Timestamp => OccurredAt;
+
+        [Ignore]
+        public override long DayTimestamp => OccurredAt;
+    }
+
+    /// <summary>
+    /// 本地目标（长目标层）。
+    ///
+    /// 表里只有名字 / 状态 / 一条下一步 / 当前标记，别的**一个都不存**：
+    /// 累计投入、最后活动、四周趋势全是查询出来的 ——
+    /// 存下来会在删块或改归属之后永久错掉，而且错得看不出来。
+    /// </summary>
+    [Table("goals")]
+    public class LocalGoal : LocalRecordBase
+    {
+        [PrimaryKey]
+        public override string Id { get; set; } = string.Empty;
+
+        public string Title { get; set; } = string.Empty;
+
+        /// <summary>0 进行中 / 1 暂停 / 2 完成 / 3 放弃。</summary>
+        public int Status { get; set; }
+
+        /// <summary>「一条下一步」，一句话，可空。不是清单。</summary>
+        public string NextStep { get; set; } = string.Empty;
+
+        /// <summary>录入时新块默认归它。全局最多一个为 true。</summary>
+        public bool IsCurrent { get; set; }
+
+        public long StartedAt { get; set; }
+
+        public long CreatedAt { get; set; }
+
+        public long UpdatedAt { get; set; }
+
+        public override bool Deleted { get; set; }
+
+        public override bool Synced { get; set; }
+
+        public override long SyncedAt { get; set; }
+
+        public override long Timestamp => StartedAt;
+
+        [Ignore]
+        public override long DayTimestamp => StartedAt;
     }
 
 }

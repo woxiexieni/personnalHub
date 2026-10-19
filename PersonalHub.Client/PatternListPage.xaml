@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.PatternListPage"
+             Title="行为模式">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20,12" Spacing="12">
+
+            <Label Text="一个模式 = 触发 / 旧反应 / 新反应。一季度两三个就够，多了练不过来。"
+                   FontSize="12" TextColor="{StaticResource Gray500}"/>
+
+            <!-- 新建：只有两格必填（名字 + 新反应），其余可以以后再补 -->
+            <Border Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="14,10">
+                <VerticalStackLayout Spacing="8">
+                    <Entry x:Name="TitleEntry" Placeholder="要练什么？例：被质疑时不立刻反驳"/>
+                    <Entry x:Name="NewResponseEntry" Placeholder="新反应（要做的那个动作）"/>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" Text="其余三段建好后在详情里补"
+                               FontSize="11" TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="建" WidthRequest="60" HeightRequest="34"
+                                Clicked="OnCreateClicked"/>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
+
+            <Label x:Name="ActiveHeader" Text="在练" Style="{StaticResource SubHeadline}"/>
+            <VerticalStackLayout x:Name="ActivePanel" Spacing="8"/>
+            <Label x:Name="EmptyLabel" Text="" FontSize="12"
+                   TextColor="{StaticResource Gray500}" IsVisible="False"/>
+
+            <Button x:Name="OthersHeader" Text="已暂停 / 已自动化 ▾" FontSize="12"
+                    HeightRequest="34" Padding="14,0" IsVisible="False"
+                    BackgroundColor="Transparent" TextColor="{StaticResource Gray500}"
+                    BorderWidth="1" BorderColor="{StaticResource Gray300}"
+                    HorizontalOptions="Start" Clicked="OnToggleOthersClicked"/>
+
+            <VerticalStackLayout x:Name="OthersPanel" Spacing="8" IsVisible="False"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

@@ -85,4 +85,185 @@ namespace PersonalHub.Client.Services
             };
         }
     }
+
+    /// <summary>
+    /// 时间块上传器：LocalBlock 列表 → UploadBlocksRequest → BlockService.UploadBlocks。
+    /// 与上面两个结构完全对称 —— 这就是把 proto 差异关进 UploadAsync 的好处。
+    /// </summary>
+    public sealed class BlockUploader : IRecordUploader<LocalBlock>
+    {
+        private static readonly TimeSpan UploadTimeout = TimeSpan.FromSeconds(10);
+
+        private readonly ServerConnection _conn;
+
+        public BlockUploader(ServerConnection conn) => _conn = conn;
+
+        public string DisplayName => "时间块";
+
+        public async Task<UploadOutcome> UploadAsync(IReadOnlyList<LocalBlock> items, CancellationToken ct = default)
+        {
+            if (items.Count == 0) return UploadOutcome.Empty;
+
+            await _conn.EnsureAsync().ConfigureAwait(false);
+
+            var request = new UploadBlocksRequest();
+            request.Blocks.AddRange(items.Select(x => x.ToProto()));
+
+            var resp = await _conn.NewBlockClient()
+                .UploadBlocksAsync(
+                    request,
+                    deadline: DateTime.UtcNow.Add(UploadTimeout),
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            return new UploadOutcome
+            {
+                Accepted = resp.AcceptedCount,
+                FailedIds = resp.FailedIds.ToArray(),
+                ErrorMsg = string.IsNullOrEmpty(resp.ErrorMsg) ? null : resp.ErrorMsg,
+            };
+        }
+    }
+
+    /// <summary>计划上传器：LocalPlan 列表 → UploadPlansRequest → PlanService.UploadPlans。</summary>
+    public sealed class PlanUploader : IRecordUploader<LocalPlan>
+    {
+        private static readonly TimeSpan UploadTimeout = TimeSpan.FromSeconds(10);
+
+        private readonly ServerConnection _conn;
+
+        public PlanUploader(ServerConnection conn) => _conn = conn;
+
+        public string DisplayName => "计划";
+
+        public async Task<UploadOutcome> UploadAsync(IReadOnlyList<LocalPlan> items, CancellationToken ct = default)
+        {
+            if (items.Count == 0) return UploadOutcome.Empty;
+
+            await _conn.EnsureAsync().ConfigureAwait(false);
+
+            var request = new UploadPlansRequest();
+            request.Plans.AddRange(items.Select(x => x.ToProto()));
+
+            var resp = await _conn.NewPlanClient()
+                .UploadPlansAsync(
+                    request,
+                    deadline: DateTime.UtcNow.Add(UploadTimeout),
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            return new UploadOutcome
+            {
+                Accepted = resp.AcceptedCount,
+                FailedIds = resp.FailedIds.ToArray(),
+                ErrorMsg = string.IsNullOrEmpty(resp.ErrorMsg) ? null : resp.ErrorMsg,
+            };
+        }
+    }
+
+    /// <summary>目标上传器：LocalGoal 列表 → UploadGoalsRequest → GoalService.UploadGoals。</summary>
+    public sealed class GoalUploader : IRecordUploader<LocalGoal>
+    {
+        private static readonly TimeSpan UploadTimeout = TimeSpan.FromSeconds(10);
+
+        private readonly ServerConnection _conn;
+
+        public GoalUploader(ServerConnection conn) => _conn = conn;
+
+        public string DisplayName => "目标";
+
+        public async Task<UploadOutcome> UploadAsync(IReadOnlyList<LocalGoal> items, CancellationToken ct = default)
+        {
+            if (items.Count == 0) return UploadOutcome.Empty;
+
+            await _conn.EnsureAsync().ConfigureAwait(false);
+
+            var request = new UploadGoalsRequest();
+            request.Goals.AddRange(items.Select(x => x.ToProto()));
+
+            var resp = await _conn.NewGoalClient()
+                .UploadGoalsAsync(
+                    request,
+                    deadline: DateTime.UtcNow.Add(UploadTimeout),
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            return new UploadOutcome
+            {
+                Accepted = resp.AcceptedCount,
+                FailedIds = resp.FailedIds.ToArray(),
+                ErrorMsg = string.IsNullOrEmpty(resp.ErrorMsg) ? null : resp.ErrorMsg,
+            };
+        }
+    }
+
+    /// <summary>模式上传器：LocalPattern 列表 → UploadPatternsRequest → PatternService.UploadPatterns。</summary>
+    public sealed class PatternUploader : IRecordUploader<LocalPattern>
+    {
+        private static readonly TimeSpan UploadTimeout = TimeSpan.FromSeconds(10);
+
+        private readonly ServerConnection _conn;
+
+        public PatternUploader(ServerConnection conn) => _conn = conn;
+
+        public string DisplayName => "模式";
+
+        public async Task<UploadOutcome> UploadAsync(IReadOnlyList<LocalPattern> items, CancellationToken ct = default)
+        {
+            if (items.Count == 0) return UploadOutcome.Empty;
+
+            await _conn.EnsureAsync().ConfigureAwait(false);
+
+            var request = new UploadPatternsRequest();
+            request.Patterns.AddRange(items.Select(x => x.ToProto()));
+
+            var resp = await _conn.NewPatternClient()
+                .UploadPatternsAsync(request,
+                    deadline: DateTime.UtcNow.Add(UploadTimeout),
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            return new UploadOutcome
+            {
+                Accepted = resp.AcceptedCount,
+                FailedIds = resp.FailedIds.ToArray(),
+                ErrorMsg = string.IsNullOrEmpty(resp.ErrorMsg) ? null : resp.ErrorMsg,
+            };
+        }
+    }
+
+    /// <summary>练习上传器：LocalPractice 列表 → UploadPracticesRequest → PatternService.UploadPractices。</summary>
+    public sealed class PracticeUploader : IRecordUploader<LocalPractice>
+    {
+        private static readonly TimeSpan UploadTimeout = TimeSpan.FromSeconds(10);
+
+        private readonly ServerConnection _conn;
+
+        public PracticeUploader(ServerConnection conn) => _conn = conn;
+
+        public string DisplayName => "练习";
+
+        public async Task<UploadOutcome> UploadAsync(IReadOnlyList<LocalPractice> items, CancellationToken ct = default)
+        {
+            if (items.Count == 0) return UploadOutcome.Empty;
+
+            await _conn.EnsureAsync().ConfigureAwait(false);
+
+            var request = new UploadPracticesRequest();
+            request.Practices.AddRange(items.Select(x => x.ToProto()));
+
+            var resp = await _conn.NewPatternClient()
+                .UploadPracticesAsync(request,
+                    deadline: DateTime.UtcNow.Add(UploadTimeout),
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            return new UploadOutcome
+            {
+                Accepted = resp.AcceptedCount,
+                FailedIds = resp.FailedIds.ToArray(),
+                ErrorMsg = string.IsNullOrEmpty(resp.ErrorMsg) ? null : resp.ErrorMsg,
+            };
+        }
+    }
 }

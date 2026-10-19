@@ -117,6 +117,23 @@ namespace PersonHub.Server
             // 事件反思存储（同一库文件、独立 things 表）。
             builder.Services.AddSingleton<ThingStore>();
 
+            // 时间块存储（R2 新增，独立 blocks 表；things 一行不动）。
+            builder.Services.AddSingleton<BlockStore>();
+
+            // 目标存储（依赖 BlockStore 现算「累计投入 / 最后活动」）。
+            builder.Services.AddSingleton<GoalStore>();
+
+            // 每日计划（R4）：一天最多 3 件，达成率由 BlockStore 现算。
+            builder.Services.AddSingleton<PlanStore>();
+
+            // 行为模式 / 练习（R5）：模式一季度两三个，练习一天 0~1 次。
+            builder.Services.AddSingleton<PatternStore>();
+
+            // 本地每日快照（VACUUM INTO）。服务端是唯一数据源，没有它一次误删就不可逆。
+            builder.Services.AddSingleton<BackupService>();
+            // 服务端常常连开好几天，所以备份不能只在启动时做一次。
+            builder.Services.AddHostedService<BackupWorker>();
+
             // 监听所有网卡（0.0.0.0，含局域网 IP）。
             //   port      → HTTP/2，给手机端的 gRPC（强制 HTTP/2）
             //   webPort   → HTTP/1.1，给浏览器开管理端
@@ -142,15 +159,35 @@ namespace PersonHub.Server
             app.MapGrpcService<SystemServiceImpl>();
             app.MapGrpcService<CategoryServiceImpl>();
             app.MapGrpcService<AnalysisServiceImpl>();
+            app.MapGrpcService<BlockServiceImpl>();
+            app.MapGrpcService<GoalServiceImpl>();
+            app.MapGrpcService<PlanServiceImpl>();
+            app.MapGrpcService<PatternServiceImpl>();
 
             // 管理端页面（/、/records、/records/edit、/categories）
             app.MapRazorPages();
+
+            // 备份文件下载。只允许 /backup 目录里、文件名严格符合 personalhub-YYYY-MM-DD.db3 的文件，
+            // 其余一律 404 —— 这个端口在局域网里谁都能访问，不能让它变成任意文件读取。
+            app.MapGet("/backup/file/{name}", (string name, BackupService backup) =>
+            {
+                if (!BackupService.TryParseDate(name, out var date) || name != BackupService.FileName(date))
+                    return Results.NotFound();
+
+                string path = Path.Combine(backup.Directory, name);
+                return File.Exists(path)
+                    ? Results.File(path, "application/octet-stream", name)
+                    : Results.NotFound();
+            });
 
             // 启动前打印可连接的地址，方便手机侧排查。
             // 这里主动解析一次 Db：让"表结构迁移"在启动时就跑完。
             // 否则迁移要等到第一个手机请求进来才执行，出错时你只会在手机上看到一个 gRPC 错误码。
             var db = app.Services.GetRequiredService<Db>();
             Console.WriteLine($"[OK] 数据库: {db.Path}");
+
+            var backup = app.Services.GetRequiredService<BackupService>();
+            Console.WriteLine($"[OK] 备份目录: {backup.Directory}（每天 1 份，保留 14 天 + 12 周 + 12 个月）");
 
             app.Start();
             PrintBanner(port, webPort);

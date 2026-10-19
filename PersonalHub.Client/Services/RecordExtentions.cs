@@ -68,5 +68,171 @@ namespace Personalhub
             ActionPlan = r.ActionPlan ?? string.Empty,
             CreatedAt = r.CreatedTimestamp,
         };
+
+        // ============================================================
+        // R2：时间块
+        // ============================================================
+
+        /// <summary>本地时间块 → proto Block。</summary>
+        public static Block ToProto(this LocalBlock b) => new()
+        {
+            Id = b.Id,
+            PieceCode = b.PieceCode ?? string.Empty,
+            OccurredAt = b.OccurredAt,
+            DurationMin = b.DurationMin,
+            GoalId = b.GoalId ?? string.Empty,
+            Note = b.Note ?? string.Empty,
+            Worth = b.Worth,
+            Lesson = b.Lesson ?? string.Empty,
+            PlanId = b.PlanId ?? string.Empty,
+            Anomaly = b.Anomaly,
+            Mood = b.Mood,
+            StartedAt = b.StartedAt,
+            EndedAt = b.EndedAt,
+            CreatedAt = b.CreatedAt,
+            UpdatedAt = b.UpdatedAt,
+            Deleted = b.Deleted,
+        };
+
+        /// <summary>
+        /// proto Block → 本地时间块（镜像同步用）。
+        /// **不设 Synced**，由调用方补 —— 理由同 <see cref="ToLocalRecord"/>。
+        /// </summary>
+        public static LocalBlock ToLocalBlock(this Block p) => new()
+        {
+            Id = p.Id,
+            PieceCode = p.PieceCode ?? string.Empty,
+            OccurredAt = p.OccurredAt,
+            DurationMin = p.DurationMin,
+            GoalId = p.GoalId ?? string.Empty,
+            Note = p.Note ?? string.Empty,
+            Worth = p.Worth,
+            Lesson = p.Lesson ?? string.Empty,
+            PlanId = p.PlanId ?? string.Empty,
+            Anomaly = p.Anomaly,
+            Mood = p.Mood,
+            StartedAt = p.StartedAt,
+            EndedAt = p.EndedAt,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
+            Deleted = p.Deleted,
+        };
+
+        // ============================================================
+        // R2：目标
+        // ============================================================
+
+        /// <summary>
+        /// 本地目标 → proto Goal。
+        /// 注意**不回传** total_minutes / last_activity_at —— 那是服务端现算的，回传只会制造脏数据。
+        /// </summary>
+        public static Goal ToProto(this LocalGoal g) => new()
+        {
+            Id = g.Id,
+            Title = g.Title ?? string.Empty,
+            Status = g.Status,
+            NextStep = g.NextStep ?? string.Empty,
+            IsCurrent = g.IsCurrent,
+            StartedAt = g.StartedAt,
+            CreatedAt = g.CreatedAt,
+            UpdatedAt = g.UpdatedAt,
+            Deleted = g.Deleted,
+        };
+
+        public static LocalGoal ToLocalGoal(this Goal p) => new()
+        {
+            Id = p.Id,
+            Title = p.Title ?? string.Empty,
+            Status = p.Status,
+            NextStep = p.NextStep ?? string.Empty,
+            IsCurrent = p.IsCurrent,
+            StartedAt = p.StartedAt,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
+            Deleted = p.Deleted,
+        };
+
+        // ============================================================
+        // R4：每日计划
+        // ============================================================
+
+        public static Plan ToProto(this LocalPlan p) => new()
+        {
+            Id = p.Id,
+            Day = p.Day ?? string.Empty,
+            PieceCode = p.PieceCode ?? string.Empty,
+            BudgetMin = p.BudgetMin,
+            GoalId = p.GoalId ?? string.Empty,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt,
+            Deleted = p.Deleted,
+        };
+
+        /// <summary>不设 Synced，由调用方补（镜像下载 ≠ 已上传，两者别混）。</summary>
+        public static LocalPlan ToLocalPlan(this Plan p) => new()
+        {
+            Id = p.Id,
+            Day = p.Day ?? string.Empty,
+            PieceCode = p.PieceCode ?? string.Empty,
+            BudgetMin = p.BudgetMin,
+            GoalId = p.GoalId ?? string.Empty,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
+            Deleted = p.Deleted,
+        };
+
+        // ============================================================
+        // R5：行为模式 / 练习
+        // ============================================================
+
+        public static Pattern ToProto(this LocalPattern p) => new()
+        {
+            Id = p.Id,
+            Title = p.Title ?? string.Empty,
+            Trigger = p.Trigger ?? string.Empty,
+            OldResponse = p.OldResponse ?? string.Empty,
+            NewResponse = p.NewResponse ?? string.Empty,
+            RewardKept = p.RewardKept ?? string.Empty,
+            Status = p.Status,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt,
+            Deleted = p.Deleted,
+        };
+
+        public static LocalPattern ToLocalPattern(this Pattern p) => new()
+        {
+            Id = p.Id,
+            Title = p.Title ?? string.Empty,
+            Trigger = p.Trigger ?? string.Empty,
+            OldResponse = p.OldResponse ?? string.Empty,
+            NewResponse = p.NewResponse ?? string.Empty,
+            RewardKept = p.RewardKept ?? string.Empty,
+            Status = p.Status,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
+            Deleted = p.Deleted,
+        };
+
+        public static Practice ToProto(this LocalPractice p) => new()
+        {
+            Id = p.Id,
+            PatternId = p.PatternId ?? string.Empty,
+            Result = p.Result,
+            OccurredAt = p.OccurredAt,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt,
+            Deleted = p.Deleted,
+        };
+
+        public static LocalPractice ToLocalPractice(this Practice p) => new()
+        {
+            Id = p.Id,
+            PatternId = p.PatternId ?? string.Empty,
+            Result = p.Result,
+            OccurredAt = p.OccurredAt,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
+            Deleted = p.Deleted,
+        };
     }
 }

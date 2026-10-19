@@ -1,0 +1,122 @@
+@page
+@model PersonalHub.Server.Pages.Goals.DetailModel
+@using personalHub.Server.Data
+@{
+    ViewData["Title"] = Model.Goal?.Title ?? "目标演进";
+}
+
+@if (Model.Goal is null)
+{
+    <div class="card">
+        <div class="empty">这个目标不存在（可能已被删除）。<a href="/goals">回目标列表 →</a></div>
+    </div>
+    return;
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>@Model.Goal.Title</h2>
+        <span class="hint">
+            @(Model.Goal.Status switch { 1 => "已暂停", 2 => "已完成", 3 => "已放弃", _ => "进行中" })
+            @if (Model.Goal.IsCurrent)
+            {
+                <text> · 当前目标</text>
+            }
+        </span>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Goal.NextStep))
+    {
+        <div class="hint" style="margin-bottom:10px">下一步：@Model.Goal.NextStep</div>
+    }
+
+    <div class="kpis">
+        <div class="kpi">
+            <div class="label">累计投入</div>
+            <div class="num balance">@Pieces.Minutes(Model.Goal.TotalMinutes)</div>
+            <div class="sub">@Model.TotalCount 个时间片</div>
+        </div>
+        <div class="kpi">
+            <div class="label">本周</div>
+            <div class="num income">@Pieces.Minutes(Model.Weeks[3])</div>
+            <div class="sub">周一至今</div>
+        </div>
+        <div class="kpi">
+            <div class="label">&nbsp;</div>
+            <a class="btn" href="/goals/edit?id=@Model.Goal.Id" style="margin-top:6px">编辑目标</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2>最近四周</h2>
+        <span class="hint">空的那一周就是没动，不是没数据</span>
+    </div>
+
+    @{
+        int maxWeek = Math.Max(1, Model.Weeks.Max());
+    }
+    <div class="weekbars">
+        @for (int i = 0; i < 4; i++)
+        {
+            int m = Model.Weeks[i];
+            int h = m == 0 ? 3 : Math.Max(8, (int)Math.Round(m * 90.0 / maxWeek));
+            <div class="weekbar">
+                <div class="cap">@(m > 0 ? Pieces.Minutes(m) : "没动")</div>
+                <div class="col" style="height:@(h)px;background:@(m == 0 ? "#e3e1da" : "#185fa5")"></div>
+                <div class="lbl">@(i == 3 ? "本周" : $"-{3 - i}w")</div>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2>演进</h2>
+        <span class="hint">这个目标由下面这一长串时间片组成 · 最近 500 个节点</span>
+    </div>
+
+    @if (Model.Days.Count == 0)
+    {
+        <div class="empty">这个目标还没有任何时间块。<a href="/blocks/edit?goalId=@Model.Goal.Id">补录一条 →</a></div>
+    }
+    else
+    {
+        <div class="tl">
+            @foreach (var day in Model.Days)
+            {
+                <div class="tl-day">
+                    <span>@day.DayLabel</span>
+                    <span class="hint">@Pieces.Minutes(day.Minutes)</span>
+                </div>
+
+                @foreach (var b in day.Blocks)
+                {
+                    <div class="tl-item">
+                        <div class="tl-rail"><i class="tl-dot @Model.WorthClass(b.Worth)"></i></div>
+                        <div class="tl-body">
+                            <div class="tl-line1">
+                                <span class="tl-time">@Model.TimeText(b.OccurredAt)</span>
+                                <span class="tl-piece">@Model.PieceName(b.PieceCode)</span>
+                                <span class="tl-min">@(b.DurationMin > 0 ? Pieces.Minutes(b.DurationMin) : "未填时长")</span>
+                                @if (b.Worth != 0)
+                                {
+                                    <span class="tag @Model.WorthClass(b.Worth)">@Model.WorthText(b.Worth)</span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrEmpty(b.Note))
+                            {
+                                <div class="tl-note">@b.Note</div>
+                            }
+                            @if (!string.IsNullOrEmpty(b.Lesson))
+                            {
+                                <div class="tl-lesson">↳ @b.Lesson</div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>

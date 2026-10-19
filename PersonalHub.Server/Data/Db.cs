@@ -58,7 +58,7 @@ namespace personalHub.Server.Data
             CreateTables();
             Migrate();
 
-            Console.WriteLine($"[Db] SQLite 已就绪: {dbPath}（records / things / categories）");
+            Console.WriteLine($"[Db] SQLite 已就绪: {dbPath}（records / things / categories / blocks / goals）");
         }
 
         /// <summary>在全局锁 + 事务里执行，异常会回滚。</summary>
@@ -75,6 +75,13 @@ namespace personalHub.Server.Data
             Conn.CreateTable<RecordRow>();
             Conn.CreateTable<ThingRow>();
             Conn.CreateTable<CategoryRow>();
+
+            // R2：时间块 + 目标。新建表，CreateTable 就是完整的建表语句，不需要补列迁移。
+            Conn.CreateTable<BlockRow>();
+            Conn.CreateTable<GoalRow>();
+            Conn.CreateTable<PlanRow>();
+            Conn.CreateTable<PatternRow>();
+            Conn.CreateTable<PracticeRow>();
         }
 
         /// <summary>
@@ -103,6 +110,15 @@ namespace personalHub.Server.Data
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_records_dir_spent ON records(direction, spent_at)");
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_records_cat_spent ON records(category_id, spent_at)");
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_things_occurred   ON things(occurred_at)");
+
+            // R2：时间块的三条查询路径分别是「按区间」「按目标+区间」「按片+区间」，
+            // 没有一条是单列查询，所以索引都带 occurred_at。
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_blocks_occurred ON blocks(occurred_at)");
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_blocks_goal     ON blocks(goal_id, occurred_at)");
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_blocks_piece    ON blocks(piece_code, occurred_at)");
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_plans_day      ON plans(day)");
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_practices_pat ON practices(pattern_id, occurred_at)");
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_practices_at  ON practices(occurred_at)");
 
             SeedCategories();
         }

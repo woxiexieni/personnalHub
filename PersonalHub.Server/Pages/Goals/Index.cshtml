@@ -1,0 +1,100 @@
+@page
+@model PersonalHub.Server.Pages.Goals.IndexModel
+@using personalHub.Server.Data
+@{
+    ViewData["Title"] = "目标";
+}
+
+@if (TempData["Ok"] is string ok)
+{
+    <div class="ok">@ok</div>
+}
+@if (TempData["Err"] is string err)
+{
+    <div class="err">@err</div>
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>目标</h2>
+        <span class="hint">累计投入是全量统计（不受时间筛选影响）· 停滞 = 进行中但 14 天没动</span>
+    </div>
+    <div class="kpis">
+        <div class="kpi">
+            <div class="label">进行中</div>
+            <div class="num balance">@Model.ActiveCount / 3</div>
+            <div class="sub">活跃目标上限 3 个</div>
+        </div>
+        <div class="kpi">
+            <div class="label">全部目标</div>
+            <div class="num">@Model.Items.Count</div>
+            <div class="sub">含暂停 / 完成 / 放弃</div>
+        </div>
+        <div class="kpi">
+            <div class="label">&nbsp;</div>
+            <a class="btn primary" href="/goals/edit" style="margin-top:6px">新建目标</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty">还没有目标。手机端或这里都能建。</div>
+    }
+    else
+    {
+        <table class="grid">
+            <thead>
+            <tr>
+                <th>目标</th>
+                <th>状态</th>
+                <th>下一步</th>
+                <th class="num">累计投入</th>
+                <th>最近四周</th>
+                <th>最后活动</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var g in Model.Items)
+            {
+                var trend = Model.TrendOf(g.Id);
+                int tmax = Math.Max(1, trend.Max());
+                <tr>
+                    <td>
+                        <a href="/goals/detail?id=@g.Id">@g.Title</a>
+                        @if (g.IsCurrent)
+                        {
+                            <span class="tag">当前</span>
+                        }
+                        @if (Model.IsStalled(g))
+                        {
+                            <span class="tag deleted">停滞</span>
+                        }
+                    </td>
+                    <td><span class="tag @Model.StatusClass(g.Status)">@Model.StatusText(g.Status)</span></td>
+                    <td>@g.NextStep</td>
+                    <td class="num">@(g.TotalMinutes > 0 ? Pieces.Minutes(g.TotalMinutes) : "—")</td>
+                    <td>
+                        <div class="spark" title="左旧右新，空格子 = 那周没动">
+                            @for (int i = 0; i < 4; i++)
+                            {
+                                int m = trend[i];
+                                int h = m == 0 ? 3 : Math.Max(6, (int)Math.Round(m * 26.0 / tmax));
+                                <i style="height:@(h)px;background:@(m == 0 ? "#e3e1da" : "#185fa5")"
+                                   title="@(m == 0 ? "没动" : Pieces.Minutes(m))"></i>
+                            }
+                        </div>
+                    </td>
+                    <td>@Model.LastText(g.LastActivityAt)</td>
+                    <td style="white-space:nowrap">
+                        <a class="btn sm" href="/goals/detail?id=@g.Id">演进</a>
+                        <a class="btn sm" href="/goals/edit?id=@g.Id">编辑</a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>

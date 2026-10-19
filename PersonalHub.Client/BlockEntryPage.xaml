@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.BlockEntryPage"
+             Title="时间块">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20,12" Spacing="10">
+
+            <!-- ============ 顶部：当前目标 + 今日合计 ============ -->
+            <Border Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="14,10">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="今天记了" FontSize="12" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="TodayTotalLabel" Text="0 分钟" FontSize="26" FontAttributes="Bold"/>
+                        <Label x:Name="TodaySubLabel" Text=" " FontSize="12" TextColor="{StaticResource Gray500}"/>
+                    </VerticalStackLayout>
+
+                    <!-- 目标归属：默认继承「当前目标」，在这里能直接切（不用跑去目标页） -->
+                    <VerticalStackLayout Grid.Column="1" Spacing="2" HorizontalOptions="End">
+                        <Label Text="归到目标" FontSize="12" HorizontalTextAlignment="End"
+                               TextColor="{StaticResource Gray500}"/>
+                        <Button x:Name="GoalChipBtn"
+                                Text="未设置"
+                                FontSize="12"
+                                Padding="10,0"
+                                HeightRequest="30"
+                                CornerRadius="15"
+                                BackgroundColor="#F1EFE8"
+                                TextColor="#2C2C2A"
+                                Clicked="OnGoalChipClicked"/>
+                        <Label x:Name="SyncStateLabel" Text="" FontSize="11"
+                               HorizontalTextAlignment="End"
+                               TextColor="{StaticResource Gray500}"/>
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+
+            <!-- ============ 没有当前目标时的引导（第一次用会看到） ============ -->
+            <Border x:Name="NoGoalCard" IsVisible="False"
+                    Stroke="#E6C68A" StrokeThickness="1" Padding="14,12">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="先建个目标，今天的记录才知道往哪儿算" FontSize="13"/>
+                    <Label Text="不建也能记：只是这些时间不会归到任何一条线上。"
+                           FontSize="11" TextColor="{StaticResource Gray500}"/>
+                    <HorizontalStackLayout Spacing="8">
+                        <Button Text="建目标" FontSize="12" HeightRequest="34" Padding="14,0"
+                                Clicked="OnCreateGoalClicked"/>
+                        <Button Text="先跳过" FontSize="12" HeightRequest="34" Padding="14,0"
+                                BackgroundColor="Transparent"
+                                TextColor="{StaticResource Gray500}"
+                                BorderWidth="1" BorderColor="{StaticResource Gray300}"
+                                Clicked="OnSkipGoalClicked"/>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- ============ R4：今天做哪 3 件（只点选，0 打字） ============ -->
+            <Border x:Name="PlanCard"
+                    Stroke="#C9D8EA" StrokeThickness="1" Padding="14,10">
+                <VerticalStackLayout Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" x:Name="PlanTitle" Text="今天做哪 3 件？"
+                               FontSize="13" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" x:Name="PlanAddBtn" Text="+ 加一件"
+                                FontSize="12" HeightRequest="30" Padding="12,0"
+                                BackgroundColor="Transparent" TextColor="#185FA5"
+                                Clicked="OnAddPlanClicked"/>
+                    </Grid>
+                    <VerticalStackLayout x:Name="PlanRows" Spacing="6"/>
+                    <Label x:Name="PlanHint" Text="只点选，不写字。晚上这里会显示计划 vs 实际。"
+                           FontSize="11" TextColor="{StaticResource Gray500}"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- ============ R5：今天在练什么（1 次点击，正向为主） ============ -->
+            <Border x:Name="PracticeCard" IsVisible="False"
+                    Stroke="#D9D3E8" StrokeThickness="1" Padding="14,10">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="今天在练什么" FontSize="13"/>
+                    <VerticalStackLayout x:Name="PracticeRows" Spacing="8"/>
+                    <Label Text="只在想起来的时候点，不点不算失败。" FontSize="11"
+                           TextColor="{StaticResource Gray500}"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- ============ 可选备注：空着不影响 1 次点击，想写就先写再点片 ============ -->
+            <Entry x:Name="NoteEntry"
+                   Placeholder="备注（可选）：比如「理发」"
+                   FontSize="13" HeightRequest="38" ClearButtonVisibility="WhileEditing"/>
+
+            <!-- ============ 时长档 ============ -->
+            <Label Text="时长" FontSize="12" TextColor="{StaticResource Gray500}"/>
+            <FlexLayout x:Name="DurationChips"
+                        Wrap="Wrap" Direction="Row"
+                        JustifyContent="Start" AlignItems="Start"/>
+
+            <!-- ============ 前排 6 片（钉子优先，其余按 7 天频次补位） ============ -->
+            <Label Text="点一下就记下（长按可钉住 / 改名）" FontSize="12"
+                   TextColor="{StaticResource Gray500}" Margin="0,4,0,0"/>
+            <FlexLayout x:Name="FrontPieces"
+                        Wrap="Wrap" Direction="Row"
+                        JustifyContent="Start" AlignItems="Start"/>
+
+            <Button x:Name="MorePiecesBtn"
+                    Text="全部事情片 ▾"
+                    FontSize="12"
+                    HeightRequest="34"
+                    BackgroundColor="Transparent"
+                    TextColor="{StaticResource Gray500}"
+                    BorderWidth="1"
+                    BorderColor="{StaticResource Gray300}"
+                    Clicked="OnToggleAllPiecesClicked"/>
+
+            <VerticalStackLayout x:Name="AllPiecesPanel" IsVisible="False" Spacing="4"/>
+
+            <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
+
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,4"/>
+
+            <!-- ============ 今日列表 ============ -->
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="今天" Style="{StaticResource SubHeadline}"
+                       VerticalOptions="Center"/>
+                <Button Grid.Column="1" x:Name="SyncBtn" Text="同步"
+                        FontSize="12" Padding="14,0" HeightRequest="30"
+                        Clicked="OnSyncClicked"/>
+            </Grid>
+
+            <CollectionView x:Name="TodayList" HeightRequest="320">
+                <CollectionView.EmptyView>
+                    <Label Text="今天还没有记录" HorizontalOptions="Center" Margin="0,16"
+                           TextColor="{StaticResource Gray500}"/>
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Padding="0,7">
+                            <VerticalStackLayout Grid.Column="0" Spacing="1">
+                                <Label Text="{Binding Title}" FontSize="14" LineBreakMode="TailTruncation"/>
+                                <HorizontalStackLayout Spacing="8">
+                                    <Label Text="{Binding Time}" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                                    <Label Text="{Binding GoalText}" FontSize="11" TextColor="#185FA5"/>
+                                    <Label Text="{Binding SyncText}" FontSize="11" TextColor="{Binding SyncColor}"/>
+                                </HorizontalStackLayout>
+                                <Label Text="{Binding NoteText}" FontSize="11" TextColor="{StaticResource Gray500}"
+                                       LineBreakMode="TailTruncation"/>
+                            </VerticalStackLayout>
+
+                            <Label Grid.Column="1" Text="{Binding Minutes}" FontSize="14" VerticalOptions="Center"/>
+
+                            <Button Grid.Column="2" Text="···" FontSize="12" Padding="0"
+                                    WidthRequest="40" HeightRequest="30"
+                                    BackgroundColor="Transparent"
+                                    TextColor="{StaticResource Gray500}"
+                                    Clicked="OnRowMenuClicked"
+                                    CommandParameter="{Binding Id}"/>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,4"/>
+
+            <!-- ============ R3 日复盘：三个按钮，只在想起来的时候评 ============ -->
+            <Label Text="今晚扫一遍：哪段时间值得再来？" Style="{StaticResource SubHeadline}"/>
+            <Label Text="值得 / 一般 / 别做了 · 只在想起来的时候评，不评不算失败"
+                   FontSize="11" TextColor="{StaticResource Gray500}"/>
+            <VerticalStackLayout x:Name="ReviewPanel" Spacing="0"/>
+
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,4"/>
+
+            <!-- ============ 极简统计：今天 / 本周 ============ -->
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="时间去向" Style="{StaticResource SubHeadline}"
+                       VerticalOptions="Center"/>
+                <HorizontalStackLayout Grid.Column="1" Spacing="6">
+                    <Button x:Name="PeriodTodayBtn" Text="今天" FontSize="12"
+                            HeightRequest="30" Padding="12,0" Clicked="OnPeriodTodayClicked"/>
+                    <Button x:Name="PeriodWeekBtn" Text="本周" FontSize="12"
+                            HeightRequest="30" Padding="12,0" Clicked="OnPeriodWeekClicked"/>
+                </HorizontalStackLayout>
+            </Grid>
+
+            <VerticalStackLayout x:Name="StatsPanel" Spacing="6"/>
+
+            <Label x:Name="UnrecordedLabel" Text="" FontSize="12"
+                   TextColor="{StaticResource Gray500}" Margin="0,2,0,0"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

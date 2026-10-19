@@ -40,6 +40,26 @@ namespace PersonalHub.Client.Services
         }
 
         /// <summary>
+        /// 本周：[本周一 00:00, 下周一 00:00)。
+        /// **从周一开始**：C# 的 DayOfWeek 里周日是 0，直接减会整体错一天，
+        /// 而且只在周日那天看得出来。
+        /// </summary>
+        public static (long From, long To) ThisWeek()
+        {
+            var today = StartOfDay(DateTimeOffset.UtcNow);
+            var monday = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+            return (monday.ToUnixTimeMilliseconds(), monday.AddDays(7).ToUnixTimeMilliseconds());
+        }
+
+        /// <summary>本月：[本月 1 日 00:00, 下月 1 日 00:00)。</summary>
+        public static (long From, long To) ThisMonth()
+        {
+            var local = DateTimeOffset.UtcNow.ToOffset(Cst);
+            var first = new DateTimeOffset(local.Year, local.Month, 1, 0, 0, 0, Cst);
+            return (first.ToUnixTimeMilliseconds(), first.AddMonths(1).ToUnixTimeMilliseconds());
+        }
+
+        /// <summary>
         /// 某个时间戳是否属于"今天"（决定这条记录在手机上能不能改）。
         ///
         /// 规则来自需求：今日（无论是否已同步）可编辑；昨天及更早只读，去电脑端改。

@@ -265,3 +265,238 @@ message TrendResponse {
     optional double total = 2;
     optional double daily_avg = 3;
 }
+// =====================
+// 时间块服务（R2）
+// =====================
+// 与账单 / 事件反思并列的第三类「可同步记录」，但语义完全不同：
+//   账单   = 钱的一次流出/流入（时点）
+//   事件反思 = 一件值得深挖的事（9 段长文本）
+//   时间块 = 一段连续的投入（时长档，绝大多数只有一个 piece_code）
+//
+// 为什么单独一张表而不是并进 things：
+//   时间块一天 6~10 条、零打字；事件反思一周 0~2 条、9 段。
+//   合成一张表后每个统计查询都要多带一个 kind 条件，忘一次就串数据。
+//   （详见 需求文档/事件时间块与OPDCA-v0.1.md §4.7）
+service BlockService {
+    rpc UploadBlocks (UploadBlocksRequest) returns (UploadBlocksResponse);
+    // 手机端拉最近 30 天做镜像；管理端做区间查询。
+    // include_deleted 默认 false：默认值必须是「安全值」。
+    rpc ListBlocks (ListBlocksRequest) returns (BlockList);
+    // 按片聚合的统计（today / week / month），区间由服务端算并回传，
+    // 否则手机和服务端会各算一遍，迟早出现"手机说本周 40 小时、网页说 38 小时"。
+    rpc GetPieceStats (PieceStatsRequest) returns (PieceStatsResponse);
+}
+
+// 时间块。
+// 关键：**除了 piece_code，其余字段全部可空**（半条记录也要能存）。
+// 旧事件表单正是死在"全必填"上，这里从协议层就放开。
+message Block {
+    optional string id = 1;
+    optional string piece_code = 2;      // 事情片代号（code 生成后不改，显示名可改）
+    optional int64 occurred_at = 3;      // 这段投入归到哪一天的哪一刻（Unix 毫秒，固定 UTC+8 归日）
+    optional int32 duration_min = 4;     // 时长（分钟）；0 = 还没填，也合法
+    optional string goal_id = 5;         // 归属目标；空 = 没归（不报错）
+    optional string note = 6;            // 备注（选填，极少用）
+    optional int32 worth = 7 [default = 0];   // 复盘：0 未评 / 1 值得 / 2 一般 / 3 别做
+    optional string lesson = 8;          // 只在「值得」时问一句
+    optional string plan_id = 9;         // R4 的计划关联
+    optional int32 anomaly = 10 [default = 0]; // 0 正常 / 1 跨天或超长待确认（R2.5 计时用）
+    optional int32 mood = 11 [default = 0];    // 本版不采集，字段先留着
+    optional int64 started_at = 12;      // R2.5 计时：开始
+    optional int64 ended_at = 13;        // R2.5 计时：结束
+    optional int64 created_at = 14;
+    optional int64 updated_at = 15;      // 版本比较；0 = 未知版本，服务端直接接受
+    optional bool deleted = 16 [default = false];
+}
+
+message UploadBlocksRequest {
+    repeated Block blocks = 1;
+}
+
+message UploadBlocksResponse {
+    optional int32 accepted_count = 1 [default = 0];
+    repeated string failed_ids = 2;
+    optional string error_msg = 3;
+}
+
+message ListBlocksRequest {
+    optional int64 from = 1;                             // 含（Unix 毫秒）
+    optional int64 to = 2;                               // 不含（Unix 毫秒）
+    optional bool include_deleted = 3 [default = false];  // 镜像同步必须显式传 true
+    optional string goal_id = 4;                         // 空 = 全部目标
+    optional string piece_code = 5;                      // 空 = 全部片
+    optional int32 limit = 6 [default = 0];
+}
+
+message BlockList {
+    repeated Block blocks = 1;
+}
+
+message PieceStatsRequest {
+    // today | week | month（空/无法识别时按 today）
+    optional string period = 1;
+}
+
+message PieceSlice {
+    optional string piece_code = 1;
+    optional int32 minutes = 2;
+    optional int32 count = 3;
+}
+
+message PieceStatsResponse {
+    optional string period = 1;
+    optional int64 range_start = 2;
+    optional int64 range_end = 3;
+    optional int32 total_minutes = 4;       // 区间总分钟数（今天 1440 / 本周已过 / 本月已过）
+    optional int32 covered_minutes = 5;     // 已记录分钟数
+    optional int32 unrecorded_minutes = 6;  // total - covered，钳制到 >= 0
+    repeated PieceSlice pieces = 7;         // 按分钟降序
+    optional int64 generated_at = 8;
+}
+
+// =====================
+// 目标服务（R2）
+// =====================
+// 目标层薄到只有四样东西：名字、状态、一条下一步、当前标记。
+// 其余（累计投入、最后活动、四周趋势）**全部是查询结果，不存字段** ——
+// 存了就会在删块 / 改归属后永久错掉，而且错得看不出来。
+service GoalService {
+    rpc UploadGoals (UploadGoalsRequest) returns (UploadGoalsResponse);
+    rpc ListGoals (Empty) returns (GoalList);
+}
+
+message Goal {
+    optional string id = 1;
+    optional string title = 2;
+    // 0 进行中 / 1 暂停 / 2 完成 / 3 放弃
+    optional int32 status = 3 [default = 0];
+    optional string next_step = 4;       // 「一条下一步」，不是清单；可空
+    optional bool is_current = 5 [default = false]; // 录入时新块默认归它（全局最多一个）
+    optional int64 started_at = 6;
+    optional int64 created_at = 7;
+    optional int64 updated_at = 8;
+    optional bool deleted = 9 [default = false];
+
+    // ---- 以下是 ListGoals 补上的计算值，客户端不要回传 ----
+    optional int32 total_minutes = 10;   // 该目标全部块的 duration_min 之和
+    optional int64 last_activity_at = 11; // 最后一次有块的时间；0 = 从未
+}
+
+message UploadGoalsRequest {
+    repeated Goal goals = 1;
+}
+
+message UploadGoalsResponse {
+    optional int32 accepted_count = 1 [default = 0];
+    repeated string failed_ids = 2;
+    optional string error_msg = 3;
+}
+
+message GoalList {
+    repeated Goal goals = 1;
+}
+
+// =====================
+// 每日计划（R4）
+// =====================
+// 计划回答"今天想把时间给谁"，一天最多 3 条，隔日作废。
+// 与目标的区别：目标跨月、要打字、一条线；计划只有今天、只点选、一次意图。
+service PlanService {
+    rpc UploadPlans (UploadPlansRequest) returns (UploadPlansResponse);
+    rpc ListPlans (ListPlansRequest) returns (PlanList);
+}
+
+message Plan {
+    optional string id = 1;
+    optional string day = 2;             // yyyy-MM-dd（固定 UTC+8，不用时间戳是为了不可能有时区歧义）
+    optional string piece_code = 3;      // 事情片
+    optional int32 budget_min = 4;       // 预算时长；0 = 没设，也合法
+    optional string goal_id = 5;         // 归属目标，可空
+    optional int64 created_at = 6;
+    optional int64 updated_at = 7;       // 版本比较；0 = 未知版本，直接接受
+    optional bool deleted = 8 [default = false];
+}
+
+message UploadPlansRequest {
+    repeated Plan plans = 1;
+}
+
+message UploadPlansResponse {
+    optional int32 accepted_count = 1 [default = 0];
+    repeated string failed_ids = 2;
+    optional string error_msg = 3;
+}
+
+message ListPlansRequest {
+    optional string day = 1;                              // yyyy-MM-dd；空 = 用 from/to
+    optional int64 from = 2;                              // 含（Unix 毫秒）
+    optional int64 to = 3;                                // 不含
+    optional bool include_deleted = 4 [default = false];
+}
+
+message PlanList {
+    repeated Plan plans = 1;
+}
+
+// =====================
+// 行为模式 / 练习（R5）
+// =====================
+// 回答的是"我对这类事的反应模式"，不是"时间去哪了"。
+// 两层：
+//   Pattern  = 一个模式的拆解（触发 / 旧反应 / 新反应 / 保留的回报），一季度 2~3 个
+//   Practice = 一天 0~1 次的练习记录（只有 result：守住了 or 又回去了）
+// 为什么不合成一张表：前者低频高打字，后者高频零打字。
+//
+// 刻意没有的东西：成功率、连续天数、阶段字段（阶段是系统推断的，客户端可否决）。
+service PatternService {
+    rpc UploadPatterns (UploadPatternsRequest) returns (UploadPatternsResponse);
+    rpc ListPatterns (Empty) returns (PatternList);
+    rpc UploadPractices (UploadPracticesRequest) returns (UploadPracticesResponse);
+    // 按区间拉练习（手机镜像最近 30 天；管理端可按目标/模式查）
+    rpc ListPractices (ListPracticesRequest) returns (PracticeList);
+}
+
+message Pattern {
+    optional string id = 1;
+    optional string title = 2;            // 例：被质疑时不立刻反驳
+    optional string trigger = 3;          // 触发场景
+    optional string old_response = 4;     // 旧自动反应
+    optional string new_response = 5;     // 新反应（必填：它是要练的那个动作）
+    optional string reward_kept = 6;      // 保留的回报（不是要消灭的东西）
+    optional int32 status = 7 [default = 0]; // 0 活跃 / 1 暂停 / 2 已自动化 / 3 放弃
+    optional int64 created_at = 8;
+    optional int64 updated_at = 9;
+    optional bool deleted = 10 [default = false];
+}
+
+message Practice {
+    optional string id = 1;
+    optional string pattern_id = 2;
+    optional int32 result = 3;            // 1 守住了（新反应）/ 0 又回去了（旧反应）
+    optional int64 occurred_at = 4;       // 默认"今天"，可改；归因反查靠它
+    optional int64 created_at = 5;
+    optional int64 updated_at = 6;
+    optional bool deleted = 7 [default = false];
+}
+
+message UploadPatternsRequest { repeated Pattern patterns = 1; }
+message UploadPatternsResponse {
+    optional int32 accepted_count = 1 [default = 0];
+    repeated string failed_ids = 2;
+    optional string error_msg = 3;
+}
+message PatternList { repeated Pattern patterns = 1; }
+
+message UploadPracticesRequest { repeated Practice practices = 1; }
+message UploadPracticesResponse {
+    optional int32 accepted_count = 1 [default = 0];
+    repeated string failed_ids = 2;
+    optional string error_msg = 3;
+}
+message ListPracticesRequest {
+    optional string pattern_id = 1;       // 空 = 全部
+    optional int64 from = 2;
+    optional int64 to = 3;
+    optional bool include_deleted = 4 [default = false];
+}
+message PracticeList { repeated Practice practices = 1; }

@@ -1,134 +1,55 @@
-using System.ComponentModel;
 using PersonalHub.Client.Data;
 
 namespace PersonalHub.Client.Services
 {
     /// <summary>
-    /// 「记录」目录里的一项 = 一种可以录入的记录类型。
+    /// 「记录」Tab 的目录：往库里写什么。
     ///
-    /// 这是导航重构的核心：底部 Tab **不按记录类型分**，只分「概览 / 记录」两项。
-    /// 类型一律挂在这个目录里，所以以后加"习惯 / 体重 / 阅读"，
-    /// 只需要在 <see cref="RecordCatalog.Build"/> 里加一条、在 AppShell 注册一个路由，
-    /// **不用碰底部导航**——底部一排最多也就放得下 4~5 个，按类型分会很快加不下。
-    /// </summary>
-    public sealed class RecordTypeItem : INotifyPropertyChanged
-    {
-        private string _summary = string.Empty;
-        private string _badge = string.Empty;
-
-        public RecordTypeItem(
-            string key,
-            string title,
-            string subtitle,
-            string icon,
-            string route,
-            Func<Task<string?>>? summaryProvider = null,
-            Func<Task<int>>? pendingProvider = null)
-        {
-            Key = key;
-            Title = title;
-            Subtitle = subtitle;
-            Icon = icon;
-            Route = route;
-            SummaryProvider = summaryProvider;
-            PendingProvider = pendingProvider;
-        }
-
-        /// <summary>稳定标识（日志/埋点用，不参与界面）。</summary>
-        public string Key { get; }
-
-        public string Title { get; }
-
-        /// <summary>一句话说明，让人在目录里就知道这类记的是什么。</summary>
-        public string Subtitle { get; }
-
-        /// <summary>用 emoji 而不是图片：省一套图标资源，也不用为深色模式准备两套。</summary>
-        public string Icon { get; }
-
-        /// <summary>Shell 路由（AppShell 里注册）。</summary>
-        public string Route { get; }
-
-        /// <summary>副标题下面那行小字，例如"今日支出 ¥12.30"。返回 null = 不显示。</summary>
-        public string SummaryText => _summary;
-
-        public bool HasSummary => _summary.Length > 0;
-
-        /// <summary>右上角徽标，例如"3 条待同步"。</summary>
-        public string BadgeText => _badge;
-
-        public bool HasBadge => _badge.Length > 0;
-
-        internal Func<Task<string?>>? SummaryProvider { get; }
-
-        internal Func<Task<int>>? PendingProvider { get; }
-
-        /// <summary>
-        /// 刷新小字与徽标。**故意吞掉异常**：目录页是"入口"，某个类型的本地库读失败
-        /// 不该让整个目录打不开——那一项只是少行小字而已。
-        /// </summary>
-        public async Task RefreshAsync()
-        {
-            string summary = string.Empty;
-            string badge = string.Empty;
-
-            try
-            {
-                if (SummaryProvider is not null)
-                {
-                    // ConfigureAwait(true)：改的是绑定到界面的属性，必须回 UI 线程
-                    summary = await SummaryProvider().ConfigureAwait(true) ?? string.Empty;
-                }
-
-                if (PendingProvider is not null)
-                {
-                    int pending = await PendingProvider().ConfigureAwait(true);
-                    badge = pending > 0 ? $"{pending} 条待同步" : string.Empty;
-                }
-            }
-            catch
-            {
-                // 读不到就当作"没有额外信息"，不影响点进去录入
-            }
-
-            Set(ref _summary, summary, nameof(SummaryText), nameof(HasSummary));
-            Set(ref _badge, badge, nameof(BadgeText), nameof(HasBadge));
-        }
-
-        private void Set(ref string field, string value, string textProp, string boolProp)
-        {
-            if (field == value) return;
-
-            field = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(textProp));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(boolProp));
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-    }
-
-    /// <summary>
-    /// 记录类型目录 —— 新增一种记录类型，只改这里（+ 一个路由 + 一个页面）。
+    /// 新增一种记录类型，只改这里（+ AppShell 一行路由 + MauiProgram 一行注册 + 一个录入页）。
+    /// 底部导航永远不用动 —— 这也是为什么 Tab 只有「概览 / 记录」两项。
     ///
-    /// 为什么用"静态方法 + 参数注入"而不是注册成 DI 服务：
-    /// 目录项各自要读自己的 Store（账单表 / 事件表），而这些 Store 是闭合泛型、
-    /// 类型不同；写成静态构建方法最直白，也不用为每种组合再登记一次容器。
+    /// R2 加了第三项「时间块」。三项的动机刻意不重叠，用户不会犹豫该点哪个：
+    ///   账单     → 钱出去了
+    ///   时间块   → 刚才那段时间去哪了
+    ///   事件反思 → 有一件事值得深挖
+    /// 目标不在这里：它不是"记录"，是归属容器，入口在
+    ///   ① 时间块页顶部（快速切当前目标）
+    ///   ② 概览目录（看"我在推进哪几条线"）
     /// </summary>
     public static class RecordCatalog
     {
         /// <summary>账单录入页路由。</summary>
         public const string ExpenseRoute = "entry/expense";
 
-        /// <summary>事件反思录入页路由。</summary>
+        /// <summary>事件反思录入页路由（9 段，低频深写）。</summary>
         public const string ThingRoute = "entry/thing";
 
-        public static List<RecordTypeItem> Build(
+        /// <summary>时间块录入页路由（R2 主入口）。</summary>
+        public const string BlockRoute = "entry/block";
+
+        /// <summary>行为模式列表路由（R5）。</summary>
+        public const string PatternRoute = "pattern/list";
+
+        /// <summary>行为模式详情路由（带 ?id=）。</summary>
+        public const string PatternDetailRoute = "pattern/detail";
+
+        /// <summary>目标列表路由。</summary>
+        public const string GoalRoute = "goal/list";
+
+        /// <summary>目标详情路由（带 ?id=）。</summary>
+        public const string GoalDetailRoute = "goal/detail";
+
+        /// <summary>回顾页（三个数 + 停滞目标 + 奖励自决）。</summary>
+        public const string QuarterReviewRoute = "goal/review";
+
+        public static List<DirectoryItem> Build(
             LocalRecordStore<LocalRecord> expenses,
-            LocalRecordStore<ThingRecord> things)
+            LocalRecordStore<ThingRecord> things,
+            LocalRecordStore<LocalBlock> blocks)
         {
-            return new List<RecordTypeItem>
+            return new List<DirectoryItem>
             {
                 new(
-                    key: "expense",
                     title: "账单",
                     subtitle: "支出 / 收入，随手记一笔",
                     icon: "💰",
@@ -147,10 +68,27 @@ namespace PersonalHub.Client.Services
                     },
                     pendingProvider: expenses.CountUnsyncedAsync),
 
+                // 时间块放第二项：它是唯一一个"一天点 6~10 次"的入口，
+                // 位置越靠上，越不用找。
                 new(
-                    key: "thing",
+                    title: "时间块",
+                    subtitle: "刚才那段时间去哪了",
+                    icon: "⏱",
+                    route: BlockRoute,
+                    summaryProvider: async () =>
+                    {
+                        var (from, to) = Period.Today();
+                        var rows = await blocks.GetByRangeAsync(from, to).ConfigureAwait(false);
+                        if (rows.Count == 0) return null;
+
+                        int minutes = rows.Sum(r => Math.Max(0, r.DurationMin));
+                        return $"今天已记 {rows.Count} 条 · 共 {BlockEntryPage.FormatMinutes(minutes)}";
+                    },
+                    pendingProvider: blocks.CountUnsyncedAsync),
+
+                new(
                     title: "事件反思",
-                    subtitle: "发生了什么、我的情绪与反思",
+                    subtitle: "想深挖一件事时用（9 段，不是日常入口）",
                     icon: "📝",
                     route: ThingRoute,
                     summaryProvider: async () =>
@@ -160,9 +98,15 @@ namespace PersonalHub.Client.Services
                         return rows.Count == 0 ? null : $"今日已记 {rows.Count} 条";
                     },
                     pendingProvider: things.CountUnsyncedAsync),
+
+                new(
+                    title: "行为模式",
+                    subtitle: "在练什么：触发 / 旧反应 / 新反应（一季度两三个）",
+                    icon: "🌱",
+                    route: PatternRoute),
             };
         }
 
-        private static string Money(long cents) => "¥" + (cents / 100m).ToString("0.00");
+        internal static string Money(long cents) => "¥" + (cents / 100m).ToString("0.00");
     }
 }

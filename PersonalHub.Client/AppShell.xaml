@@ -20,7 +20,7 @@
     <TabBar>
         <ShellContent
             Title="概览"
-            ContentTemplate="{DataTemplate local:MainPage}"
+            ContentTemplate="{DataTemplate local:OverviewHubPage}"
             Route="overview" />
         <ShellContent
             Title="记录"

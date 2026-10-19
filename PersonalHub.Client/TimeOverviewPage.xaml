@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.TimeOverviewPage"
+             Title="时间概览">
+
+    <RefreshView x:Name="Refresher" Refreshing="OnRefreshing">
+        <ScrollView>
+            <VerticalStackLayout Padding="20,16" Spacing="14">
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label
+                        x:Name="ConnLabel"
+                        Grid.Column="1"
+                        Text="连接中…"
+                        FontSize="11"
+                        TextColor="{StaticResource Gray500}"
+                        VerticalOptions="Center"/>
+                </Grid>
+
+                <!-- 三个档位。不做自定义区间：时间块的用途是"看清这段日子怎么过的"，
+                     不是做财务对账，多一个日期选择器只多一次操作。 -->
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+                    <Button x:Name="TodayBtn" Text="今日" FontSize="13" Padding="0" HeightRequest="34"
+                            Clicked="OnPeriodClicked" CommandParameter="today"/>
+                    <Button x:Name="WeekBtn" Grid.Column="1" Text="本周" FontSize="13" Padding="0" HeightRequest="34"
+                            Clicked="OnPeriodClicked" CommandParameter="week"/>
+                    <Button x:Name="MonthBtn" Grid.Column="2" Text="本月" FontSize="13" Padding="0" HeightRequest="34"
+                            Clicked="OnPeriodClicked" CommandParameter="month"/>
+                </Grid>
+
+                <!-- 大数字：已记录 + 未记录。未记录不是缺口提示，是这个系统最值钱的一栏。 -->
+                <Border Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="16,14">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="已记录" FontSize="12" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="RecordedLabel" Text="0 分钟" FontSize="32" FontAttributes="Bold"/>
+                        <ProgressBar x:Name="CoverBar" Progress="0" HeightRequest="6" Margin="0,4"/>
+                        <Label x:Name="UnrecordedLabel" Text=" " FontSize="12" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="RangeLabel" Text=" " FontSize="12" TextColor="{StaticResource Gray500}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 时间去向 -->
+                <VerticalStackLayout x:Name="PieceSection" Spacing="10" IsVisible="False">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="时间去哪了" Style="{StaticResource SubHeadline}" VerticalOptions="Center"/>
+                        <Label x:Name="PieceHint" Grid.Column="1" Text="" FontSize="11"
+                               TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
+                    </Grid>
+                    <VerticalStackLayout x:Name="PieceRows" Spacing="10"/>
+                </VerticalStackLayout>
+
+                <!-- 目标累计投入（全量，来自服务端；本地只有 30 天，算不出来） -->
+                <VerticalStackLayout x:Name="GoalSection" Spacing="10" IsVisible="False">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="目标累计投入" Style="{StaticResource SubHeadline}" VerticalOptions="Center"/>
+                        <Label x:Name="GoalHint" Grid.Column="1" Text="全部时间，不限档位" FontSize="11"
+                               TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
+                    </Grid>
+                    <VerticalStackLayout x:Name="GoalRows" Spacing="8"/>
+                </VerticalStackLayout>
+
+                <!-- 空态 -->
+                <VerticalStackLayout x:Name="EmptySection" Spacing="8" IsVisible="False">
+                    <Label x:Name="EmptyLabel" Text="这段时间还没有时间块"
+                           HorizontalOptions="Center" TextColor="{StaticResource Gray500}"/>
+                    <Button Text="去记一条" FontSize="13" HorizontalOptions="Center"
+                            Padding="18,0" HeightRequest="34" Clicked="OnGoRecordClicked"/>
+                </VerticalStackLayout>
+
+                <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,4"/>
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label x:Name="FooterLabel" Text=" " FontSize="11" TextColor="{StaticResource Gray500}"
+                           LineBreakMode="WordWrap" VerticalOptions="Center"/>
+                    <Button x:Name="RefreshBtn" Grid.Column="1" Text="刷新" FontSize="12"
+                            Padding="14,0" HeightRequest="32" Clicked="OnRefreshClicked"/>
+                </Grid>
+
+            </VerticalStackLayout>
+        </ScrollView>
+    </RefreshView>
+
+</ContentPage>

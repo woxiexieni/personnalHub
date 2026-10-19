@@ -1,0 +1,56 @@
+@page
+@model PersonalHub.Server.Pages.Goals.EditModel
+@{
+    ViewData["Title"] = Model.IsNew ? "新建目标" : "编辑目标";
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>@ViewData["Title"]</h2>
+        <span class="hint">目标只有四样东西：名字、状态、一条下一步、是否当前</span>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="err">@Model.Error</div>
+    }
+
+    <form method="post">
+        <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="RowUpdatedAt" />
+
+        <div class="field">
+            <label>目标名称</label>
+            <input asp-for="Title" maxlength="60" placeholder="比如：做 PersonalHub" />
+        </div>
+
+        <div class="field">
+            <label>下一步（一句话，可空）</label>
+            <input asp-for="NextStep" maxlength="100" placeholder="下次打开这个目标，从哪里继续？" />
+            <span class="hint">做完就换，只留一条。它不是任务清单。</span>
+        </div>
+
+        <div class="field">
+            <label>状态</label>
+            <select asp-for="Status">
+                <option value="0" selected="@(Model.Status == 0)">进行中</option>
+                <option value="1" selected="@(Model.Status == 1)">已暂停（不算进 3 个活跃名额）</option>
+                <option value="2" selected="@(Model.Status == 2)">已完成</option>
+                <option value="3" selected="@(Model.Status == 3)">已放弃</option>
+            </select>
+        </div>
+
+        <div class="field">
+            <label>&nbsp;</label>
+            <label class="hint" style="display:flex;align-items:center;gap:6px;min-height:36px">
+                <input type="checkbox" asp-for="IsCurrent" />
+                设为当前目标（之后记的时间块默认归它）
+            </label>
+        </div>
+
+        <div class="filters">
+            <button class="btn primary" type="submit">保存</button>
+            <a class="btn" href="/goals">取消</a>
+        </div>
+    </form>
+</div>

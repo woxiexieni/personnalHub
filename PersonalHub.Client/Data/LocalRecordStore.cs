@@ -223,12 +223,7 @@ namespace PersonalHub.Client.Data
             return await _db.ExecuteScalarAsync<U>(sql, args).ConfigureAwait(false);
         }
 
-        private static bool IsDeleted(T row) => row switch
-        {
-            LocalRecord r => r.Deleted,
-            ThingRecord t => t.Deleted,
-            _ => false,
-        };
+        private static bool IsDeleted(T row) => row.Deleted;
 
         /// <summary>sqlite_master / PRAGMA table_info 的通用返回行。</summary>
         private sealed class SqlNameRow

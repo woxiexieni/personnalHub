@@ -492,3 +492,9 @@ personalhub.db3-shm
 
 # 发布产物（scripts 里 *-release / *-publish 的输出目录：服务端 exe、安卓 apk），不入库
 out/
+# 本机临时测试目录（探针用，切勿提交）
+.tmp-test/
+.tmp-build/
+
+# 数据库快照（本地备份，不提交）
+backups/

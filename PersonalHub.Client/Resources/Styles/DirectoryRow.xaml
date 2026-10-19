@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<?xaml-comp compile="true" ?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:svc="clr-namespace:PersonalHub.Client.Services">
+
+    <!--
+        「目录行」——两个目录页（概览 / 记录）共用同一份模板。
+
+        抽出来的理由不是省几行 XAML，而是：以后加第三种入口（比如"设置"目录）时
+        样式、点击区域、小字/徽标的排布不需要再实现一次，
+        改一处两个页面同时生效 —— 界面也算"可复用资产"。
+
+        颜色用 DynamicResource：这份字典被 App.xaml 合并，StaticResource
+        在字典加载期的可见范围依赖合并顺序，用 Dynamic 更稳（模板只在列表里用几次，开销可忽略）。
+    -->
+    <DataTemplate x:Key="DirectoryRowTemplate" x:DataType="svc:DirectoryItem">
+        <Border
+            Stroke="{DynamicResource Gray300}"
+            StrokeThickness="1"
+            Padding="14,12"
+            Margin="0,0,0,10">
+            <Border.GestureRecognizers>
+                <TapGestureRecognizer Command="{Binding OpenCommand}" />
+            </Border.GestureRecognizers>
+
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <Border
+                    Grid.Column="0"
+                    WidthRequest="42"
+                    HeightRequest="42"
+                    StrokeThickness="0"
+                    BackgroundColor="{DynamicResource Gray100}"
+                    StrokeShape="RoundRectangle 21"
+                    VerticalOptions="Center">
+                    <Label
+                        Text="{Binding Icon}"
+                        FontSize="20"
+                        HorizontalOptions="Center"
+                        VerticalOptions="Center"/>
+                </Border>
+
+                <VerticalStackLayout
+                    Grid.Column="1"
+                    Spacing="2"
+                    VerticalOptions="Center">
+                    <Label
+                        Text="{Binding Title}"
+                        FontSize="16"
+                        FontAttributes="Bold"/>
+                    <Label
+                        Text="{Binding Subtitle}"
+                        FontSize="12"
+                        TextColor="{DynamicResource Gray500}"
+                        LineBreakMode="WordWrap"/>
+                    <Label
+                        Text="{Binding SummaryText}"
+                        IsVisible="{Binding HasSummary}"
+                        FontSize="11"
+                        Margin="0,2,0,0"/>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout
+                    Grid.Column="2"
+                    Spacing="0"
+                    HorizontalOptions="End"
+                    VerticalOptions="Center">
+                    <Label
+                        Text="{Binding BadgeText}"
+                        IsVisible="{Binding HasBadge}"
+                        FontSize="10"
+                        TextColor="{DynamicResource Gray600}"
+                        HorizontalOptions="End"/>
+                    <Label
+                        Text="&gt;"
+                        FontSize="20"
+                        TextColor="{DynamicResource Gray400}"
+                        HorizontalOptions="End"/>
+                </VerticalStackLayout>
+            </Grid>
+        </Border>
+    </DataTemplate>
+
+</ResourceDictionary>

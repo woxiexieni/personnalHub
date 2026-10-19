@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:svc="clr-namespace:PersonalHub.Client.Services"
              x:Class="PersonalHub.Client.RecordHubPage"
              Title="记录">
 
@@ -26,76 +25,10 @@
                     VerticalOptions="Center"/>
             </Grid>
 
-            <!-- ============ 类型目录（项由后台按 RecordCatalog 生成） ============ -->
-            <VerticalStackLayout x:Name="TypeRows" Spacing="10">
-                <BindableLayout.ItemTemplate>
-                    <DataTemplate x:DataType="svc:RecordTypeItem">
-                        <Border
-                            Stroke="{StaticResource Gray300}"
-                            StrokeThickness="1"
-                            Padding="14,12">
-                            <Border.GestureRecognizers>
-                                <TapGestureRecognizer Tapped="OnTypeTapped"/>
-                            </Border.GestureRecognizers>
-
-                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                                <Border
-                                    Grid.Column="0"
-                                    WidthRequest="42"
-                                    HeightRequest="42"
-                                    StrokeThickness="0"
-                                    BackgroundColor="{StaticResource Gray100}"
-                                    StrokeShape="RoundRectangle 21"
-                                    VerticalOptions="Center">
-                                    <Label
-                                        Text="{Binding Icon}"
-                                        FontSize="20"
-                                        HorizontalOptions="Center"
-                                        VerticalOptions="Center"/>
-                                </Border>
-
-                                <VerticalStackLayout
-                                    Grid.Column="1"
-                                    Spacing="2"
-                                    VerticalOptions="Center">
-                                    <Label
-                                        Text="{Binding Title}"
-                                        FontSize="16"
-                                        FontAttributes="Bold"/>
-                                    <Label
-                                        Text="{Binding Subtitle}"
-                                        FontSize="12"
-                                        TextColor="{StaticResource Gray500}"
-                                        LineBreakMode="WordWrap"/>
-                                    <Label
-                                        Text="{Binding SummaryText}"
-                                        IsVisible="{Binding HasSummary}"
-                                        FontSize="11"
-                                        Margin="0,2,0,0"/>
-                                </VerticalStackLayout>
-
-                                <VerticalStackLayout
-                                    Grid.Column="2"
-                                    Spacing="0"
-                                    HorizontalOptions="End"
-                                    VerticalOptions="Center">
-                                    <Label
-                                        Text="{Binding BadgeText}"
-                                        IsVisible="{Binding HasBadge}"
-                                        FontSize="10"
-                                        TextColor="{StaticResource Gray600}"
-                                        HorizontalOptions="End"/>
-                                    <Label
-                                        Text="&gt;"
-                                        FontSize="20"
-                                        TextColor="{StaticResource Gray400}"
-                                        HorizontalOptions="End"/>
-                                </VerticalStackLayout>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </BindableLayout.ItemTemplate>
-            </VerticalStackLayout>
+            <!-- ============ 类型目录（项由 RecordCatalog 生成，行模板与概览页共用） ============ -->
+            <VerticalStackLayout
+                x:Name="TypeRows"
+                BindableLayout.ItemTemplate="{StaticResource DirectoryRowTemplate}"/>
 
             <!-- ============ 说明：这段是给"三个月后的自己"看的 ============ -->
             <Label

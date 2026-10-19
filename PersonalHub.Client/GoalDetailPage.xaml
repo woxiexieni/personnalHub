@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.GoalDetailPage"
+             Title="目标详情">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20,14" Spacing="14">
+
+            <!-- ============ 主体一：标题与状态（状态改动收进底部弹层） ============ -->
+            <Label x:Name="TitleLabel" Text="" FontSize="22" FontAttributes="Bold"/>
+            <Label x:Name="StateLabel" Text="" FontSize="12" TextColor="{StaticResource Gray500}"/>
+
+            <!-- ============ 主体二：三样数字（全部算出来的） ============ -->
+            <Border Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="14,12">
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                    <VerticalStackLayout Grid.Row="0" Grid.Column="0" Spacing="1">
+                        <Label Text="累计投入" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="TotalLabel" Text="—" FontSize="20" FontAttributes="Bold"/>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="1">
+                        <Label Text="最后活动" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="LastLabel" Text="—" FontSize="20" FontAttributes="Bold"/>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="4">
+                        <Label Text="最近四周" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        <Grid x:Name="WeekBars" ColumnDefinitions="*,*,*,*" ColumnSpacing="10"
+                              HeightRequest="64"/>
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+
+            <!-- 两个「方向 / 节律」数：全部来自最近 30 天的块，不存字段 -->
+            <Border Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="14,10">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <VerticalStackLayout Grid.Column="0" Spacing="1">
+                        <Label Text="值得率" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="WorthRateLabel" Text="—" FontSize="20" FontAttributes="Bold"/>
+                        <Label x:Name="WorthSubLabel" Text="最近 30 天 · 只算已评的"
+                               FontSize="10" TextColor="{StaticResource Gray500}"/>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1" Spacing="1">
+                        <Label Text="活跃周数" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        <Label x:Name="ActiveWeeksLabel" Text="—" FontSize="20" FontAttributes="Bold"/>
+                        <Label Text="最近四周里有记录的" FontSize="10"
+                               TextColor="{StaticResource Gray500}"/>
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+
+            <!-- ============ 主体三：一条下一步 ============ -->
+            <Label Text="下一步" Style="{StaticResource SubHeadline}"/>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Entry x:Name="NextStepEntry" Grid.Column="0"
+                       Placeholder="下次打开这个目标，从哪里继续？"/>
+                <Button Grid.Column="1" Text="保存" WidthRequest="64" HeightRequest="38"
+                        Clicked="OnSaveNextStepClicked"/>
+            </Grid>
+            <Label Text="做完就换，只留一条。" FontSize="11" TextColor="{StaticResource Gray500}"/>
+
+            <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
+
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}"/>
+
+            <!-- ============ 主体四：演进（一长串时间片，不是百分比） ============ -->
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="演进" Style="{StaticResource SubHeadline}"
+                       VerticalOptions="Center"/>
+                <Label Grid.Column="1" x:Name="TimelineHint" Text="" FontSize="11"
+                       TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
+            </Grid>
+            <Label Text="这个目标由下面这一串时间片组成：横轴就是时间，颜色是复盘评价"
+                   FontSize="11" TextColor="{StaticResource Gray500}"/>
+            <VerticalStackLayout x:Name="TimelinePanel" Spacing="0"/>
+
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}"/>
+
+            <!-- ============ 低频动作全部收进这一行（暂停/完成/放弃/改名/设当前/归入/删除） ============ -->
+            <Button x:Name="StatusRowBtn"
+                    Text="状态 · 改状态 ▸"
+                    HeightRequest="40"
+                    BackgroundColor="Transparent"
+                    BorderWidth="1"
+                    BorderColor="{StaticResource Gray300}"
+                    TextColor="{StaticResource Gray500}"
+                    Clicked="OnStatusRowClicked"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

@@ -1,8 +1,14 @@
 @page
 @model IndexModel
+@using personalHub.Server.Data
 @{
     ViewData["Title"] = "概览";
     var month = Model.Month;
+}
+
+@if (Model.BackupWarning is string warn)
+{
+    <div class="err">@warn · <a href="/backup">去备份页看看 →</a></div>
 }
 
 <div class="card">
@@ -93,6 +99,56 @@
         </div>
     }
 </div>
+
+<div class="card">
+    <div class="card-head">
+        <h2>时间 · 今天</h2>
+        <a class="btn sm" href="/blocks">时间块 →</a>
+    </div>
+    <div class="kpis">
+        <div class="kpi">
+            <div class="label">已记录</div>
+            <div class="num balance">@Pieces.Minutes(Model.TodayTime.RecordedMinutes)</div>
+            <div class="sub">@Model.TodayTime.Count 条</div>
+        </div>
+        <div class="kpi">
+            <div class="label">未记录</div>
+            <div class="num expense">@Pieces.Minutes(Model.TodayTime.UnrecordedMinutes)</div>
+            <div class="sub">已过去 @Pieces.Minutes(Model.TodayTime.ElapsedMinutes)</div>
+        </div>
+        <div class="kpi">
+            <div class="label">本周</div>
+            <div class="num income">@Pieces.Minutes(Model.WeekTime.RecordedMinutes)</div>
+            <div class="sub">覆盖率 @Model.WeekTime.CoverPct%（本周已过去）</div>
+        </div>
+    </div>
+    <div class="hint" style="margin-top:12px">
+        未记录这一栏是整页最有信息量的数字：人不会去记的，恰恰是浪费时间的那几小时。
+    </div>
+</div>
+
+@if (Model.TodayTime.Pieces.Count > 0)
+{
+    <div class="card">
+        <div class="card-head">
+            <h2>今天的时间去哪了</h2>
+            <span class="hint">按事情片，占比分母是今天已记录时间</span>
+        </div>
+        <div class="rows">
+            @foreach (var p in Model.TodayTime.Pieces.Take(6).Where(x => x.Minutes > 0))
+            {
+                <div class="row">
+                    <div class="name" title="@Pieces.Name(p.PieceCode)">@Pieces.Name(p.PieceCode)</div>
+                    <div class="bar">
+                        <i style="width:@(Model.TodayTime.RecordedMinutes > 0 ? Fmt.Pct(p.Minutes / (double)Model.TodayTime.RecordedMinutes) : "0")%"></i>
+                    </div>
+                    <div class="amt">@Pieces.Minutes(p.Minutes)</div>
+                    <div class="ratio">@(Model.TodayTime.RecordedMinutes > 0 ? Fmt.Pct(p.Minutes / (double)Model.TodayTime.RecordedMinutes) : "0")%</div>
+                </div>
+            }
+        </div>
+    </div>
+}
 
 @if (month.PayMethods.Count > 0)
 {
