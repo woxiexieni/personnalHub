@@ -29,6 +29,7 @@ namespace PersonalHub.Client
             LocalRecordStore<LocalRecord> expenses,
             LocalRecordStore<ThingRecord> things,
             LocalRecordStore<LocalBlock> blocks,
+            LocalRecordStore<LocalIdea> ideas,
             RecordSyncService<LocalRecord> expenseSync,
             RecordSyncService<ThingRecord> thingSync,
             RecordSyncService<LocalBlock> blockSync)
@@ -41,7 +42,7 @@ namespace PersonalHub.Client
 
             // 目录只有几项、且是固定集合 → 用 BindableLayout 而不是 CollectionView。
             // （CollectionView 套在 ScrollView 里测量高度会出问题，这里根本不需要虚拟化。）
-            _types = RecordCatalog.Build(expenses, things, blocks);
+            _types = RecordCatalog.Build(expenses, things, blocks, ideas);
             BindableLayout.SetItemsSource(TypeRows, _types);
         }
 

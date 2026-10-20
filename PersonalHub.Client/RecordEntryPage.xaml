@@ -75,10 +75,13 @@
                 AlignItems="Start"/>
 
             <!-- ============ 备注 ============ -->
-            <Entry
-                x:Name="NoteEntry"
-                Placeholder="备注（选填）"
-                ClearButtonVisibility="WhileEditing"/>
+            <Border Style="{StaticResource FieldBorder}">
+                <Editor
+                    x:Name="NoteEntry"
+                    Style="{StaticResource FieldEditor}"
+                    Placeholder="备注（选填）"
+                    MaxLength="200"/>
+            </Border>
 
             <!-- ============ 时间折叠成一行，默认"现在" ============ -->
             <Grid ColumnDefinitions="Auto,*,*" ColumnSpacing="8">

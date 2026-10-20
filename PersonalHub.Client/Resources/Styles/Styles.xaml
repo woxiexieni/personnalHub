@@ -132,6 +132,40 @@
         </Setter>
     </Style>
 
+    <!--
+        注意：不要再这里加新的 <Style TargetType="Editor">（不带 x:Key 的那个）。
+        上面第 91 行已经有 MAUI 模板自带的隐式 Editor 样式了，隐式样式的键就是类型名
+        "Microsoft.Maui.Controls.Editor"，同一个 ResourceDictionary 里出现两次会在
+        XAML 加载时抛 "A resource with the key ... is already present" —— 编译期不报，
+        一跑就崩。需要别的外观就用带 x:Key 的样式（见下面 FieldEditor）。
+    -->
+
+    <!--
+        多行输入框（短文本就地编辑用）。
+        原来这些位置都是 <Entry>，一行装不下就只看得见尾巴。
+        用法：
+            <Border Style="{StaticResource FieldBorder}">
+                <Editor x:Name="NoteEntry" Style="{StaticResource FieldEditor}" Placeholder="…"/>
+            </Border>
+        Border 是必须的：Editor 在 Android 上没有边框，单放一个透明框看不出可以点。
+    -->
+    <Style x:Key="FieldBorder" TargetType="Border">
+        <Setter Property="Stroke" Value="{StaticResource Gray300}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 8" />
+    </Style>
+
+    <Style x:Key="FieldEditor" TargetType="Editor">
+        <Setter Property="AutoSize" Value="TextChanges" />
+        <Setter Property="MinimumHeightRequest" Value="56" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource White}}" />
+        <!-- 隐式 Editor 样式的 PlaceholderColor 是 Gray200，浅色主题下几乎看不见提示文字 -->
+        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}" />
+    </Style>
+
     <Style TargetType="Frame">
         <Setter Property="HasShadow" Value="False" />
         <Setter Property="BorderColor" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray950}}" />

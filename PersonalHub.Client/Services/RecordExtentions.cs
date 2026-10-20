@@ -234,5 +234,32 @@ namespace Personalhub
             UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
             Deleted = p.Deleted,
         };
+
+        // ============================================================
+        // R6：想法
+        // ============================================================
+
+        public static Idea ToProto(this LocalIdea p) => new()
+        {
+            Id = p.Id,
+            Text = p.Text ?? string.Empty,
+            Kind = p.Kind,
+            GoalId = p.GoalId ?? string.Empty,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt,
+            Deleted = p.Deleted,
+        };
+
+        /// <summary>镜像下载用：不设 Synced（下载 ≠ 已上传）。</summary>
+        public static LocalIdea ToLocalIdea(this Idea p) => new()
+        {
+            Id = p.Id,
+            Text = p.Text ?? string.Empty,
+            Kind = p.Kind,
+            GoalId = p.GoalId ?? string.Empty,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
+            Deleted = p.Deleted,
+        };
     }
 }

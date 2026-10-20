@@ -40,6 +40,9 @@ namespace PersonalHub.Client
             builder.Services.AddSingleton(new LocalRecordStore<LocalPattern>(dbPath));
             builder.Services.AddSingleton(new LocalRecordStore<LocalPractice>(dbPath));
 
+            // R6：想法（原材料仓库，与"行动"无关）
+            builder.Services.AddSingleton(new LocalRecordStore<LocalIdea>(dbPath));
+
             // ===== 上传器：每类记录一个（proto 差异全部关在这里）=====
             builder.Services.AddSingleton<IRecordUploader<LocalRecord>, RecordUploader>();
             builder.Services.AddSingleton<IRecordUploader<ThingRecord>, ThingUploader>();
@@ -48,6 +51,7 @@ namespace PersonalHub.Client
             builder.Services.AddSingleton<IRecordUploader<LocalPlan>, PlanUploader>();
             builder.Services.AddSingleton<IRecordUploader<LocalPattern>, PatternUploader>();
             builder.Services.AddSingleton<IRecordUploader<LocalPractice>, PracticeUploader>();
+            builder.Services.AddSingleton<IRecordUploader<LocalIdea>, IdeaUploader>();
 
             // ===== 同步器：泛型只吃本地模型，所以一个类服务三种记录 =====
             builder.Services.AddSingleton<RecordSyncService<LocalRecord>>();
@@ -57,6 +61,7 @@ namespace PersonalHub.Client
             builder.Services.AddSingleton<RecordSyncService<LocalPlan>>();
             builder.Services.AddSingleton<RecordSyncService<LocalPattern>>();
             builder.Services.AddSingleton<RecordSyncService<LocalPractice>>();
+            builder.Services.AddSingleton<RecordSyncService<LocalIdea>>();
 
             // ===== 缓存层：最近 30 天镜像 + 今日汇总 + 分类 =====
             // 只负责"从服务端拉下来把本地副本对齐"，上传仍然归 RecordSyncService。
@@ -86,6 +91,8 @@ namespace PersonalHub.Client
             builder.Services.AddTransient<QuarterReviewPage>(); // 目标列表 → 回顾（三个数 + 该砍的）
             builder.Services.AddTransient<PatternListPage>();   // 目录 → 行为模式
             builder.Services.AddTransient<PatternDetailPage>(); // 模式列表 → 详情（带 ?id=）
+            builder.Services.AddTransient<IdeaEntryPage>();     // 目录 → 想法（记一条）
+            builder.Services.AddTransient<IdeaListPage>();      // 目录 → 想法库（列表 + 转成目标）
 
             var app = builder.Build();
 
@@ -106,6 +113,7 @@ namespace PersonalHub.Client
             app.Services.GetRequiredService<RecordSyncService<LocalPlan>>().Start();
             app.Services.GetRequiredService<RecordSyncService<LocalPattern>>().Start();
             app.Services.GetRequiredService<RecordSyncService<LocalPractice>>().Start();
+            app.Services.GetRequiredService<RecordSyncService<LocalIdea>>().Start();
 
             return app;
         }

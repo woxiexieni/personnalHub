@@ -1,3 +1,4 @@
+using PersonalHub.Client.Controls;
 using PersonalHub.Client.Services;
 
 namespace PersonalHub.Client
@@ -205,13 +206,13 @@ namespace PersonalHub.Client
                 ColumnSpacing = 8,
             };
 
-            var nameLabel = new Label
+            var nameLabel = TextPeek.Attach(new Label
             {
                 Text = name,
                 FontSize = 13,
                 VerticalOptions = LayoutOptions.Center,
                 LineBreakMode = LineBreakMode.TailTruncation,
-            };
+            });
             var amountLabel = new Label
             {
                 Text = Money(cents),

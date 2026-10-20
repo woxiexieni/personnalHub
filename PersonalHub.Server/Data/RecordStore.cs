@@ -26,7 +26,7 @@ namespace personalHub.Server.Data
         public static SaveResult Success(Record? record) => new() { Ok = true, Record = record };
         public static SaveResult Fail(string error) => new() { Error = error };
         public static SaveResult ConflictWith(Record current) =>
-            new() { Conflict = true, Error = "版本冲突：服务端已有更新的数据", Record = current };
+            new() { Conflict = true, Error = "版本冲突（conflict）：服务端已有更新的数据", Record = current };
     }
 
     /// <summary>管理端列表的一页（含总数，页面要显示"共 N 条"）。</summary>

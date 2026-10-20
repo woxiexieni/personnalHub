@@ -1,0 +1,178 @@
+#requires -Version 5.1
+<#
+    Create the release signing keystore for PersonalHub.
+
+    Outputs (both excluded from git by .gitignore):
+      %USERPROFILE%\.personalhub\personalhub-release.jks
+      PersonalHub.Client\local-signing.props
+
+    Usage:
+      scripts\create-keystore.bat                 interactive (recommended)
+      scripts\create-keystore.bat <password>      non-interactive, for CI
+
+    Why not just keep using the debug keystore:
+      Its password is public ("android"), Play rejects it, and it differs on
+      every machine - so a rebuild would not install over the previous app.
+#>
+
+$ErrorActionPreference = 'Stop'
+
+$ksDir  = Join-Path $env:USERPROFILE '.personalhub'
+$ks     = Join-Path $ksDir 'personalhub-release.jks'
+$props  = Join-Path (Split-Path -Parent $PSScriptRoot) 'PersonalHub.Client\local-signing.props'
+$alias  = 'personalhub'
+
+# Password on the command line means "nobody is watching": never prompt.
+$argPass = if ($args.Count -ge 1 -and $args[0]) { [string]$args[0] } else { $null }
+
+function Say($text) { Write-Output $text }
+
+Say ''
+Say '============================================================'
+Say ' PersonalHub - release signing key'
+Say '============================================================'
+Say ''
+Say " This .jks file is the app's identity on Android:"
+Say '   - every future version must be signed with it, or old installs'
+Say '     cannot upgrade in place (users would have to uninstall first)'
+Say '   - if it is lost, the published app can never be updated again'
+Say '   - keep it out of git, but DO back it up somewhere else'
+Say ''
+
+# ---------------------------------------------------------------- keytool
+$keytool = Get-ChildItem 'C:\Program Files\Android\jdk' -Recurse -Filter 'keytool.exe' -ErrorAction SilentlyContinue |
+           Select-Object -First 1 -ExpandProperty FullName
+if (-not $keytool) {
+    $cmd = Get-Command keytool -ErrorAction SilentlyContinue
+    if ($cmd) { $keytool = $cmd.Source }
+}
+if (-not $keytool) {
+    Say ' [!] keytool.exe not found.'
+    Say '     It ships with the JDK. Usual location:'
+    Say '       C:\Program Files\Android\jdk\jdk-*\jdk*\bin\keytool.exe'
+    Say '     Or install "Android SDK build tools" via Visual Studio Installer.'
+    exit 1
+}
+Say " keytool: $keytool"
+Say ''
+
+# ---------------------------------------------------------------- existing?
+if (Test-Path $ks) {
+    Say ' [!] A keystore already exists:'
+    Say "     $ks"
+    Say ''
+    if ($argPass) {
+        Say '     Non-interactive mode: replacing it (the old key is gone for good).'
+        Say ''
+    }
+    else {
+        Say '     Overwriting it means giving up the ability to update anything'
+        Say '     you already published. Unless this is a real first run, keep it.'
+        Say ''
+        $a = Read-Host ' Overwrite anyway? [y/N]'
+        if ($a -notmatch '^(y|yes)$') {
+            Say ''
+            Say ' Cancelled, nothing changed.'
+            exit 1
+        }
+        Say ''
+    }
+
+    # keytool -genkeypair refuses when the alias already exists, so the old
+    # container has to go first. This is the destructive step, keep it here.
+    Remove-Item $ks -Force
+}
+
+# ---------------------------------------------------------------- password
+$pass = $null
+if ($argPass) {
+    $pass = $argPass
+    if ($pass -notmatch '^[A-Za-z0-9_-]{6,}$') {
+        Say ' [!] password must be 6+ chars: letters, digits, _ or -'
+        exit 1
+    }
+}
+else {
+    while (-not $pass) {
+        $s1 = Read-Host -AsSecureString ' Password (6+ chars, letters/digits/_/-)'
+        $p1 = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($s1))
+        if ($p1 -notmatch '^[A-Za-z0-9_-]{6,}$') {
+            Say '     only letters, digits, _ and -, at least 6 characters.'
+            continue
+        }
+        $s2 = Read-Host -AsSecureString ' Repeat password'
+        $p2 = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($s2))
+        if ($p1 -ne $p2) {
+            Say '     the two passwords differ.'
+            continue
+        }
+        $pass = $p1
+    }
+}
+
+# ---------------------------------------------------------------- generate
+if (-not (Test-Path $ksDir)) { New-Item -ItemType Directory -Path $ksDir | Out-Null }
+
+Say ''
+Say ' Generating keystore...'
+
+$dn = 'CN=PersonalHub, OU=PersonalHub, O=PersonalHub, L=Beijing, ST=Beijing, C=CN'
+& $keytool -genkeypair -v `
+    -keystore $ks `
+    -alias $alias `
+    -keyalg RSA -keysize 2048 -validity 10000 `
+    -storetype PKCS12 `
+    -storepass $pass -keypass $pass `
+    -dname $dn
+
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ks)) {
+    Say ''
+    Say ' [!] keytool failed. Scroll up for its message.'
+    exit 1
+}
+
+# ---------------------------------------------------------------- props
+$xml = @"
+<Project>
+
+  <!--
+    Generated by scripts\create-keystore.bat on $(Get-Date -Format 'yyyy-MM-dd HH:mm').
+    Contains the signing password, therefore excluded from git.
+    Moving machines: copy both this file and the .jks, then fix the path below.
+  -->
+  <PropertyGroup>
+    <AndroidKeyStore>true</AndroidKeyStore>
+    <AndroidSigningKeyStore>$ks</AndroidSigningKeyStore>
+    <AndroidSigningStorePass>$pass</AndroidSigningStorePass>
+    <AndroidSigningKeyAlias>$alias</AndroidSigningKeyAlias>
+    <AndroidSigningKeyPass>$pass</AndroidSigningKeyPass>
+  </PropertyGroup>
+
+</Project>
+"@
+
+[IO.File]::WriteAllText($props, $xml, (New-Object Text.UTF8Encoding($false)))
+
+Say ''
+Say '============================================================'
+Say ' [OK] done'
+Say '============================================================'
+Say ''
+Say " keystore : $ks"
+Say " signing  : $props"
+Say " alias    : $alias"
+Say ''
+Say ' Release builds pick this up automatically: the csproj imports'
+Say ' local-signing.props when it exists, and falls back to debug.keystore'
+Say ' when it does not.'
+Say ''
+Say ' DO THIS NOW: back up the .jks to somewhere outside the repo.'
+Say ' Losing it means this app can never be updated again.'
+Say ''
+Say ' Inspect the key later with:'
+Say "   `"$keytool`" -list -v -keystore `"$ks`" -alias $alias"
+Say ''
+
+exit 0

@@ -52,13 +52,18 @@
 
             <!-- ============ 主体三：一条下一步 ============ -->
             <Label Text="下一步" Style="{StaticResource SubHeadline}"/>
+            <Border Style="{StaticResource FieldBorder}">
+                <Editor x:Name="NextStepEntry"
+                        Style="{StaticResource FieldEditor}"
+                        Placeholder="下次打开这个目标，从哪里继续？"
+                        MaxLength="120"/>
+            </Border>
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                <Entry x:Name="NextStepEntry" Grid.Column="0"
-                       Placeholder="下次打开这个目标，从哪里继续？"/>
-                <Button Grid.Column="1" Text="保存" WidthRequest="64" HeightRequest="38"
+                <Label Grid.Column="0" Text="做完就换，只留一条。"
+                       FontSize="11" TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
+                <Button Grid.Column="1" Text="保存" WidthRequest="64" HeightRequest="36"
                         Clicked="OnSaveNextStepClicked"/>
             </Grid>
-            <Label Text="做完就换，只留一条。" FontSize="11" TextColor="{StaticResource Gray500}"/>
 
             <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
 

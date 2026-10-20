@@ -20,7 +20,7 @@ namespace personalHub.Server.Data
         /// 表现是"点了暂停，界面显示成功，但状态没变"，而且完全不报错。
         /// </summary>
         public static PatternSaveResult ConflictWith(Pattern current) =>
-            new() { Error = "版本冲突：服务端已有更新的数据", Pattern = current };
+            new() { Error = "版本冲突（conflict）：服务端已有更新的数据", Pattern = current };
     }
 
     public sealed class PracticeSaveResult
@@ -169,7 +169,7 @@ namespace personalHub.Server.Data
 
             if (old is not null && p.UpdatedAt != 0 && old.UpdatedAt != 0 && p.UpdatedAt < old.UpdatedAt)
             {
-                return PracticeSaveResult.Fail("版本冲突：服务端已有更新的数据");
+                return PracticeSaveResult.Fail("版本冲突（conflict）：服务端已有更新的数据");
             }
 
             if (p.UpdatedAt == 0) p.UpdatedAt = now;

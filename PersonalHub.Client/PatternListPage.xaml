@@ -13,8 +13,18 @@
             <!-- 新建：只有两格必填（名字 + 新反应），其余可以以后再补 -->
             <Border Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="14,10">
                 <VerticalStackLayout Spacing="8">
-                    <Entry x:Name="TitleEntry" Placeholder="要练什么？例：被质疑时不立刻反驳"/>
-                    <Entry x:Name="NewResponseEntry" Placeholder="新反应（要做的那个动作）"/>
+                    <Border Style="{StaticResource FieldBorder}">
+                        <Editor x:Name="TitleEntry"
+                                Style="{StaticResource FieldEditor}"
+                                Placeholder="要练什么？例：被质疑时不立刻反驳"
+                                MaxLength="120"/>
+                    </Border>
+                    <Border Style="{StaticResource FieldBorder}">
+                        <Editor x:Name="NewResponseEntry"
+                                Style="{StaticResource FieldEditor}"
+                                Placeholder="新反应（要做的那个动作）"
+                                MaxLength="200"/>
+                    </Border>
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Grid.Column="0" Text="其余三段建好后在详情里补"
                                FontSize="11" TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>

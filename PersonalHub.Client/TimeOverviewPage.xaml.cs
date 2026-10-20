@@ -1,3 +1,4 @@
+using PersonalHub.Client.Controls;
 using PersonalHub.Client.Data;
 using PersonalHub.Client.Services;
 
@@ -252,13 +253,13 @@ namespace PersonalHub.Client
                     },
                     ColumnSpacing = 8,
                 };
-                head.Add(new Label
+                head.Add(TextPeek.Attach(new Label
                 {
                     Text = g.Title,
                     FontSize = 13,
                     LineBreakMode = LineBreakMode.TailTruncation,
                     VerticalOptions = LayoutOptions.Center,
-                }, 0);
+                }), 0);
                 head.Add(new Label
                 {
                     Text = minutes,
@@ -338,13 +339,13 @@ namespace PersonalHub.Client
                 ColumnSpacing = 8,
             };
 
-            head.Add(new Label
+            head.Add(TextPeek.Attach(new Label
             {
                 Text = name,
                 FontSize = 13,
                 VerticalOptions = LayoutOptions.Center,
                 LineBreakMode = LineBreakMode.TailTruncation,
-            }, 0);
+            }), 0);
 
             head.Add(new Label
             {

@@ -1,3 +1,4 @@
+using PersonalHub.Client.Controls;
 using PersonalHub.Client.Data;
 using PersonalHub.Client.Services;
 
@@ -95,10 +96,14 @@ namespace PersonalHub.Client
         {
             base.OnAppearing();
 
-            await LoadGoalsAsync();
-            await BuildFrontPiecesAsync();
-            await RefreshTodayAsync();
-            await RefreshPracticeAsync();
+            // 五个都在读同一个本地库、互不依赖 → 并行，别串着等。
+            // 串行时每段各有一次 open/查询开销，叠起来就是"进页面要顿一下"。
+            await Task.WhenAll(
+                LoadGoalsAsync(),
+                BuildFrontPiecesAsync(),
+                RefreshTodayAsync(),
+                RefreshPracticeAsync());
+
             await RefreshStatsAsync();
 
             _ = SyncAndRefreshAsync();
@@ -272,8 +277,11 @@ namespace PersonalHub.Client
                     break;
 
                 case "改名":
-                    string? input = await DisplayPromptAsync("改名", "只改显示名，历史统计不受影响",
-                        initialValue: name, maxLength: 12, keyboard: Keyboard.Text);
+                    string? input = await TextEditorPage.ShowAsync("改名",
+                        initial: name,
+                        placeholder: "只改显示名，历史统计不受影响",
+                        compact: true,
+                        maxLength: 12);
                     if (!string.IsNullOrWhiteSpace(input))
                     {
                         _settings.Rename(code, input);
@@ -302,6 +310,9 @@ namespace PersonalHub.Client
         // 时长档
         // ============================================================
 
+        /// <summary>自定义时长（不在固定档里，比如 37 分钟）。0 = 没设过。</summary>
+        private int _customDuration;
+
         private void BuildDurationChips()
         {
             DurationChips.Children.Clear();
@@ -323,11 +334,53 @@ namespace PersonalHub.Client
                 btn.Clicked += OnDurationClicked;
                 DurationChips.Children.Add(btn);
             }
+
+            // 「自定义」：理发 25 分钟、路上 50 分钟这类不在档位上的真实时长，
+            // 以前只能选 15 或 30（少算/多算），久了就不信这个数了。
+            bool customActive = _customDuration > 0 && _duration == _customDuration;
+            var customBtn = new Button
+            {
+                Text = _customDuration > 0 ? ShortMinutes(_customDuration) + " · 改" : "自定义",
+                FontSize = 13,
+                HeightRequest = 34,
+                Padding = new Thickness(13, 0),
+                CornerRadius = 17,
+                Margin = new Thickness(0, 0, 8, 8),
+                CommandParameter = -1,
+                BackgroundColor = customActive ? ChipActiveBg : ChipBg,
+                TextColor = customActive ? Colors.White : ChipText,
+                BorderWidth = 1,
+                BorderColor = Color.FromArgb("#D9D3E8"),
+            };
+            customBtn.Clicked += OnDurationClicked;
+            DurationChips.Children.Add(customBtn);
         }
 
-        private void OnDurationClicked(object? sender, EventArgs e)
+        private static string ShortMinutes(int min) =>
+            min >= 60 ? $"{min / 60}h" + (min % 60 == 0 ? "" : $"{min % 60}m") : $"{min}m";
+
+        private async void OnDurationClicked(object? sender, EventArgs e)
         {
             if (sender is not Button b || b.CommandParameter is not int min) return;
+
+            if (min == -1)
+            {
+                string? input = await DisplayPromptAsync("自定义时长", "分钟数（1 ~ 1440）",
+                    initialValue: _duration.ToString(), maxLength: 4, keyboard: Keyboard.Numeric);
+                if (input is null) return;
+                if (!int.TryParse(input, out int custom) || custom < 1 || custom > 1440)
+                {
+                    StatusLabel.Text = "时长要在 1 ~ 1440 分钟之间";
+                    return;
+                }
+
+                _customDuration = custom;
+                _duration = custom;
+                Preferences.Default.Set("ph.blocks.lastDuration", custom);
+                BuildDurationChips();
+                StatusLabel.Text = $"下次点片按 {FormatMinutes(custom)} 记";
+                return;
+            }
 
             _duration = min;
             Preferences.Default.Set("ph.blocks.lastDuration", min);
@@ -479,12 +532,12 @@ namespace PersonalHub.Client
                 var (status, color) = PlanStatus(plan.BudgetMin, actual);
 
                 var info = new VerticalStackLayout { Spacing = 1 };
-                info.Children.Add(new Label
+                info.Children.Add(TextPeek.Attach(new Label
                 {
                     Text = _settings.DisplayName(plan.PieceCode),
                     FontSize = 13,
                     LineBreakMode = LineBreakMode.TailTruncation,
-                });
+                }));
                 info.Children.Add(new Label
                 {
                     Text = plan.BudgetMin > 0
@@ -657,12 +710,15 @@ namespace PersonalHub.Client
                 int back = today.Count(x => x.PatternId == p.Id && x.Result == 0);
 
                 var info = new VerticalStackLayout { Spacing = 1 };
-                info.Children.Add(new Label
+                info.Children.Add(TextPeek.Attach(new Label
                 {
                     Text = p.Title,
                     FontSize = 13,
+                    // 两行：模式名往往是一句完整行为（"被质疑时不立刻反驳"），
+                    // 单行会被截成"被质疑时…"，等于没显示
                     LineBreakMode = LineBreakMode.TailTruncation,
-                });
+                    MaxLines = 2,
+                }));
                 info.Children.Add(new Label
                 {
                     Text = $"今天：守住 {good} · 又回去 {back}",
@@ -785,12 +841,16 @@ namespace PersonalHub.Client
 
         private async Task ChangeNoteAsync(LocalBlock row)
         {
-            string? input = await DisplayPromptAsync("备注",
-                _settings.DisplayName(row.PieceCode),
-                initialValue: row.Note, maxLength: 60, keyboard: Keyboard.Text);
+            // 换成卡片式多行编辑：原来的单行弹框只露出尾巴，改一段旧备注等于盲改
+            string? input = await TextEditorPage.ShowAsync(
+                $"备注 · {_settings.DisplayName(row.PieceCode)}",
+                initial: row.Note,
+                placeholder: "比如「理发」「路上顺便买了电池」",
+                compact: true,
+                maxLength: 200);
             if (input is null) return;   // 取消 = 不改
 
-            row.Note = input.Trim();
+            row.Note = input;
             row.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             row.Synced = false;
 
@@ -801,14 +861,33 @@ namespace PersonalHub.Client
 
         private async Task ChangeDurationAsync(LocalBlock row)
         {
-            var options = Pieces.Durations.Select(FormatMinutes).ToArray();
-            string? pick = await DisplayActionSheet("改成多久", "取消", null, options);
+            var options = Pieces.Durations.Select(FormatMinutes).ToList();
+            options.Add("自定义…");
+
+            string pick = await DisplayActionSheet("改成多久", "取消", null, options.ToArray());
             if (string.IsNullOrEmpty(pick) || pick == "取消") return;
 
-            int idx = Array.IndexOf(options, pick);
-            if (idx < 0) return;
+            int minutes;
+            if (pick == "自定义…")
+            {
+                string? input = await DisplayPromptAsync("自定义时长", "分钟数（1 ~ 1440）",
+                    initialValue: row.DurationMin > 0 ? row.DurationMin.ToString() : "30",
+                    maxLength: 4, keyboard: Keyboard.Numeric);
+                if (input is null) return;
+                if (!int.TryParse(input, out minutes) || minutes < 1 || minutes > 1440)
+                {
+                    StatusLabel.Text = "时长要在 1 ~ 1440 分钟之间";
+                    return;
+                }
+            }
+            else
+            {
+                int idx = options.IndexOf(pick);
+                if (idx < 0) return;
+                minutes = Pieces.Durations[idx];
+            }
 
-            row.DurationMin = Pieces.Durations[idx];
+            row.DurationMin = minutes;
             row.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             row.Synced = false;
 
@@ -902,12 +981,12 @@ namespace PersonalHub.Client
 
                 string head = _settings.DisplayName(r.PieceCode)
                     + (r.DurationMin > 0 ? " · " + FormatMinutes(r.DurationMin) : " · 未填时长");
-                info.Children.Add(new Label
+                info.Children.Add(TextPeek.Attach(new Label
                 {
                     Text = head,
                     FontSize = 13,
                     LineBreakMode = LineBreakMode.TailTruncation,
-                });
+                }));
 
                 // 只在「值得」时写的那一句经验，跟着行显示
                 if (!string.IsNullOrEmpty(r.Lesson))
@@ -981,12 +1060,15 @@ namespace PersonalHub.Client
             {
                 // 只有「值得」才问那一句：下次怎么做更快？一句话，可跳过。
                 // 取消 = 这次不评，不落任何值。
-                string? lesson = await DisplayPromptAsync("下次怎么做更快？",
-                    "一句话，可跳过", initialValue: row.Lesson, maxLength: 60, keyboard: Keyboard.Text);
+                string? lesson = await TextEditorPage.ShowAsync("下次怎么做更快？",
+                    initial: row.Lesson,
+                    placeholder: "一句话，可跳过",
+                    compact: true,
+                    maxLength: 200);
                 if (lesson is null) return;
 
                 row.Worth = 1;
-                row.Lesson = lesson.Trim();
+                row.Lesson = lesson;
             }
             else
             {
@@ -1069,13 +1151,14 @@ namespace PersonalHub.Client
                     ColumnSpacing = 8,
                 };
 
-                grid.Add(new Label
+                // 定宽 96px 的图表列：这里展开会把整行统计条撑歪，只能浮起来看
+                grid.Add(TextPeek.Attach(new Label
                 {
                     Text = name,
                     FontSize = 12,
                     VerticalOptions = LayoutOptions.Center,
                     LineBreakMode = LineBreakMode.TailTruncation,
-                }, 0);
+                }, forceCard: true), 0);
 
                 grid.Add(new ProgressBar
                 {

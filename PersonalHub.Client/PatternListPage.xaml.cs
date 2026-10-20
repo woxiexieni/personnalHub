@@ -1,3 +1,4 @@
+using PersonalHub.Client.Controls;
 using PersonalHub.Client.Data;
 using PersonalHub.Client.Services;
 
@@ -76,19 +77,19 @@ namespace PersonalHub.Client
             int back = practices.Count(x => x.PatternId == p.Id && x.Result == 0);
 
             var stack = new VerticalStackLayout { Spacing = 2 };
-            stack.Children.Add(new Label
+            stack.Children.Add(TextPeek.Attach(new Label
             {
                 Text = p.Title,
                 FontSize = 15,
                 LineBreakMode = LineBreakMode.TailTruncation,
-            });
-            stack.Children.Add(new Label
+            }));
+            stack.Children.Add(TextPeek.Attach(new Label
             {
                 Text = string.IsNullOrEmpty(p.NewResponse) ? "还没写新反应" : "练：" + p.NewResponse,
                 FontSize = 12,
                 TextColor = Color.FromArgb("#5F5E5A"),
                 LineBreakMode = LineBreakMode.TailTruncation,
-            });
+            }));
 
             // 只给次数，不给比率 —— 有比率就会开始不记失败那次
             stack.Children.Add(new Label
@@ -118,7 +119,12 @@ namespace PersonalHub.Client
 
             var tap = new TapGestureRecognizer();
             tap.Tapped += async (_, _) =>
+            {
+                // 点文字 = 看全文，点行 = 进详情。先到先得，后到的被吞掉。
+                if (!TapArbiter.TryClaim()) return;
+
                 await Shell.Current.GoToAsync($"{RecordCatalog.PatternDetailRoute}?id={p.Id}");
+            };
             border.GestureRecognizers.Add(tap);
 
             return border;

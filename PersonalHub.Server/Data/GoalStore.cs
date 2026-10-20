@@ -16,7 +16,7 @@ namespace personalHub.Server.Data
         public static GoalSaveResult Success(Goal? goal) => new() { Ok = true, Goal = goal };
         public static GoalSaveResult Fail(string error) => new() { Error = error };
         public static GoalSaveResult ConflictWith(Goal current) =>
-            new() { Conflict = true, Error = "版本冲突：服务端已有更新的数据", Goal = current };
+            new() { Conflict = true, Error = "版本冲突（conflict）：服务端已有更新的数据", Goal = current };
     }
 
     /// <summary>

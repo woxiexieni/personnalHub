@@ -1,3 +1,4 @@
+using PersonalHub.Client.Controls;
 using PersonalHub.Client.Data;
 using PersonalHub.Client.Services;
 using Microsoft.Maui.Controls.Shapes;
@@ -569,11 +570,14 @@ namespace PersonalHub.Client
         {
             if (_goal is null) return;
 
-            string? input = await DisplayPromptAsync("改名字",
-                "目标的名字", initialValue: _goal.Title, maxLength: 60, keyboard: Keyboard.Text);
-            if (string.IsNullOrWhiteSpace(input) || input.Trim() == _goal.Title) return;
+            string? input = await TextEditorPage.ShowAsync("改名字",
+                initial: _goal.Title,
+                placeholder: "目标的名字",
+                compact: true,
+                maxLength: 120);
+            if (string.IsNullOrWhiteSpace(input) || input == _goal.Title) return;
 
-            _goal.Title = input.Trim();
+            _goal.Title = input;
             _goal.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             _goal.Synced = false;
 

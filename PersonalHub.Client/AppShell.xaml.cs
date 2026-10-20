@@ -43,6 +43,14 @@ namespace PersonalHub.Client
                 RecordCatalog.ThingRoute,
                 new ServiceRouteFactory(typeof(RecordDothingPage)));
 
+            // R6：想法（录入 + 想法库）。两级：先记，再整理。
+            Routing.RegisterRoute(
+                RecordCatalog.IdeaRoute,
+                new ServiceRouteFactory(typeof(IdeaEntryPage)));
+            Routing.RegisterRoute(
+                RecordCatalog.IdeaListRoute,
+                new ServiceRouteFactory(typeof(IdeaListPage)));
+
             // R2：时间块 + 目标
             Routing.RegisterRoute(
                 RecordCatalog.BlockRoute,

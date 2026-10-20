@@ -13,8 +13,12 @@ set "OUTDIR=%PH_ROOT%\out\android"
 REM --------------------------------------------------------------- arguments
 REM  client-android-release.bat                 use version.txt
 REM  client-android-release.bat 1.4.2           force this version for this build
-REM  client-android-release.bat noaot           skip AOT, ~6-7 MB smaller
-REM  client-android-release.bat 1.4.2 noaot     both
+REM  client-android-release.bat aot             enable AOT: +~7 MB, faster cold start
+REM  client-android-release.bat 1.4.2 aot       both
+REM
+REM  AOT is OFF by default (.NET 8 / MAUI default), which is why a plain build
+REM  lands around 18.7 MiB. The old "noaot" switch is kept as a no-op alias so
+REM  existing shortcuts / notes still work.
 set "VEROVERRIDE="
 set "EXTRA="
 
@@ -26,6 +30,7 @@ if not "%~1"=="" (
     )
 )
 if /i "%~1"=="noaot" set "EXTRA=-p:RunAOTCompilation=false"
+if /i "%~1"=="aot"   set "EXTRA=-p:RunAOTCompilation=true"
 if defined VEROVERRIDE set "EXTRA=%EXTRA% -p:PhVersion=%VEROVERRIDE%"
 
 set "VER=%PH_VERSION%"
@@ -45,16 +50,28 @@ if defined EXTRA echo  extra switch: %EXTRA%
 echo ============================================================
 echo.
 
-REM Release signing uses the machine-local .NET Android debug keystore that
-REM PersonalHub.Client.csproj points at. It exists once you have built Debug
-REM at least once on this machine; another machine may need one build first.
-if not exist "%LocalAppData%\Xamarin\Mono for Android\debug.keystore" (
-    echo [!] debug.keystore not found for this Windows user.
-    echo     Run client-android-debug.bat once, then run this script again.
-    echo     ^(or set AndroidSigningKeyStore in PersonalHub.Client.csproj^)
+REM Signing key resolution - must mirror what the csproj does:
+REM   local-signing.props exists -> the real release keystore
+REM   otherwise                  -> the machine-local debug keystore
+REM Checking only debug.keystore used to block clean machines that only had a
+REM proper release key, which is exactly the setup you want for shipping.
+set "SIGNPROPS=%PH_ROOT%\PersonalHub.Client\local-signing.props"
+set "SIGNDESC=debug.keystore   (NOT for distribution)"
+set "SIGNFAIL="
+if exist "%SIGNPROPS%" (
+    set "SIGNDESC=local-signing.props   (release keystore)"
+) else (
+    if not exist "%LocalAppData%\Xamarin\Mono for Android\debug.keystore" set "SIGNFAIL=1"
+)
+if defined SIGNFAIL (
+    echo [!] No signing key available.
+    echo     Either run scripts\create-keystore.bat once ^(real release key^),
+    echo     or run client-android-debug.bat once ^(creates debug.keystore^).
     echo.
     goto :fail
 )
+echo  signing key : %SIGNDESC%
+echo.
 
 dotnet publish "%PROJ%" -f net8.0-android -c Release -p:AndroidPackageFormats=apk %EXTRA%
 if errorlevel 1 goto :fail
@@ -90,20 +107,22 @@ echo      version %VER%  (versionCode %CODE%)
 echo.
 echo      Copy this single file to the phone and tap it to install.
 echo      Same signing key as the Debug build, so it upgrades in place.
-echo      To shrink further: client-android-release.bat noaot
+echo      Want a faster cold start (bigger package): client-android-release.bat aot
+echo      Want a smaller package than this: not much left - see README section
+echo      "why is it 18 MB" for what is inside.
 echo      To bump the version: scripts\version-bump.bat patch
 echo.
-pause
+if not defined PH_NO_PAUSE pause
 exit /b 0
 
 :fail
 echo.
 echo [!] Publish FAILED. Scroll up for the first error.
 echo.
-pause
+if not defined PH_NO_PAUSE pause
 exit /b 1
 
 :abort
 echo.
-pause
+if not defined PH_NO_PAUSE pause
 exit /b 1

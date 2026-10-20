@@ -37,12 +37,15 @@
                 </Grid>
             </Border>
 
-            <!-- ============ 1.事件标题（单行必填） ============ -->
+            <!-- ============ 1.事件标题（必填） ============ -->
             <Label Text="事件标题" Style="{StaticResource SubHeadline}"/>
-            <Entry
-                x:Name="TitleEntry"
-                Placeholder="一句话概括这件事（必填）"
-                ClearButtonVisibility="WhileEditing"/>
+            <Border Style="{StaticResource FieldBorder}">
+                <Editor
+                    x:Name="TitleEntry"
+                    Style="{StaticResource FieldEditor}"
+                    Placeholder="一句话概括这件事（必填）"
+                    MaxLength="120"/>
+            </Border>
 
             <!-- ============ 2.事件标签（分类Picker，单选） ============ -->
             <Label Text="事件标签" Style="{StaticResource SubHeadline}"/>

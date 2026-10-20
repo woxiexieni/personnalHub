@@ -18,11 +18,13 @@
                     Clicked="OnReviewClicked"/>
 
             <!-- ============ 新建 ============ -->
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                <Entry x:Name="NewGoalEntry" Grid.Column="0" Placeholder="比如：做完 PersonalHub"/>
-                <Button Grid.Column="1" Text="建" WidthRequest="60" HeightRequest="38"
-                        Clicked="OnCreateClicked"/>
-            </Grid>
+            <Border Style="{StaticResource FieldBorder}">
+                <Editor x:Name="NewGoalEntry"
+                        Style="{StaticResource FieldEditor}"
+                        Placeholder="比如：做完 PersonalHub"
+                        MaxLength="120"/>
+            </Border>
+            <Button Text="建这个目标" HeightRequest="38" Clicked="OnCreateClicked"/>
 
             <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
 

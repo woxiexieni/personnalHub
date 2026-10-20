@@ -25,6 +25,14 @@ namespace PersonalHub.Client.Services
         private readonly SemaphoreSlim _gate = new(1, 1);
         private GrpcChannel? _channel;
 
+        /// <summary>
+        /// 上一次定位失败的冷却时间。没有它，每个页面进来都会重新扫一遍网段：
+        /// 离线时一次扫描最多 3 个候选 × 2 秒 Ping，于是每页都卡几秒。
+        /// 20 秒内直接返回 false，让调用方立刻用本地数据。
+        /// </summary>
+        private DateTime _lastFailAt = DateTime.MinValue;
+        private static readonly TimeSpan FailCooldown = TimeSpan.FromSeconds(20);
+
 
 
         /// <summary>当前使用的服务端基地址（形如 http://192.168.11.168:5000）；尚未定位时为 null。</summary>
@@ -62,6 +70,9 @@ namespace PersonalHub.Client.Services
         // 行为模式 / 练习（R5）
         public Personalhub.PatternService.PatternServiceClient NewPatternClient() => new(Channel);
 
+        // 想法（R6）
+        public Personalhub.IdeaService.IdeaServiceClient NewIdeaClient() => new(Channel);
+
         /// <summary>
         /// 确保已定位到服务端并建好通道。
         /// force=false：已有通道就直接复用；
@@ -74,6 +85,7 @@ namespace PersonalHub.Client.Services
             try
             {
                 if (!force && _channel != null) return true;
+                if (!force && _channel is null && DateTime.UtcNow - _lastFailAt < FailCooldown) return false;
 
                 var tried = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -108,6 +120,7 @@ namespace PersonalHub.Client.Services
                     try { channel.Dispose(); } catch { /* 忽略 */ }
                 }
 
+                if (_channel is null) _lastFailAt = DateTime.UtcNow;
                 return _channel != null;
             }
             finally

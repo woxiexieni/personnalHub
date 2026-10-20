@@ -498,3 +498,10 @@ out/
 
 # 数据库快照（本地备份，不提交）
 backups/
+
+# ===== 签名密钥：绝不进仓库 =====
+# scripts/create-keystore.bat 生成的正式签名库与密码文件。
+# 丢了它 = 已发布的应用永远无法更新；泄露它 = 别人能冒名发你的包。
+*.keystore
+*.jks
+local-signing.props

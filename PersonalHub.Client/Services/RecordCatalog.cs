@@ -42,10 +42,17 @@ namespace PersonalHub.Client.Services
         /// <summary>回顾页（三个数 + 停滞目标 + 奖励自决）。</summary>
         public const string QuarterReviewRoute = "goal/review";
 
+        /// <summary>想法录入路由（R6）：一个大框 + 四个类型，默认未分类。</summary>
+        public const string IdeaRoute = "idea/entry";
+
+        /// <summary>想法库路由（列表 + 转成目标）。</summary>
+        public const string IdeaListRoute = "idea/list";
+
         public static List<DirectoryItem> Build(
             LocalRecordStore<LocalRecord> expenses,
             LocalRecordStore<ThingRecord> things,
-            LocalRecordStore<LocalBlock> blocks)
+            LocalRecordStore<LocalBlock> blocks,
+            LocalRecordStore<LocalIdea> ideas)
         {
             return new List<DirectoryItem>
             {
@@ -104,6 +111,28 @@ namespace PersonalHub.Client.Services
                     subtitle: "在练什么：触发 / 旧反应 / 新反应（一季度两三个）",
                     icon: "🌱",
                     route: PatternRoute),
+
+                // R6：想法放最后一项。
+                // 位置说明：前四项都是"已经发生、有结构"的事（钱 / 时间 / 事件 / 反应），
+                // 想法是唯一"还没成形"的东西 —— 放在最后，既不会抢主入口，也随时找得到。
+                // 它和三、四项的关系是：想法是原材料，反思和模式是加工后的产物。
+                new(
+                    title: "想法",
+                    subtitle: "冒出来就记：事实 / 评价 / 计划 / 脑补，不分类也行",
+                    icon: "💡",
+                    route: IdeaRoute,
+                    summaryProvider: async () =>
+                    {
+                        var (from, to) = Period.Today();
+                        var todayRows = await ideas.GetByRangeAsync(from, to).ConfigureAwait(false);
+                        var all = await ideas.GetByRangeAsync(0, long.MaxValue).ConfigureAwait(false);
+
+                        if (all.Count == 0) return null;
+                        return todayRows.Count == 0
+                            ? $"库里 {all.Count} 条"
+                            : $"今天 {todayRows.Count} 条 · 库里共 {all.Count} 条";
+                    },
+                    pendingProvider: ideas.CountUnsyncedAsync),
             };
         }
 

@@ -47,8 +47,10 @@
 
 	<!--
 	  Release 配置：官方推荐的「裁剪 + assembly store」组合，体积最小。
-	  这里直接用现成的调试签名库签 Release 包 —— 免去自建 keystore，
+	  这里默认用现成的调试签名库签 Release 包 —— 免去自建 keystore，
 	  且与已安装的 Debug 包同一签名，可直接覆盖升级、不用先卸载。
+	  （只适合自己手机装；要正式发版请跑 scripts\create-keystore.bat，
+	   它会让下面的 Import 生效并覆盖这几行。）
 	-->
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net8.0-android|AnyCPU'">
 		<AndroidPackageFormat>apk</AndroidPackageFormat>
@@ -58,6 +60,14 @@
 		<AndroidSigningKeyAlias>androiddebugkey</AndroidSigningKeyAlias>
 		<AndroidSigningKeyPass>android</AndroidSigningKeyPass>
 	</PropertyGroup>
+
+	<!--
+	  ===== 正式签名（可选）=====
+	  scripts\create-keystore.bat 会生成 local-signing.props（含密码，已被 .gitignore 排除）。
+	  文件存在 → 用它覆盖上面那组 debug 签名；不存在 → 保持 debug 签名，什么都不影响。
+	  这里用 Import 而不是直接写在 csproj 里，是因为密码不能进仓库。
+	-->
+	<Import Project="local-signing.props" Condition="Exists('local-signing.props')" />
 
 	<!--
 	  ===== Android 打包配置：既要「能独立安装」，又要「体积压得住」 =====

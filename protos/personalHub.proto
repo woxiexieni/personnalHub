@@ -500,3 +500,53 @@ message ListPracticesRequest {
     optional bool include_deleted = 4 [default = false];
 }
 message PracticeList { repeated Practice practices = 1; }
+
+// =====================
+// 想法（R6）
+// =====================
+// 想法是**原材料**，不是行动。它只回答一个问题：「我脑子里刚刚冒出来什么」。
+//
+// 与其它四类的分工（刻意不重叠，否则用户会不知道该记哪个）：
+//   账单     → 钱出去了
+//   时间块   → 刚才那段时间去哪了（已发生，有时间刻度）
+//   事件反思 → 这一件事值得深挖（已发生，9 段，低频深写）
+//   行为模式 → 我要改的那一类反应（要练的动作，一季度两三个）
+//   想法     → 还没成形的东西（可能永远不成形，也完全可以不处理）
+//
+// 刻意没有的东西：
+//   1. 必选的分类。kind 默认 0（未分类）—— 让人在记的那一秒先想"这算哪类"，
+//      就是在记录和入库之间加了一道闸。分类是事后整理的动作，不是记录的动作。
+//   2. 任何"处理状态/完成标记"。想法库不是待办清单：攒着不发霉才叫库，
+//      一旦有了"未处理"计数，它就会变成第二个待办清单，然后过期、然后焦虑。
+//   3. 自动生成目标。只能由用户自己点「转成目标」，系统绝不替他判断哪条想法值得做。
+service IdeaService {
+    rpc UploadIdeas (UploadIdeasRequest) returns (UploadIdeasResponse);
+    rpc ListIdeas (ListIdeasRequest) returns (IdeaList);
+}
+
+message Idea {
+    optional string id = 1;
+    optional string text = 2;              // 正文（必填）
+    optional int32 kind = 3 [default = 0]; // 0 未分类 / 1 事实 / 2 评价 / 3 计划行动 / 4 想象脑补
+    optional string goal_id = 4;           // 「转成目标」后回填，可空
+    optional int64 created_at = 5;
+    optional int64 updated_at = 6;         // 版本比较；0 = 未知版本，直接接受
+    optional bool deleted = 7 [default = false];
+}
+
+message UploadIdeasRequest { repeated Idea ideas = 1; }
+
+message UploadIdeasResponse {
+    optional int32 accepted_count = 1 [default = 0];
+    repeated string failed_ids = 2;
+    optional string error_msg = 3;
+}
+
+message ListIdeasRequest {
+    optional int32 kind = 1 [default = -1];  // -1 = 全部
+    optional int64 from = 2;                 // 含（Unix 毫秒）
+    optional int64 to = 3;                   // 不含
+    optional bool include_deleted = 4 [default = false];
+}
+
+message IdeaList { repeated Idea ideas = 1; }

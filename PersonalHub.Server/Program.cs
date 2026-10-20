@@ -129,6 +129,9 @@ namespace PersonHub.Server
             // 行为模式 / 练习（R5）：模式一季度两三个，练习一天 0~1 次。
             builder.Services.AddSingleton<PatternStore>();
 
+            // 想法（R6）：原材料仓库，只进不出，没有任何"处理状态"。
+            builder.Services.AddSingleton<IdeaStore>();
+
             // 本地每日快照（VACUUM INTO）。服务端是唯一数据源，没有它一次误删就不可逆。
             builder.Services.AddSingleton<BackupService>();
             // 服务端常常连开好几天，所以备份不能只在启动时做一次。
@@ -163,6 +166,7 @@ namespace PersonHub.Server
             app.MapGrpcService<GoalServiceImpl>();
             app.MapGrpcService<PlanServiceImpl>();
             app.MapGrpcService<PatternServiceImpl>();
+            app.MapGrpcService<IdeaServiceImpl>();
 
             // 管理端页面（/、/records、/records/edit、/categories）
             app.MapRazorPages();

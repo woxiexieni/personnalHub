@@ -85,9 +85,12 @@
             </Border>
 
             <!-- ============ 可选备注：空着不影响 1 次点击，想写就先写再点片 ============ -->
-            <Entry x:Name="NoteEntry"
-                   Placeholder="备注（可选）：比如「理发」"
-                   FontSize="13" HeightRequest="38" ClearButtonVisibility="WhileEditing"/>
+            <Border Style="{StaticResource FieldBorder}">
+                <Editor x:Name="NoteEntry"
+                        Style="{StaticResource FieldEditor}"
+                        Placeholder="备注（可选）：比如「理发」"
+                        MaxLength="200"/>
+            </Border>
 
             <!-- ============ 时长档 ============ -->
             <Label Text="时长" FontSize="12" TextColor="{StaticResource Gray500}"/>

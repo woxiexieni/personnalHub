@@ -18,7 +18,7 @@ namespace personalHub.Server.Data
         public static BlockSaveResult Success(Block? block) => new() { Ok = true, Block = block };
         public static BlockSaveResult Fail(string error) => new() { Error = error };
         public static BlockSaveResult ConflictWith(Block current) =>
-            new() { Conflict = true, Error = "版本冲突：服务端已有更新的数据", Block = current };
+            new() { Conflict = true, Error = "版本冲突（conflict）：服务端已有更新的数据", Block = current };
     }
 
     /// <summary>一个片的聚合结果（管理端 / 手机统计用）。</summary>

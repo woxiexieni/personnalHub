@@ -266,4 +266,39 @@ namespace PersonalHub.Client.Services
             };
         }
     }
+
+    /// <summary>想法上传器：LocalIdea 列表 → UploadIdeasRequest → IdeaService.UploadIdeas。</summary>
+    public sealed class IdeaUploader : IRecordUploader<LocalIdea>
+    {
+        private static readonly TimeSpan UploadTimeout = TimeSpan.FromSeconds(10);
+
+        private readonly ServerConnection _conn;
+
+        public IdeaUploader(ServerConnection conn) => _conn = conn;
+
+        public string DisplayName => "想法";
+
+        public async Task<UploadOutcome> UploadAsync(IReadOnlyList<LocalIdea> items, CancellationToken ct = default)
+        {
+            if (items.Count == 0) return UploadOutcome.Empty;
+
+            await _conn.EnsureAsync().ConfigureAwait(false);
+
+            var request = new UploadIdeasRequest();
+            request.Ideas.AddRange(items.Select(x => x.ToProto()));
+
+            var resp = await _conn.NewIdeaClient()
+                .UploadIdeasAsync(request,
+                    deadline: DateTime.UtcNow.Add(UploadTimeout),
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            return new UploadOutcome
+            {
+                Accepted = resp.AcceptedCount,
+                FailedIds = resp.FailedIds.ToArray(),
+                ErrorMsg = string.IsNullOrEmpty(resp.ErrorMsg) ? null : resp.ErrorMsg,
+            };
+        }
+    }
 }

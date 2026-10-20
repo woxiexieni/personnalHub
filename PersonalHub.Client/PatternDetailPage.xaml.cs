@@ -1,3 +1,4 @@
+using PersonalHub.Client.Controls;
 using PersonalHub.Client.Data;
 using PersonalHub.Client.Services;
 
@@ -285,11 +286,15 @@ namespace PersonalHub.Client
         {
             if (_pattern is null) return;
 
-            string? input = await DisplayPromptAsync(title, "一句话就够",
-                initialValue: current, maxLength: 100, keyboard: Keyboard.Text);
+            // 四段里的触发/旧反应往往是一整段描述，用整页编辑（单行弹框完全看不全）
+            string? input = await TextEditorPage.ShowAsync(title,
+                initial: current,
+                placeholder: "一句话就够，写清楚什么时候、做什么就行",
+                compact: false,
+                maxLength: 500);
             if (input is null) return;
 
-            apply(input.Trim());
+            apply(input);
             _pattern.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             _pattern.Synced = false;
 

@@ -1,3 +1,4 @@
+using PersonalHub.Client.Controls;
 using PersonalHub.Client.Data;
 using PersonalHub.Client.Services;
 
@@ -112,19 +113,19 @@ namespace PersonalHub.Client
         private View BuildStalledRow(LocalGoal goal, int days)
         {
             var info = new VerticalStackLayout { Spacing = 1 };
-            info.Children.Add(new Label
+            info.Children.Add(TextPeek.Attach(new Label
             {
                 Text = goal.Title,
                 FontSize = 14,
                 LineBreakMode = LineBreakMode.TailTruncation,
-            });
-            info.Children.Add(new Label
+            }));
+            info.Children.Add(TextPeek.Attach(new Label
             {
                 Text = $"{days} 天没动" + (string.IsNullOrEmpty(goal.NextStep) ? "" : " · 卡在：" + goal.NextStep),
                 FontSize = 11,
                 TextColor = Color.FromArgb("#8A8A8E"),
                 LineBreakMode = LineBreakMode.TailTruncation,
-            });
+            }));
 
             var handle = new Button
             {
@@ -173,11 +174,13 @@ namespace PersonalHub.Client
             switch (pick)
             {
                 case "改小":
-                    string? input = await DisplayPromptAsync("改小一点",
-                        "改成一句更小的标题（比如只读前 6 章）",
-                        initialValue: goal.Title, maxLength: 60, keyboard: Keyboard.Text);
+                    string? input = await TextEditorPage.ShowAsync("改小一点",
+                        initial: goal.Title,
+                        placeholder: "改成一句更小的标题（比如只读前 6 章）",
+                        compact: true,
+                        maxLength: 120);
                     if (string.IsNullOrWhiteSpace(input)) return;
-                    goal.Title = input.Trim();
+                    goal.Title = input;
                     break;
 
                 case "暂停":

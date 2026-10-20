@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Reflection;
 using PersonalHub.Client.Services;
 using SQLite;
@@ -33,15 +34,27 @@ namespace PersonalHub.Client.Data
             ("ThingsRecords", "Deleted",   "INTEGER NOT NULL DEFAULT 0"),
         };
 
+        /// <summary>
+        /// 同一个库文件只开一个连接。
+        ///
+        /// 以前是每个 Store（账单 / 反思 / 时间块 / 目标 / 计划 / 模式 / 练习）各开一个，
+        /// 同一个库上挂 7~8 个 SQLiteAsyncConnection：每个都要各自打开文件、各自跑一次
+        /// CreateTable + 迁移查询。冷启动/首次进页面时这些开销叠加，正是"要等七八秒"的主要来源。
+        /// 连接本身是线程安全的（内部排队），共享没有副作用。
+        /// </summary>
+        private static readonly ConcurrentDictionary<string, SQLiteAsyncConnection> SharedConnections = new();
+
         private readonly SQLiteAsyncConnection _db;
         private readonly SemaphoreSlim _initGate = new(1, 1);
         private bool _ready;
 
         public LocalRecordStore(string dbPath)
         {
-            _db = new SQLiteAsyncConnection(
-                dbPath,
-                SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.SharedCache);
+            string key = Path.GetFullPath(dbPath);
+
+            _db = SharedConnections.GetOrAdd(key, p => new SQLiteAsyncConnection(
+                p,
+                SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.SharedCache));
         }
 
         /// <summary>本 store 对应的表名（raw SQL 用）。</summary>

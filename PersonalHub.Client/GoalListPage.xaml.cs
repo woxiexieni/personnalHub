@@ -1,4 +1,5 @@
 using Personalhub;
+using PersonalHub.Client.Controls;
 using PersonalHub.Client.Data;
 using PersonalHub.Client.Services;
 
@@ -85,18 +86,33 @@ namespace PersonalHub.Client
                 })
                 .ToList();
 
-            // 3) 服务端有更准的全量累计（本地只有 30 天），拿到就用它覆盖
-            var server = await _mirror.FetchGoalsAsync();
-            if (server.Count > 0)
+            Render();
+
+            // 3) 服务端有更准的全量累计（本地只有 30 天），**后台**拉，拿到再覆盖。
+            //    以前这里是 await：一旦没缓存地址、要扫网段找服务端，这一页就会白等 7~8 秒。
+            //    本地数据本来就够画这一页，服务端只是来校正数字的，不该阻塞首屏。
+            _ = RefreshFromServerAsync();
+        }
+
+        private async Task RefreshFromServerAsync()
+        {
+            try
             {
+                var server = await _mirror.FetchGoalsAsync().ConfigureAwait(true);
+                if (server.Count == 0) return;   // 离线：保持本地视图
+
                 _items = server
                     .Where(g => !g.Deleted && g.Status != 2 && g.Status != 3)
                     .Select(g => new GoalVm(g.Id, g.Title, g.NextStep, g.IsCurrent, g.Status,
                         g.StartedAt, g.TotalMinutes, g.LastActivityAt))
                     .ToList();
-            }
 
-            Render();
+                Render();
+            }
+            catch
+            {
+                // 离线不动界面
+            }
         }
 
         private async Task<Dictionary<string, (int Minutes, long LastAt)>> LocalTotalsAsync()
@@ -172,14 +188,14 @@ namespace PersonalHub.Client
             var stack = new VerticalStackLayout { Spacing = 3 };
 
             var titleRow = new HorizontalStackLayout { Spacing = 6 };
-            titleRow.Children.Add(new Label
+            titleRow.Children.Add(TextPeek.Attach(new Label
             {
                 Text = g.Title,
                 FontSize = 15,
                 FontAttributes = FontAttributes.Bold,
                 TextColor = dimmed ? Color.FromArgb("#8A8A8E") : Color.FromArgb("#2C2C2A"),
                 LineBreakMode = LineBreakMode.TailTruncation,
-            });
+            }));
 
             if (g.IsCurrent)
             {
@@ -198,13 +214,13 @@ namespace PersonalHub.Client
 
             if (!string.IsNullOrWhiteSpace(g.NextStep))
             {
-                stack.Children.Add(new Label
+                stack.Children.Add(TextPeek.Attach(new Label
                 {
                     Text = "下一步：" + g.NextStep,
                     FontSize = 12,
                     TextColor = Color.FromArgb("#5F5E5A"),
                     LineBreakMode = LineBreakMode.TailTruncation,
-                });
+                }));
             }
 
             stack.Children.Add(new Label
@@ -224,7 +240,13 @@ namespace PersonalHub.Client
 
             var tap = new TapGestureRecognizer();
             tap.Tapped += async (_, _) =>
+            {
+                // 点文字 = 看全文，点行 = 进详情。两个手势谁先到谁生效，
+                // 后到的那个 400ms 内被吞掉（见 TapArbiter）。
+                if (!TapArbiter.TryClaim()) return;
+
                 await Shell.Current.GoToAsync($"{RecordCatalog.GoalDetailRoute}?id={g.Id}");
+            };
             border.GestureRecognizers.Add(tap);
 
             return border;

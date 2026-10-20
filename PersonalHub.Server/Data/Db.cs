@@ -82,6 +82,9 @@ namespace personalHub.Server.Data
             Conn.CreateTable<PlanRow>();
             Conn.CreateTable<PatternRow>();
             Conn.CreateTable<PracticeRow>();
+
+            // R6：想法（原材料仓库，与"行动"无关）
+            Conn.CreateTable<IdeaRow>();
         }
 
         /// <summary>
@@ -119,6 +122,11 @@ namespace personalHub.Server.Data
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_plans_day      ON plans(day)");
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_practices_pat ON practices(pattern_id, occurred_at)");
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_practices_at  ON practices(occurred_at)");
+
+            // 想法库是长期攒的（可能上万条），列表按"时间倒序 + 可选按类型筛"，
+            // 所以索引带 created_at；单列 kind 没用（几乎不会只按类型查而不排序）。
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_ideas_created ON ideas(created_at)");
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_ideas_kind    ON ideas(kind, created_at)");
 
             SeedCategories();
         }

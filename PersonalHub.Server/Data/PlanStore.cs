@@ -16,6 +16,15 @@ namespace personalHub.Server.Data
 
         public static PlanSaveResult Success(Plan? plan) => new() { Ok = true, Plan = plan };
         public static PlanSaveResult Fail(string error) => new() { Error = error };
+
+        /// <summary>
+        /// 版本冲突必须算**失败**，不能算成功。
+        /// 这里原来返回的是 Success(ToProto(old)) —— 客户端以为存上了、服务端其实没改，
+        /// 属于"不报错也不生效"的一类，是 PlanStore 与 PatternStore 都踩过的同一个坑。
+        /// 文案里必须带 conflict：客户端靠它决定"不重试、直接拉服务端版本覆盖"。
+        /// </summary>
+        public static PlanSaveResult ConflictWith(Plan current) =>
+            new() { Error = "版本冲突（conflict）：服务端已有更新的数据", Plan = current };
     }
 
     /// <summary>
@@ -69,8 +78,8 @@ namespace personalHub.Server.Data
 
             if (old is not null && p.UpdatedAt != 0 && old.UpdatedAt != 0 && p.UpdatedAt < old.UpdatedAt)
             {
-                // 与时间块一致：冲突不重试，让客户端拉服务端覆盖
-                return PlanSaveResult.Success(ToProto(old));
+                // 与其它表一致：冲突不重试，让客户端拉服务端覆盖
+                return PlanSaveResult.ConflictWith(ToProto(old));
             }
 
             if (p.UpdatedAt == 0) p.UpdatedAt = now;

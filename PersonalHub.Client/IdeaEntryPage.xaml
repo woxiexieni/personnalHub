@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.IdeaEntryPage"
+             Title="想法">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20,12" Spacing="12">
+
+            <Label Text="冒出来什么就写什么。不用先判断它算不算回事，也不用先分类。"
+                   FontSize="12" TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
+
+            <!--
+                一个大框，没有标题栏、没有必填项。
+                想法录入的唯一敌人是"还没写完就放弃了"，所以这里除了正文什么都没有。
+            -->
+            <Border Style="{StaticResource FieldBorder}">
+                <Editor x:Name="IdeaEditor"
+                        Style="{StaticResource FieldEditor}"
+                        Placeholder="比如：我好像每次做完计划就松一口气，然后就不做了"
+                        MinimumHeightRequest="150"
+                        FontSize="15"
+                        MaxLength="2000"/>
+            </Border>
+
+            <Label Text="类型（可不选）" FontSize="12" TextColor="{StaticResource Gray500}"/>
+            <FlexLayout x:Name="KindChips"
+                        Wrap="Wrap" Direction="Row"
+                        JustifyContent="Start" AlignItems="Start"/>
+
+            <!-- 选中类型后的一句解释：分类标准是要学的，光给四个词没人知道自己该点哪个 -->
+            <Label x:Name="KindHintLabel" Text="" FontSize="11"
+                   TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
+
+            <Button x:Name="SaveBtn" Text="记下" HeightRequest="46" Clicked="OnSaveClicked"/>
+
+            <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
+
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,6"/>
+
+            <Button x:Name="LibraryBtn" Text="想法库 ▸"
+                    FontSize="13" HeightRequest="40"
+                    BackgroundColor="Transparent"
+                    TextColor="#185FA5"
+                    BorderWidth="1" BorderColor="#C9D8EA"
+                    Clicked="OnLibraryClicked"/>
+
+            <Label Text="想法是原材料，不是待办。攒着不处理是正常的，不用清空它。"
+                   FontSize="11" TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
