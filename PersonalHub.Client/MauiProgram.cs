@@ -73,6 +73,9 @@ namespace PersonalHub.Client
             // 事情片的本地偏好：钉子 / 改名 / 隐藏 / 上次时长（设备偏好，不同步）。
             builder.Services.AddSingleton<PieceSettings>();
 
+            // AI 助手（§27）：只有用户点按钮时才会走到这里；key 在服务端 ai.json，客户端拿不到。
+            builder.Services.AddSingleton<AiAssistService>();
+
             // ===== 统计：状态页的数据来源（档位 → 服务端算好的结构结果）=====
             // 不做本地聚合：本地只有 30 天副本，拿它算"本月/本年"必然缺数据。
             builder.Services.AddSingleton<StatsService>();

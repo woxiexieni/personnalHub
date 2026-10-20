@@ -73,6 +73,9 @@ namespace PersonalHub.Client.Services
         // 想法（R6）
         public Personalhub.IdeaService.IdeaServiceClient NewIdeaClient() => new(Channel);
 
+        // AI 助手（§27）。key 在服务端 ai.json 里，这条通道只传"要点什么"，不传 key。
+        public Personalhub.AiService.AiServiceClient NewAiClient() => new(Channel);
+
         /// <summary>
         /// 确保已定位到服务端并建好通道。
         /// force=false：已有通道就直接复用；

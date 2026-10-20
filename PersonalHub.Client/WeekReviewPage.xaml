@@ -79,6 +79,27 @@
 
             <BoxView HeightRequest="1" Color="{StaticResource Gray300}"/>
 
+            <!-- ============ 五、AI 补一句（§27-C） ============ -->
+            <!-- 四个数系统已经算完了，这里只让模型把「差别」说出来，不让它评价 -->
+            <Button x:Name="AiCommentBtn" Text="让 AI 补一句"
+                    FontSize="12" HeightRequest="34" Padding="14,0"
+                    HorizontalOptions="Start"
+                    BackgroundColor="Transparent" TextColor="#5F5E5A"
+                    BorderWidth="1" BorderColor="{StaticResource Gray300}"
+                    Clicked="OnAiCommentClicked"/>
+
+            <Border x:Name="AiCommentCard" IsVisible="False"
+                    Stroke="#D9D7CE" StrokeThickness="1" Padding="14,10">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="一句话" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                    <Label x:Name="AiCommentLabel" Text="" FontSize="14"
+                           LineBreakMode="WordWrap"/>
+                    <Label Text="只陈述这周和上周的差别。不评价、不建议、不打分。"
+                           FontSize="11" TextColor="{StaticResource Gray500}"
+                           LineBreakMode="WordWrap"/>
+                </VerticalStackLayout>
+            </Border>
+
             <!-- 说明这一页的边界：不评分、不建议、不催 -->
             <Label Text="这一页不打分、不排名、不给建议。它只是把你上周和这周放在一起，剩下的判断归你。"
                    FontSize="11" TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>

@@ -2,6 +2,7 @@ using System.Text;
 using PersonalHub.Client.Controls;
 using PersonalHub.Client.Data;
 using PersonalHub.Client.Services;
+using Personalhub;
 
 namespace PersonalHub.Client
 {
@@ -38,23 +39,31 @@ namespace PersonalHub.Client
         private readonly LocalRecordStore<LocalGoal> _goals;
         private readonly BlockMirrorService _mirror;
         private readonly PieceSettings _settings;
+        private readonly AiAssistService _ai;
 
         /// <summary>0 = 本周，-1 = 上周，-2 = 两周前…</summary>
         private int _offset;
 
         private bool _loading;
 
+        // ---- AI 那一句话要用的数字：在渲染各段时顺手记下来，避免第二次遍历 ----
+        private int _thisMin, _lastMin, _days, _blockCount, _activeGoals, _movedGoals;
+        private string _topShift = string.Empty;
+        private string _repeat = string.Empty;
+
         public WeekReviewPage(
             LocalRecordStore<LocalBlock> blocks,
             LocalRecordStore<LocalGoal> goals,
             BlockMirrorService mirror,
-            PieceSettings settings)
+            PieceSettings settings,
+            AiAssistService ai)
         {
             InitializeComponent();
             _blocks = blocks;
             _goals = goals;
             _mirror = mirror;
             _settings = settings;
+            _ai = ai;
         }
 
         protected override async void OnAppearing()
@@ -122,6 +131,10 @@ namespace PersonalHub.Client
             {
                 var (from, to) = RangeOf(_offset);
                 var (prevFrom, prevTo) = RangeOf(_offset - 1);
+
+                // 换周之后，上一句 AI 的话就不对应当前这一周了：收起来，要用再点
+                AiCommentCard.IsVisible = false;
+                AiCommentBtn.IsVisible = true;
 
                 // 一次读足够大的范围，省掉多次查询。本地最多 30 天，多读的部分是空的，无害。
                 var (wideFrom, wideTo) = Period.LastDays(45);
@@ -205,6 +218,11 @@ namespace PersonalHub.Client
                 : $"这周的 7 天里有 {days} 天留下了记录"
                   + (prevMin > 0 ? $"，上周是 {prevDays} 天。" : "。")
                   + $"共 {thisWeek.Count} 条。";
+
+            _thisMin = nowMin;
+            _lastMin = prevMin;
+            _days = days;
+            _blockCount = thisWeek.Count;
         }
 
         // ============================================================
@@ -226,6 +244,8 @@ namespace PersonalHub.Client
                 GoalEmptyLabel.Text = goals.Count == 0
                     ? "还没有目标。目标不是必须的 —— 但有了它，这些时间才能归到一条线上。"
                     : "没有进行中的目标（都暂停或完成了）。";
+                _activeGoals = 0;
+                _movedGoals = 0;
                 return;
             }
 
@@ -257,6 +277,9 @@ namespace PersonalHub.Client
             GoalSummaryLabel.Text = movedCount == rows.Count
                 ? $"{rows.Count} 条进行中的线，这周全部动过。"
                 : $"{rows.Count} 条进行中的线，这周动了 {movedCount} 条。";
+
+            _activeGoals = rows.Count;
+            _movedGoals = movedCount;
         }
 
         private View BuildGoalRow(LocalGoal goal, int nowMin, int prevMin, long? lastAt)
@@ -335,6 +358,7 @@ namespace PersonalHub.Client
         private void RenderRepeats(List<LocalBlock> thisWeek, List<LocalBlock> lastWeek)
         {
             RepeatPanel.Children.Clear();
+            _repeat = string.Empty;
 
             var entries = thisWeek.Concat(lastWeek)
                 .Where(b => !string.IsNullOrWhiteSpace(b.Lesson))
@@ -392,6 +416,8 @@ namespace PersonalHub.Client
 
             RepeatEmptyLabel.IsVisible = false;
             RepeatHint.Text = $"最近两周写了 {entries.Count} 句「下次怎么做」，下面是说过不止一次的。";
+
+            _repeat = $"{repeats[0].Display}（{repeats[0].Count} 次）";
 
             foreach (var r in repeats)
             {
@@ -453,6 +479,7 @@ namespace PersonalHub.Client
         private void RenderShift(List<LocalBlock> thisWeek, List<LocalBlock> lastWeek)
         {
             ShiftPanel.Children.Clear();
+            _topShift = string.Empty;
 
             if (lastWeek.Count < MinBlocksForTrend)
             {
@@ -484,6 +511,10 @@ namespace PersonalHub.Client
             }
 
             ShiftEmptyLabel.IsVisible = false;
+
+            var top = diffs[0];
+            _topShift = $"{_settings.DisplayName(top.Code)} {(top.Diff > 0 ? "+" : "−")}"
+                + BlockEntryPage.FormatMinutes(Math.Abs(top.Diff));
 
             foreach (var (code, nowMin, prevMin, diff) in diffs)
             {
@@ -525,6 +556,70 @@ namespace PersonalHub.Client
                 }, 2);
 
                 ShiftPanel.Children.Add(row);
+            }
+        }
+
+        // ============================================================
+        // 五、AI 补一句（§27-C）
+        // ============================================================
+        //
+        // 四个数已经在这一页上了。这一句的作用不是"总结"，是**指出差别**：
+        // 「投入没变，但时间从写代码挪到了开会」这种事，人自己一眼看不出来。
+        //
+        // 三条约束都落在服务端的提示词里，这里只负责把事实交上去：
+        //   只给数字（分钟/天数/条数/片名），不给原始记录 —— 没有账单、没有备注正文。
+        //   数据太少时服务端会直接拒绝，不硬编。
+        //   失败只在状态栏说一句，不弹窗。
+
+        private async void OnAiCommentClicked(object? sender, EventArgs e)
+        {
+            if (!AiCommentBtn.IsEnabled) return;
+
+            AiCommentBtn.IsEnabled = false;
+            AiCommentBtn.Text = "想着…";
+
+            try
+            {
+                var (from, _) = RangeOf(_offset);
+                string weekKey = DateTimeOffset.FromUnixTimeMilliseconds(from)
+                    .ToOffset(Period.Cst).ToString("yyyyMMdd");
+
+                var facts = new WeekFacts
+                {
+                    WeekLabel = RangeLabel.Text,
+                    ThisMinutes = _thisMin,
+                    LastMinutes = _lastMin,
+                    Days = _days,
+                    Blocks = _blockCount,
+                    ActiveGoals = _activeGoals,
+                    MovedGoals = _movedGoals,
+                    TopShift = _topShift,
+                    Repeat = _repeat,
+                };
+
+                var r = await _ai.CommentWeekAsync(facts, weekKey);
+
+                if (r.Ok)
+                {
+                    AiCommentLabel.Text = r.Text;
+                    AiCommentCard.IsVisible = true;
+                    AiCommentBtn.IsVisible = false;
+                    StatusLabel.Text = string.Empty;
+                }
+                else
+                {
+                    // 不弹窗：这句话本身常常有信息量（"数据还不够，不猜" / "AI 没接上"）
+                    StatusLabel.Text = r.Message;
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusLabel.Text = "出错了：" + ex.Message;
+            }
+            finally
+            {
+                AiCommentBtn.IsEnabled = true;
+                AiCommentBtn.Text = "让 AI 补一句";
             }
         }
     }

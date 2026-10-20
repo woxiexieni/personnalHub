@@ -28,13 +28,22 @@ namespace PersonalHub.Client
         private readonly LocalRecordStore<LocalGoal> _goals;
         private readonly LocalRecordStore<LocalBlock> _blocks;
         private readonly LocalRecordStore<LocalPlan> _plans;
+        private readonly LocalRecordStore<LocalIdea> _ideas;
         private readonly RecordSyncService<LocalGoal> _goalSync;
         private readonly RecordSyncService<LocalBlock> _blockSync;
         private readonly RecordSyncService<LocalPlan> _planSync;
         private readonly BlockMirrorService _mirror;
         private readonly PieceSettings _settings;
+        private readonly AiAssistService _ai;
 
         private LocalGoal? _goal;
+
+        /// <summary>
+        /// 用户从「帮我想」里挑中的那一条。
+        /// 只用来给「排进今天」提供片和时长 —— 框里的文字仍然是用户最后改过的那个版本，
+        /// 所以下面用 <c>next == _aiPick.Action</c> 判断"他没改"，改过就退回自己推断。
+        /// </summary>
+        private AiStepOption? _aiPick;
 
         public string GoalId { get; set; } = string.Empty;
 
@@ -42,21 +51,25 @@ namespace PersonalHub.Client
             LocalRecordStore<LocalGoal> goals,
             LocalRecordStore<LocalBlock> blocks,
             LocalRecordStore<LocalPlan> plans,
+            LocalRecordStore<LocalIdea> ideas,
             RecordSyncService<LocalGoal> goalSync,
             RecordSyncService<LocalBlock> blockSync,
             RecordSyncService<LocalPlan> planSync,
             BlockMirrorService mirror,
-            PieceSettings settings)
+            PieceSettings settings,
+            AiAssistService ai)
         {
             InitializeComponent();
             _goals = goals;
             _blocks = blocks;
             _plans = plans;
+            _ideas = ideas;
             _goalSync = goalSync;
             _blockSync = blockSync;
             _planSync = planSync;
             _mirror = mirror;
             _settings = settings;
+            _ai = ai;
         }
 
         protected override async void OnAppearing()
@@ -87,6 +100,12 @@ namespace PersonalHub.Client
             StateLabel.Text = StateText(_goal.Status) + (_goal.IsCurrent ? " · 当前目标" : string.Empty);
             StatusRowBtn.Text = $"状态：{StateText(_goal.Status)} · 改状态 ▸";
             StatusRowBtn.IsVisible = true;
+
+            // 换目标/重新进入时清掉上一条 AI 提议：它只对"刚才那个目标"有意义
+            _aiPick = null;
+            AiPanel.IsVisible = false;
+            SuggestHintLabel.Text = "做完就换，只留一条。想不出来就点「帮我想」。";
+
             ApplyPlanTodayState();
 
             // 本地先渲染（0ms），再尝试用服务端的全量数字覆盖
@@ -457,6 +476,146 @@ namespace PersonalHub.Client
         }
 
         // ============================================================
+        // 「帮我想」：AI 提议下一步（§27-A）
+        // ============================================================
+        //
+        // 这一块最容易做错的地方是"让它自动填"。这里的纪律是：
+        //   **提议永远只进输入框，不进数据库**。字是用户最后改定的，他点了保存才算数。
+        //
+        // 另一条纪律是"失败不弹错"：
+        //   没配 key / 没网 / 超时 / 模型返回不合规 → 静默换成规则版（用他自己的历史）。
+        //   用户点这个按钮时想的是"给我个方向"，不是"告诉我网络状态"。
+
+        private async void OnSuggestClicked(object? sender, EventArgs e)
+        {
+            if (_goal is null || !SuggestBtn.IsEnabled) return;
+
+            SuggestBtn.IsEnabled = false;
+            SuggestBtn.Text = "想着…";
+            AiPanel.IsVisible = false;
+            StatusLabel.Text = string.Empty;
+
+            try
+            {
+                var (from, to) = Period.LastDays(BlockMirrorService.WindowDays);
+                var blocks = (await _blocks.GetByRangeAsync(from, to))
+                    .Where(b => b.GoalId == _goal.Id)
+                    .ToList();
+
+                var (ideaFrom, ideaTo) = Period.LastDays(90);
+                var planIdeas = (await _ideas.GetByRangeAsync(ideaFrom, ideaTo))
+                    .Where(i => i.Kind == IdeaKinds.Plan && string.IsNullOrEmpty(i.GoalId))
+                    .OrderByDescending(i => i.CreatedAt)
+                    .ToList();
+
+                var (dayFrom, dayTo) = Period.Today();
+                var todayPieces = (await _plans.GetByRangeAsync(dayFrom, dayTo))
+                    .Where(p => !p.Deleted && !string.IsNullOrEmpty(p.PieceCode))
+                    .Select(p => p.PieceCode)
+                    .ToHashSet();
+
+                var result = await _ai.SuggestNextStepsAsync(_goal.Id);
+
+                List<AiStepOption> options;
+                string hint;
+
+                if (result.Ok)
+                {
+                    options = result.Options;
+                    hint = result.FromCache
+                        ? "今天已经想过了，还是这几条："
+                        : "挑一条会填进上面的框，你可以改。";
+                }
+                else
+                {
+                    // 静默降级：用规则版，并把"为什么是这几条"说清楚
+                    options = NextStepRules.Build(blocks, planIdeas, todayPieces, _settings.DisplayName);
+                    hint = "AI 这次没接上，用你过去 30 天的记录凑了几条：";
+                }
+
+                if (options.Count == 0)
+                {
+                    AiPanel.IsVisible = false;
+                    SuggestHintLabel.Text = result.Ok
+                        ? "这次没想出合适的，自己写一句吧。"
+                        : "这个目标还没有时间块，没有可参考的东西 —— 先写一句，或者记一笔再回来。";
+                    return;
+                }
+
+                RenderOptions(options, hint);
+            }
+            catch (Exception ex)
+            {
+                SuggestHintLabel.Text = "想的时候出错了：" + ex.Message;
+            }
+            finally
+            {
+                SuggestBtn.IsEnabled = true;
+                SuggestBtn.Text = "帮我想";
+            }
+        }
+
+        private void RenderOptions(List<AiStepOption> options, string hint)
+        {
+            AiOptions.Children.Clear();
+            AiPanelHint.Text = hint;
+
+            foreach (var opt in options)
+            {
+                var stack = new VerticalStackLayout { Spacing = 2 };
+                stack.Children.Add(new Label
+                {
+                    Text = opt.Action,
+                    FontSize = 14,
+                    LineBreakMode = LineBreakMode.WordWrap,
+                });
+                stack.Children.Add(new Label
+                {
+                    Text = $"{_settings.DisplayName(opt.PieceCode)} · {BlockEntryPage.FormatMinutes(opt.Minutes)}",
+                    FontSize = 11,
+                    TextColor = Color.FromArgb("#8A8A8E"),
+                });
+
+                var card = new Border
+                {
+                    Stroke = Color.FromArgb("#E3E0D8"),
+                    StrokeThickness = 1,
+                    Padding = new Thickness(14, 10),
+                    Content = stack,
+                };
+
+                var tap = new TapGestureRecognizer();
+                var picked = opt;
+                tap.Tapped += (_, _) => PickOption(picked);
+                card.GestureRecognizers.Add(tap);
+
+                AiOptions.Children.Add(card);
+            }
+
+            AiPanel.IsVisible = true;
+        }
+
+        private void PickOption(AiStepOption opt)
+        {
+            _aiPick = opt;
+            NextStepEntry.Text = opt.Action;
+            AiPanel.IsVisible = false;
+            ApplyPlanTodayState();
+
+            SuggestHintLabel.Text =
+                $"已填进框：{_settings.DisplayName(opt.PieceCode)} "
+                + $"{BlockEntryPage.FormatMinutes(opt.Minutes)}。"
+                + "改完点「保存」；直接点「排进今天」会按这个片排。";
+        }
+
+        private void OnDismissOptionsClicked(object? sender, EventArgs e)
+        {
+            AiPanel.IsVisible = false;
+            _aiPick = null;
+            SuggestHintLabel.Text = "自己写吧。";
+        }
+
+        // ============================================================
         // 下一步 → 今天的计划
         // ============================================================
         //
@@ -508,46 +667,53 @@ namespace PersonalHub.Client
                 return;
             }
 
-            // 2. 推断片：这个目标最近 30 天用得最多的片（次数优先，次数相同看总时长）
+            // 2. 排哪个片、排多久：
+            //    从「帮我想」里挑过、且框里的字没改 → 用那条（片和时长都是它给的）；
+            //    否则按历史推断：这个目标最近 30 天用得最多的片 + 该片的中位时长。
             var (from, to) = Period.LastDays(30);
             var blocks = (await _blocks.GetByRangeAsync(from, to))
                 .Where(b => b.GoalId == _goal.Id && b.DurationMin > 0)
                 .ToList();
 
-            string? code = blocks
-                .Where(b => !string.IsNullOrEmpty(b.PieceCode))
-                .GroupBy(b => b.PieceCode!)
-                .OrderByDescending(g => g.Count())
-                .ThenByDescending(g => g.Sum(b => Math.Max(0, b.DurationMin)))
-                .Select(g => g.Key)
-                .FirstOrDefault();
-
+            string? code;
             int budget;
 
-            if (code is null)
+            if (_aiPick is not null && next == _aiPick.Action
+                && Pieces.ByCode(_aiPick.PieceCode) is { } aiPiece)
             {
-                // 没有历史依据时只问一次：问的是"做哪一类"，不是"写一句话"。
-                var names = Pieces.All.Select(p => _settings.DisplayName(p.Code)).ToArray();
-                string pick = await DisplayActionSheet(
-                    "这个目标还没记过时间块。今天打算做哪一类？", "取消", null, names);
-
-                int idx = Array.IndexOf(names, pick);
-                if (idx < 0) return;
-
-                code = Pieces.All[idx].Code;
-                budget = 30;
+                code = aiPiece.Code;
+                budget = NextStepRules.NearestDuration(_aiPick.Minutes);
             }
             else
             {
-                // 预算取这个目标在这个片上的中位时长，再吸到最近的固定档 ——
-                // 平均会被一次马拉松拉飞，中位数不会。
-                var durations = blocks
-                    .Where(b => b.PieceCode == code)
-                    .Select(b => b.DurationMin)
-                    .OrderBy(x => x)
-                    .ToList();
+                string top = NextStepRules.TopPiece(blocks);
 
-                budget = NearestDuration(durations[durations.Count / 2]);
+                if (top.Length == 0)
+                {
+                    // 没有历史依据时只问一次：问的是"做哪一类"，不是"写一句话"。
+                    var names = Pieces.All.Select(p => _settings.DisplayName(p.Code)).ToArray();
+                    string pick = await DisplayActionSheet(
+                        "这个目标还没记过时间块。今天打算做哪一类？", "取消", null, names);
+
+                    int idx = Array.IndexOf(names, pick);
+                    if (idx < 0) return;
+
+                    code = Pieces.All[idx].Code;
+                    budget = 30;
+                }
+                else
+                {
+                    // 预算取这个目标在这个片上的中位时长，再吸到最近的固定档 ——
+                    // 平均会被一次马拉松拉飞，中位数不会。
+                    var durations = blocks
+                        .Where(b => b.PieceCode == top)
+                        .Select(b => b.DurationMin)
+                        .OrderBy(x => x)
+                        .ToList();
+
+                    code = top;
+                    budget = NearestDuration(durations[durations.Count / 2]);
+                }
             }
 
             // 3. 今天已经排过同一个片就不重复排（同名两行会让人以为记错了）

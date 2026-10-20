@@ -1644,3 +1644,246 @@ class IdeaService:
             timeout,
             metadata,
             _registered_method=True)
+
+
+class AiServiceStub:
+    """=====================
+    AI 助手（§27）
+    =====================
+    角色边界：助手 + 记录员，**不是教练**。
+    A 提议下一步   —— 用户点「帮我想」才发车，点一条才填进输入框，永远不自动写入
+    B 评价聚类     —— 从「评价类」想法里找反复出现的反应，提议一个可练的模式
+    C 周回顾一句话 —— 系统已经算完四个数，模型只负责把它们差别说出来
+
+    三条硬约束：
+    1. key 只在服务端（ai.json）。客户端不接触 key —— APK 能被反编译。
+    2. 模型返回的东西**必须过校验**才回给客户端：动作 ≤20 字、片必须是已存在的 code、
+    时长必须是固定档、证据必须是原文（按序号回填，杜绝编句子）。校验不过就当没生成。
+    3. 任何一个环节失败（没配 key / 超时 / 返回不合规）都返回 ok=false，
+    客户端直接降级到本地规则版，**不弹错误** —— 用户不该为"AI 挂了"承担任何操作。
+    """
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.GetAiStatus = channel.unary_unary(
+                '/personalhub.AiService/GetAiStatus',
+                request_serializer=personalHub__pb2.Empty.SerializeToString,
+                response_deserializer=personalHub__pb2.AiStatusResponse.FromString,
+                _registered_method=True)
+        self.SuggestNextSteps = channel.unary_unary(
+                '/personalhub.AiService/SuggestNextSteps',
+                request_serializer=personalHub__pb2.SuggestNextStepsRequest.SerializeToString,
+                response_deserializer=personalHub__pb2.SuggestNextStepsResponse.FromString,
+                _registered_method=True)
+        self.FindRepeatingEvaluations = channel.unary_unary(
+                '/personalhub.AiService/FindRepeatingEvaluations',
+                request_serializer=personalHub__pb2.FindRepeatingRequest.SerializeToString,
+                response_deserializer=personalHub__pb2.PatternProposalList.FromString,
+                _registered_method=True)
+        self.CommentWeek = channel.unary_unary(
+                '/personalhub.AiService/CommentWeek',
+                request_serializer=personalHub__pb2.WeekFacts.SerializeToString,
+                response_deserializer=personalHub__pb2.WeekComment.FromString,
+                _registered_method=True)
+
+
+class AiServiceServicer:
+    """=====================
+    AI 助手（§27）
+    =====================
+    角色边界：助手 + 记录员，**不是教练**。
+    A 提议下一步   —— 用户点「帮我想」才发车，点一条才填进输入框，永远不自动写入
+    B 评价聚类     —— 从「评价类」想法里找反复出现的反应，提议一个可练的模式
+    C 周回顾一句话 —— 系统已经算完四个数，模型只负责把它们差别说出来
+
+    三条硬约束：
+    1. key 只在服务端（ai.json）。客户端不接触 key —— APK 能被反编译。
+    2. 模型返回的东西**必须过校验**才回给客户端：动作 ≤20 字、片必须是已存在的 code、
+    时长必须是固定档、证据必须是原文（按序号回填，杜绝编句子）。校验不过就当没生成。
+    3. 任何一个环节失败（没配 key / 超时 / 返回不合规）都返回 ok=false，
+    客户端直接降级到本地规则版，**不弹错误** —— 用户不该为"AI 挂了"承担任何操作。
+    """
+
+    def GetAiStatus(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SuggestNextSteps(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def FindRepeatingEvaluations(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CommentWeek(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_AiServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'GetAiStatus': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAiStatus,
+                    request_deserializer=personalHub__pb2.Empty.FromString,
+                    response_serializer=personalHub__pb2.AiStatusResponse.SerializeToString,
+            ),
+            'SuggestNextSteps': grpc.unary_unary_rpc_method_handler(
+                    servicer.SuggestNextSteps,
+                    request_deserializer=personalHub__pb2.SuggestNextStepsRequest.FromString,
+                    response_serializer=personalHub__pb2.SuggestNextStepsResponse.SerializeToString,
+            ),
+            'FindRepeatingEvaluations': grpc.unary_unary_rpc_method_handler(
+                    servicer.FindRepeatingEvaluations,
+                    request_deserializer=personalHub__pb2.FindRepeatingRequest.FromString,
+                    response_serializer=personalHub__pb2.PatternProposalList.SerializeToString,
+            ),
+            'CommentWeek': grpc.unary_unary_rpc_method_handler(
+                    servicer.CommentWeek,
+                    request_deserializer=personalHub__pb2.WeekFacts.FromString,
+                    response_serializer=personalHub__pb2.WeekComment.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'personalhub.AiService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('personalhub.AiService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class AiService:
+    """=====================
+    AI 助手（§27）
+    =====================
+    角色边界：助手 + 记录员，**不是教练**。
+    A 提议下一步   —— 用户点「帮我想」才发车，点一条才填进输入框，永远不自动写入
+    B 评价聚类     —— 从「评价类」想法里找反复出现的反应，提议一个可练的模式
+    C 周回顾一句话 —— 系统已经算完四个数，模型只负责把它们差别说出来
+
+    三条硬约束：
+    1. key 只在服务端（ai.json）。客户端不接触 key —— APK 能被反编译。
+    2. 模型返回的东西**必须过校验**才回给客户端：动作 ≤20 字、片必须是已存在的 code、
+    时长必须是固定档、证据必须是原文（按序号回填，杜绝编句子）。校验不过就当没生成。
+    3. 任何一个环节失败（没配 key / 超时 / 返回不合规）都返回 ok=false，
+    客户端直接降级到本地规则版，**不弹错误** —— 用户不该为"AI 挂了"承担任何操作。
+    """
+
+    @staticmethod
+    def GetAiStatus(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/personalhub.AiService/GetAiStatus',
+            personalHub__pb2.Empty.SerializeToString,
+            personalHub__pb2.AiStatusResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SuggestNextSteps(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/personalhub.AiService/SuggestNextSteps',
+            personalHub__pb2.SuggestNextStepsRequest.SerializeToString,
+            personalHub__pb2.SuggestNextStepsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FindRepeatingEvaluations(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/personalhub.AiService/FindRepeatingEvaluations',
+            personalHub__pb2.FindRepeatingRequest.SerializeToString,
+            personalHub__pb2.PatternProposalList.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CommentWeek(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/personalhub.AiService/CommentWeek',
+            personalHub__pb2.WeekFacts.SerializeToString,
+            personalHub__pb2.WeekComment.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)

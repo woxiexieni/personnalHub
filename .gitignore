@@ -495,9 +495,15 @@ out/
 # 本机临时测试目录（探针用，切勿提交）
 .tmp-test/
 .tmp-build/
+# 服务端正在运行时编不了 bin（exe 被锁），用 -p:OutputPath=.tmp-check/ 旁路验证
+.tmp-check/
 
 # 数据库快照（本地备份，不提交）
 backups/
+
+# ===== AI 配置：里面是 API key，绝不进仓库 =====
+# 服务端第一次启动会自动生成这份模板（apiKey 为空），你填完就能用。
+ai.json
 
 # ===== 签名密钥：绝不进仓库 =====
 # scripts/create-keystore.bat 生成的正式签名库与密码文件。

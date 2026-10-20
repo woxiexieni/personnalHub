@@ -58,18 +58,36 @@
                         Placeholder="下次打开这个目标，从哪里继续？"
                         MaxLength="120"/>
             </Border>
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+            <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+                <!-- 帮我想：想不出下一步时点它。永远只填进输入框，点「排进今天」才算真的落地 -->
+                <Button Grid.Column="0" x:Name="SuggestBtn" Text="帮我想"
+                        FontSize="12" HeightRequest="36" Padding="12,0"
+                        BackgroundColor="Transparent" TextColor="#5F5E5A"
+                        BorderWidth="1" BorderColor="{StaticResource Gray300}"
+                        Clicked="OnSuggestClicked"/>
                 <!-- 排进今天：把「下一步」变成一条真实的每日计划，而不是留一句话在这儿 -->
-                <Button Grid.Column="0" x:Name="PlanTodayBtn" Text="排进今天"
+                <Button Grid.Column="1" x:Name="PlanTodayBtn" Text="排进今天"
                         FontSize="12" HeightRequest="36" Padding="12,0"
                         BackgroundColor="#185FA5" TextColor="White"
                         Clicked="OnPlanTodayClicked"/>
-                <Label Grid.Column="1" Text="做完就换，只留一条。"
-                       FontSize="11" TextColor="{StaticResource Gray500}" VerticalOptions="Center"
-                       LineBreakMode="WordWrap"/>
                 <Button Grid.Column="2" Text="保存" WidthRequest="64" HeightRequest="36"
-                        Clicked="OnSaveNextStepClicked"/>
+                        HorizontalOptions="End" Clicked="OnSaveNextStepClicked"/>
             </Grid>
+            <Label x:Name="SuggestHintLabel" Text="做完就换，只留一条。"
+                   FontSize="11" TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
+
+            <!-- ============ AI 的三条提议（只在点了「帮我想」之后出现） ============ -->
+            <!-- 刻意做成"选了就填进框里"而不是"点了就存"：框里的字永远由人最后决定 -->
+            <VerticalStackLayout x:Name="AiPanel" Spacing="6" IsVisible="False">
+                <Label x:Name="AiPanelHint" Text="挑一条会填进上面的框，你可以改。"
+                       FontSize="11" TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
+                <VerticalStackLayout x:Name="AiOptions" Spacing="6"/>
+                <Button x:Name="AiDismissBtn" Text="都不是，我自己写"
+                        FontSize="11" HeightRequest="30" Padding="10,0"
+                        HorizontalOptions="Start"
+                        BackgroundColor="Transparent" TextColor="{StaticResource Gray500}"
+                        Clicked="OnDismissOptionsClicked"/>
+            </VerticalStackLayout>
 
             <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
 

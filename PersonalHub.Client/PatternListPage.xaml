@@ -36,6 +36,26 @@
 
             <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
 
+            <!-- ============ 从想法里找模式（§27-B） ============ -->
+            <!-- 只在你点的时候才调模型：它要读你写的「评价」类想法，一次性看半年 -->
+            <Button x:Name="FindPatternBtn" Text="从想法里找找反复出现的 ▸"
+                    FontSize="12" HeightRequest="34" Padding="14,0"
+                    HorizontalOptions="Start"
+                    BackgroundColor="Transparent" TextColor="#5F5E5A"
+                    BorderWidth="1" BorderColor="{StaticResource Gray300}"
+                    Clicked="OnFindPatternClicked"/>
+
+            <VerticalStackLayout x:Name="ProposalPanel" Spacing="8" IsVisible="False">
+                <Label x:Name="ProposalHint" Text="" FontSize="11"
+                       TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
+                <VerticalStackLayout x:Name="ProposalRows" Spacing="8"/>
+                <Button x:Name="ProposalDismissBtn" Text="都不对，我自己的来"
+                        FontSize="11" HeightRequest="30" Padding="10,0"
+                        HorizontalOptions="Start"
+                        BackgroundColor="Transparent" TextColor="{StaticResource Gray500}"
+                        Clicked="OnDismissProposalsClicked"/>
+            </VerticalStackLayout>
+
             <Label x:Name="ActiveHeader" Text="在练" Style="{StaticResource SubHeadline}"/>
             <VerticalStackLayout x:Name="ActivePanel" Spacing="8"/>
             <Label x:Name="EmptyLabel" Text="" FontSize="12"

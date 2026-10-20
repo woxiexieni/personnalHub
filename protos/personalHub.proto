@@ -550,3 +550,89 @@ message ListIdeasRequest {
 }
 
 message IdeaList { repeated Idea ideas = 1; }
+
+// =====================
+// AI 助手（§27）
+// =====================
+// 角色边界：助手 + 记录员，**不是教练**。
+//   A 提议下一步   —— 用户点「帮我想」才发车，点一条才填进输入框，永远不自动写入
+//   B 评价聚类     —— 从「评价类」想法里找反复出现的反应，提议一个可练的模式
+//   C 周回顾一句话 —— 系统已经算完四个数，模型只负责把它们差别说出来
+//
+// 三条硬约束：
+//   1. key 只在服务端（ai.json）。客户端不接触 key —— APK 能被反编译。
+//   2. 模型返回的东西**必须过校验**才回给客户端：动作 ≤20 字、片必须是已存在的 code、
+//      时长必须是固定档、证据必须是原文（按序号回填，杜绝编句子）。校验不过就当没生成。
+//   3. 任何一个环节失败（没配 key / 超时 / 返回不合规）都返回 ok=false，
+//      客户端直接降级到本地规则版，**不弹错误** —— 用户不该为"AI 挂了"承担任何操作。
+service AiService {
+    rpc GetAiStatus (Empty) returns (AiStatusResponse);
+    rpc SuggestNextSteps (SuggestNextStepsRequest) returns (SuggestNextStepsResponse);
+    rpc FindRepeatingEvaluations (FindRepeatingRequest) returns (PatternProposalList);
+    rpc CommentWeek (WeekFacts) returns (WeekComment);
+}
+
+message AiStatusResponse {
+    optional bool configured = 1 [default = false]; // 有 key 且 enabled
+    optional string model = 2;
+    optional string endpoint = 3;
+    optional string hint = 4;      // 没配时给一句人话（含配置文件路径）
+}
+
+message SuggestNextStepsRequest {
+    optional string goal_id = 1;
+}
+
+message NextStepOption {
+    optional string action = 1;      // ≤20 字，能判断做没做完
+    optional string piece_code = 2;  // 必须是已有片 code
+    optional int32 minutes = 3;      // 固定档之一
+}
+
+message SuggestNextStepsResponse {
+    optional bool ok = 1 [default = false];
+    repeated NextStepOption options = 2;
+    optional string error_msg = 3;   // ok=false 时给客户端看（也用于降级提示）
+    // 1 = 模型生成；0 = 没生成（客户端走规则版）
+    optional int32 source = 4 [default = 0];
+}
+
+message FindRepeatingRequest {
+    // 往前看多少天。默认 180：评价类想法攒得慢，两周的样本找不出模式。
+    optional int32 days = 1 [default = 180];
+}
+
+message PatternProposal {
+    optional string title = 1;
+    optional string trigger = 2;
+    optional string old_response = 3;
+    optional string new_response = 4;
+    // 原文摘录：由服务端按模型给出的序号回填，模型碰不到这几个字
+    repeated string evidence = 5;
+    optional int32 count = 6;
+}
+
+message PatternProposalList {
+    optional bool ok = 1 [default = false];
+    repeated PatternProposal proposals = 2;
+    optional string error_msg = 3;
+    optional int32 scanned = 4;     // 参与聚类的想法条数（不够时告诉用户还差多少）
+}
+
+message WeekFacts {
+    optional string week_label = 1;   // "这周" / "10月5日 那一周"
+    optional int32 this_minutes = 2;
+    optional int32 last_minutes = 3;
+    optional int32 days = 4;          // 有记录的天数
+    optional int32 blocks = 5;
+    optional int32 active_goals = 6;
+    optional int32 moved_goals = 7;
+    optional string top_shift = 8;    // "写代码 +45m"，可空
+    optional string repeat = 9;       // 反复说的那句话 + 次数，可空
+}
+
+message WeekComment {
+    optional bool ok = 1 [default = false];
+    optional string text = 2;         // 一句话，≤40 字
+    optional string error_msg = 3;
+}

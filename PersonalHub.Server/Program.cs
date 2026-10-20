@@ -132,6 +132,13 @@ namespace PersonHub.Server
             // 想法（R6）：原材料仓库，只进不出，没有任何"处理状态"。
             builder.Services.AddSingleton<IdeaStore>();
 
+            // ===== AI（§27）：配置 + DeepSeek 客户端 =====
+            // AiConfig 是单例且会热加载：用户打开 ai.json 填上 key 保存，下一次点击就生效，
+            // 不用重启服务端（重启服务端在这个项目里意味着"手机重连"）。
+            builder.Services.AddSingleton<personalHub.Server.Ai.AiConfig>();
+            builder.Services.AddSingleton<personalHub.Server.Ai.DeepSeekClient>();
+
+
             // 本地每日快照（VACUUM INTO）。服务端是唯一数据源，没有它一次误删就不可逆。
             builder.Services.AddSingleton<BackupService>();
             // 服务端常常连开好几天，所以备份不能只在启动时做一次。
@@ -167,6 +174,7 @@ namespace PersonHub.Server
             app.MapGrpcService<PlanServiceImpl>();
             app.MapGrpcService<PatternServiceImpl>();
             app.MapGrpcService<IdeaServiceImpl>();
+            app.MapGrpcService<AiServiceImpl>();
 
             // 管理端页面（/、/records、/records/edit、/categories）
             app.MapRazorPages();
@@ -192,6 +200,21 @@ namespace PersonHub.Server
 
             var backup = app.Services.GetRequiredService<BackupService>();
             Console.WriteLine($"[OK] 备份目录: {backup.Directory}（每天 1 份，保留 14 天 + 12 周 + 12 个月）");
+
+            // AI：这里只打印"配了没有"，**绝不打印 key**（控制台会被截图、会被复制给别人）。
+            var ai = app.Services.GetRequiredService<personalHub.Server.Ai.AiConfig>();
+            var aiCfg = ai.Current;
+            if (aiCfg.Configured)
+            {
+                Console.WriteLine($"[OK] AI: 已配置 · 模型 {aiCfg.Model} · {aiCfg.Endpoint}");
+                Console.WriteLine("     只在手机上点「帮我想 / 找找反复出现的 / 让 AI 补一句」时才会调用。");
+            }
+            else
+            {
+                Console.WriteLine("[--] AI: 还没配 key（不影响使用，客户端会自动走本地规则版）");
+                Console.WriteLine($"     要开：用记事本打开 {ai.Path}");
+                Console.WriteLine("          把 \"apiKey\" 填成 sk- 开头的 key，保存即可生效，不用重启。");
+            }
 
             app.Start();
             PrintBanner(port, webPort);
