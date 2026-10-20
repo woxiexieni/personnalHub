@@ -18,6 +18,9 @@ namespace PersonalHub.Client.Services
         /// <summary>时间概览页路由（TimeOverviewPage）。</summary>
         public const string TimeRoute = "view/time";
 
+        /// <summary>周回顾页路由（WeekReviewPage）：这周 vs 上周，四个数，0 输入。</summary>
+        public const string WeekReviewRoute = "view/week";
+
         public static List<DirectoryItem> Build(
             LocalRecordStore<LocalRecord> expenses,
             LocalRecordStore<LocalBlock> blocks,
@@ -57,6 +60,25 @@ namespace PersonalHub.Client.Services
                         int unrecorded = Math.Max(0, elapsed - recorded);
 
                         return $"今日已记录 {BlockEntryPage.FormatMinutes(recorded)} · 未记录 {BlockEntryPage.FormatMinutes(unrecorded)}";
+                    }),
+
+                // 周回顾紧跟时间概览：它是"这段时间花在哪"的时间轴版本 ——
+                // 时间概览回答"花在哪"，周回顾回答"比上周变了没有"。
+                // 这一项存在的理由只有一个：让反馈周期从三个月缩到一周。
+                new(
+                    title: "这周回顾",
+                    subtitle: "这周 vs 上周：投入 / 哪条线动了 / 反复说的话 / 时间挪去哪",
+                    icon: "🔁",
+                    route: WeekReviewRoute,
+                    summaryProvider: async () =>
+                    {
+                        var (from, to) = Period.ThisWeek();
+                        var blocksNow = await blocks.GetByRangeAsync(from, to).ConfigureAwait(false);
+
+                        int nowMin = blocksNow.Sum(b => Math.Max(0, b.DurationMin));
+                        if (nowMin == 0 && blocksNow.Count == 0) return "这周还没有记录";
+
+                        return $"本周 {BlockEntryPage.FormatMinutes(nowMin)} · 记了 {blocksNow.Count} 条";
                     }),
 
                 // 目标放概览里，不放「记录」里：它不是一次录入，是"我正在推进的几条线"。

@@ -16,12 +16,13 @@
                         <Label x:Name="TodaySubLabel" Text=" " FontSize="12" TextColor="{StaticResource Gray500}"/>
                     </VerticalStackLayout>
 
-                    <!-- 目标归属：默认继承「当前目标」，在这里能直接切（不用跑去目标页） -->
+                    <!-- 目标归属：「自动」= 每个片归它上次的目标（点片保存时记住）。
+                         点一下就地切，不跳页；改了只影响这一页，退出恢复自动。 -->
                     <VerticalStackLayout Grid.Column="1" Spacing="2" HorizontalOptions="End">
                         <Label Text="归到目标" FontSize="12" HorizontalTextAlignment="End"
                                TextColor="{StaticResource Gray500}"/>
                         <Button x:Name="GoalChipBtn"
-                                Text="未设置"
+                                Text="自动"
                                 FontSize="12"
                                 Padding="10,0"
                                 HeightRequest="30"

@@ -58,10 +58,16 @@
                         Placeholder="下次打开这个目标，从哪里继续？"
                         MaxLength="120"/>
             </Border>
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                <Label Grid.Column="0" Text="做完就换，只留一条。"
-                       FontSize="11" TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
-                <Button Grid.Column="1" Text="保存" WidthRequest="64" HeightRequest="36"
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                <!-- 排进今天：把「下一步」变成一条真实的每日计划，而不是留一句话在这儿 -->
+                <Button Grid.Column="0" x:Name="PlanTodayBtn" Text="排进今天"
+                        FontSize="12" HeightRequest="36" Padding="12,0"
+                        BackgroundColor="#185FA5" TextColor="White"
+                        Clicked="OnPlanTodayClicked"/>
+                <Label Grid.Column="1" Text="做完就换，只留一条。"
+                       FontSize="11" TextColor="{StaticResource Gray500}" VerticalOptions="Center"
+                       LineBreakMode="WordWrap"/>
+                <Button Grid.Column="2" Text="保存" WidthRequest="64" HeightRequest="36"
                         Clicked="OnSaveNextStepClicked"/>
             </Grid>
 

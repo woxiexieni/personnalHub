@@ -73,6 +73,11 @@ namespace PersonalHub.Client
             Routing.RegisterRoute(
                 OverviewCatalog.TimeRoute,
                 new ServiceRouteFactory(typeof(TimeOverviewPage)));
+
+            // 周回顾：这周 vs 上周。概览目录进，和「时间概览」同一层。
+            Routing.RegisterRoute(
+                OverviewCatalog.WeekReviewRoute,
+                new ServiceRouteFactory(typeof(WeekReviewPage)));
         }
     }
 

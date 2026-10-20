@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.WeekReviewPage"
+             Title="这周">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20,12" Spacing="12">
+
+            <!-- ============ 顶部：哪一周 ============ -->
+            <Grid ColumnDefinitions="*,Auto">
+                <VerticalStackLayout Grid.Column="0" Spacing="1">
+                    <Label x:Name="RangeLabel" Text="—" FontSize="15" FontAttributes="Bold"/>
+                    <Label x:Name="RangeSubLabel" Text=" " FontSize="11"
+                           TextColor="{StaticResource Gray500}"/>
+                </VerticalStackLayout>
+                <Button Grid.Column="1" x:Name="PrevWeekBtn" Text="上一周"
+                        FontSize="12" HeightRequest="32" Padding="12,0"
+                        BackgroundColor="Transparent"
+                        TextColor="{StaticResource Gray500}"
+                        BorderWidth="1" BorderColor="{StaticResource Gray300}"
+                        Clicked="OnPrevWeekClicked"/>
+            </Grid>
+
+            <!-- ============ 一、投入：这周 vs 上周 ============ -->
+            <!-- 没有百分比完成率，也没有"效率"：分钟是记出来的，效率是估出来的 -->
+            <Border Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="14,12">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="这周投入" FontSize="12" TextColor="{StaticResource Gray500}"/>
+
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <VerticalStackLayout Grid.Column="0" Spacing="1">
+                            <Label x:Name="ThisWeekLabel" Text="—" FontSize="22" FontAttributes="Bold"/>
+                            <Label Text="本周" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="1">
+                            <Label x:Name="LastWeekLabel" Text="—" FontSize="22"
+                                   TextColor="{StaticResource Gray500}"/>
+                            <Label Text="上周" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="2" Spacing="1">
+                            <Label x:Name="DeltaLabel" Text="—" FontSize="22"/>
+                            <Label Text="变化" FontSize="11" TextColor="{StaticResource Gray500}"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Label x:Name="DaysLabel" Text=" " FontSize="11"
+                           TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- ============ 二、目标：动了没动 ============ -->
+            <!-- 只陈述"动/没动"和多少分钟，不算完成率、不排优劣 -->
+            <Label Text="哪几条线动了" Style="{StaticResource SubHeadline}"/>
+            <Label x:Name="GoalSummaryLabel" Text=" " FontSize="11"
+                   TextColor="{StaticResource Gray500}"/>
+            <VerticalStackLayout x:Name="GoalPanel" Spacing="8"/>
+            <Label x:Name="GoalEmptyLabel" Text="还没有进行中的目标。"
+                   FontSize="12" TextColor="{StaticResource Gray500}" IsVisible="False"/>
+
+            <!-- ============ 三、重复的话 ============ -->
+            <!-- 这是 AI 之前最该由系统做的一件事：它不需要理解，只需要数 -->
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}"/>
+            <Label Text="你反复在说同一件事" Style="{StaticResource SubHeadline}"/>
+            <Label x:Name="RepeatHint" Text="把最近两周写下的「下次怎么做」放在一起看。"
+                   FontSize="11" TextColor="{StaticResource Gray500}"/>
+            <VerticalStackLayout x:Name="RepeatPanel" Spacing="6"/>
+            <Label x:Name="RepeatEmptyLabel" Text="这两周没有重复的句子。"
+                   FontSize="12" TextColor="{StaticResource Gray500}" IsVisible="False"/>
+
+            <!-- ============ 四、结构变化 ============ -->
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}"/>
+            <Label Text="时间挪到哪儿去了" Style="{StaticResource SubHeadline}"/>
+            <Label Text="比的是这周和上周，同一件事的分钟差。少了不等于退步 —— 有时是砍对了。"
+                   FontSize="11" TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
+            <VerticalStackLayout x:Name="ShiftPanel" Spacing="6"/>
+            <Label x:Name="ShiftEmptyLabel" Text="上周还没有记录，下周这一栏才有对比。"
+                   FontSize="12" TextColor="{StaticResource Gray500}" IsVisible="False"/>
+
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}"/>
+
+            <!-- 说明这一页的边界：不评分、不建议、不催 -->
+            <Label Text="这一页不打分、不排名、不给建议。它只是把你上周和这周放在一起，剩下的判断归你。"
+                   FontSize="11" TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
+
+            <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

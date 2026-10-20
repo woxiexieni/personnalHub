@@ -106,6 +106,33 @@ namespace PersonalHub.Client.Services
         public int DurationFor(string code)
             => _state.LastDuration.TryGetValue(code, out int d) && d > 0 ? d : 30;
 
+        /// <summary>
+        /// 这个片上次归到哪个目标（空 = 没有记忆）。
+        ///
+        /// 为什么归属要挂在"片"上而不是全局一个"当前目标"：
+        /// 片和目标本来就是强关联的 ——「写代码」几乎总归 PersonalHub，「读书」归另一条线。
+        /// 用一次的选择换后面所有次都不用选，且**不增加任何一次点击**。
+        ///
+        /// 这只是"默认值的改进"，不是"绑定"：目标被暂停/删掉时调用方会回退到当前目标，
+        /// 所以它永远不会把块写进一条已经死掉的目标里。
+        /// </summary>
+        public string GoalFor(string code)
+            => _state.GoalFor.TryGetValue(code, out var id) ? id ?? string.Empty : string.Empty;
+
+        /// <summary>记住这个片的归属；传空 = 忘掉（下次回退到当前目标）。</summary>
+        public void SetGoalFor(string code, string goalId)
+        {
+            if (string.IsNullOrEmpty(goalId))
+            {
+                _state.GoalFor.Remove(code);
+            }
+            else
+            {
+                _state.GoalFor[code] = goalId;
+            }
+            Save();
+        }
+
         public void SetDuration(string code, int minutes)
         {
             if (minutes <= 0) return;
@@ -195,6 +222,9 @@ namespace PersonalHub.Client.Services
             public HashSet<string> Hidden { get; set; } = new();
             public Dictionary<string, string> Names { get; set; } = new();
             public Dictionary<string, int> LastDuration { get; set; } = new();
+
+            /// <summary>片 → 上次归到的目标 id。2026-10 新增，旧 JSON 里没有这个键，兜底见构造函数。</summary>
+            public Dictionary<string, string> GoalFor { get; set; } = new();
         }
 
         private static State Load()
@@ -204,7 +234,18 @@ namespace PersonalHub.Client.Services
                 var json = Preferences.Default.Get(Key, string.Empty);
                 if (string.IsNullOrWhiteSpace(json)) return new State();
 
-                return JsonSerializer.Deserialize<State>(json) ?? new State();
+                var state = JsonSerializer.Deserialize<State>(json) ?? new State();
+
+                // 旧版本的 JSON 里没有 GoalFor（以及更早版本没有 LastDuration）。
+                // 属性初始化器只在"键缺失"时生效，一旦某次写进了 null 就再也不会被覆盖，
+                // 所以这里统一兜一次 —— 一个空引用不该让录入页打不开。
+                state.Pinned ??= new();
+                state.Hidden ??= new();
+                state.Names ??= new();
+                state.LastDuration ??= new();
+                state.GoalFor ??= new();
+
+                return state;
             }
             catch
             {

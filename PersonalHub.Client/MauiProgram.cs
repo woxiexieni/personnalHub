@@ -83,6 +83,7 @@ namespace PersonalHub.Client
             builder.Services.AddTransient<RecordHubPage>();   // Tab 2：记录目录
             builder.Services.AddTransient<MainPage>();        // 目录 → 支出概览
             builder.Services.AddTransient<TimeOverviewPage>(); // 目录 → 时间概览
+            builder.Services.AddTransient<WeekReviewPage>();   // 目录 → 这周回顾（周对比，0 输入）
             builder.Services.AddTransient<RecordEntryPage>();   // 目录 → 账单
             builder.Services.AddTransient<RecordDothingPage>(); // 目录 → 事件反思
             builder.Services.AddTransient<BlockEntryPage>();    // 目录 → 时间块（R2 主入口）

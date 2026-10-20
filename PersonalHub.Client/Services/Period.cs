@@ -51,6 +51,20 @@ namespace PersonalHub.Client.Services
             return (monday.ToUnixTimeMilliseconds(), monday.AddDays(7).ToUnixTimeMilliseconds());
         }
 
+        /// <summary>
+        /// 上周：[上周一 00:00, 本周一 00:00)。
+        ///
+        /// 单独给一个方法而不是让调用方 <c>ThisWeek().From - 7天</c>：
+        /// 跨夏令时/时区偏移的那种减法一旦有人这么写，就会在某个周日夜里错一小时，
+        /// 而错一小时的症状是"上周凭空多了 60 分钟"，几乎查不出来。
+        /// </summary>
+        public static (long From, long To) LastWeek()
+        {
+            var (from, _) = ThisWeek();
+            var lastMonday = DateTimeOffset.FromUnixTimeMilliseconds(from).AddDays(-7);
+            return (lastMonday.ToUnixTimeMilliseconds(), from);
+        }
+
         /// <summary>本月：[本月 1 日 00:00, 下月 1 日 00:00)。</summary>
         public static (long From, long To) ThisMonth()
         {

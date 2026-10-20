@@ -27,8 +27,10 @@ namespace PersonalHub.Client
 
         private readonly LocalRecordStore<LocalGoal> _goals;
         private readonly LocalRecordStore<LocalBlock> _blocks;
+        private readonly LocalRecordStore<LocalPlan> _plans;
         private readonly RecordSyncService<LocalGoal> _goalSync;
         private readonly RecordSyncService<LocalBlock> _blockSync;
+        private readonly RecordSyncService<LocalPlan> _planSync;
         private readonly BlockMirrorService _mirror;
         private readonly PieceSettings _settings;
 
@@ -39,16 +41,20 @@ namespace PersonalHub.Client
         public GoalDetailPage(
             LocalRecordStore<LocalGoal> goals,
             LocalRecordStore<LocalBlock> blocks,
+            LocalRecordStore<LocalPlan> plans,
             RecordSyncService<LocalGoal> goalSync,
             RecordSyncService<LocalBlock> blockSync,
+            RecordSyncService<LocalPlan> planSync,
             BlockMirrorService mirror,
             PieceSettings settings)
         {
             InitializeComponent();
             _goals = goals;
             _blocks = blocks;
+            _plans = plans;
             _goalSync = goalSync;
             _blockSync = blockSync;
+            _planSync = planSync;
             _mirror = mirror;
             _settings = settings;
         }
@@ -81,6 +87,7 @@ namespace PersonalHub.Client
             StateLabel.Text = StateText(_goal.Status) + (_goal.IsCurrent ? " · 当前目标" : string.Empty);
             StatusRowBtn.Text = $"状态：{StateText(_goal.Status)} · 改状态 ▸";
             StatusRowBtn.IsVisible = true;
+            ApplyPlanTodayState();
 
             // 本地先渲染（0ms），再尝试用服务端的全量数字覆盖
             await RenderStatsAsync(serverTotal: null, serverLastAt: null);
@@ -445,7 +452,144 @@ namespace PersonalHub.Client
 
             await _goals.UpdateAsync(_goal);
             StatusLabel.Text = "已保存";
+            ApplyPlanTodayState();
             _ = _goalSync.SyncAsync();
+        }
+
+        // ============================================================
+        // 下一步 → 今天的计划
+        // ============================================================
+        //
+        // 为什么走「生成一条 plans」而不是「直接建一个时间块」：
+        // 直接建块会让一天里出现"有计划"和"临时加的块"两条并行路径，
+        // 月底统计分不清哪些是兑现的、哪些是临时起意。
+        // 走计划则完全复用 R4 已经跑通的链路：进计划卡 → 点它记块 → 块自动带 GoalId/PlanId。
+        //
+        // 「排哪个片」由历史推断：这个目标最近 30 天用得最多的那个片。
+        // 目标从来没记过块时才问用户一次 —— 那是系统唯一没有依据的时刻。
+
+        private void ApplyPlanTodayState()
+        {
+            bool hasNext = _goal is not null && !string.IsNullOrWhiteSpace(_goal.NextStep);
+            PlanTodayBtn.IsEnabled = hasNext;
+            PlanTodayBtn.BackgroundColor = hasNext ? Color.FromArgb("#185FA5") : Color.FromArgb("#C9D8EA");
+        }
+
+        private async void OnPlanTodayClicked(object sender, EventArgs e)
+        {
+            if (_goal is null) return;
+
+            string next = (NextStepEntry.Text ?? _goal.NextStep ?? string.Empty).Trim();
+            if (next.Length == 0)
+            {
+                StatusLabel.Text = "先写一句下一步，才知道今天要做什么。";
+                return;
+            }
+
+            // 下一步可能刚改还没保存，先落库，避免"排进今天了但这句话没存"
+            if (next != _goal.NextStep)
+            {
+                _goal.NextStep = next;
+                _goal.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                _goal.Synced = false;
+                await _goals.UpdateAsync(_goal);
+                _ = _goalSync.SyncAsync();
+            }
+
+            // 1. 今天还能不能排（上限 3，与服务端 PlanStore.MaxPerDay 一致）
+            var (dayFrom, dayTo) = Period.Today();
+            var todayPlans = (await _plans.GetByRangeAsync(dayFrom, dayTo))
+                .Where(p => !p.Deleted)
+                .ToList();
+
+            if (todayPlans.Count >= 3)
+            {
+                StatusLabel.Text = "今天已经排满 3 件了。想换的话，先去时间块页去掉一件。";
+                return;
+            }
+
+            // 2. 推断片：这个目标最近 30 天用得最多的片（次数优先，次数相同看总时长）
+            var (from, to) = Period.LastDays(30);
+            var blocks = (await _blocks.GetByRangeAsync(from, to))
+                .Where(b => b.GoalId == _goal.Id && b.DurationMin > 0)
+                .ToList();
+
+            string? code = blocks
+                .Where(b => !string.IsNullOrEmpty(b.PieceCode))
+                .GroupBy(b => b.PieceCode!)
+                .OrderByDescending(g => g.Count())
+                .ThenByDescending(g => g.Sum(b => Math.Max(0, b.DurationMin)))
+                .Select(g => g.Key)
+                .FirstOrDefault();
+
+            int budget;
+
+            if (code is null)
+            {
+                // 没有历史依据时只问一次：问的是"做哪一类"，不是"写一句话"。
+                var names = Pieces.All.Select(p => _settings.DisplayName(p.Code)).ToArray();
+                string pick = await DisplayActionSheet(
+                    "这个目标还没记过时间块。今天打算做哪一类？", "取消", null, names);
+
+                int idx = Array.IndexOf(names, pick);
+                if (idx < 0) return;
+
+                code = Pieces.All[idx].Code;
+                budget = 30;
+            }
+            else
+            {
+                // 预算取这个目标在这个片上的中位时长，再吸到最近的固定档 ——
+                // 平均会被一次马拉松拉飞，中位数不会。
+                var durations = blocks
+                    .Where(b => b.PieceCode == code)
+                    .Select(b => b.DurationMin)
+                    .OrderBy(x => x)
+                    .ToList();
+
+                budget = NearestDuration(durations[durations.Count / 2]);
+            }
+
+            // 3. 今天已经排过同一个片就不重复排（同名两行会让人以为记错了）
+            if (todayPlans.Any(p => p.PieceCode == code))
+            {
+                StatusLabel.Text = $"今天已经排过「{_settings.DisplayName(code)}」了，直接去时间块页点它就行。";
+                return;
+            }
+
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var plan = new LocalPlan
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Day = DateTimeOffset.UtcNow.ToOffset(Period.Cst).ToString("yyyy-MM-dd"),
+                PieceCode = code,
+                BudgetMin = budget,
+                GoalId = _goal.Id,
+                CreatedAt = now,
+                UpdatedAt = now,
+                Deleted = false,
+                Synced = false,
+                SyncedAt = 0,
+            };
+
+            await _plans.InsertAsync(plan);
+
+            StatusLabel.Text =
+                $"已排进今天：{_settings.DisplayName(code)} {BlockEntryPage.FormatMinutes(budget)}。" +
+                "去时间块页点它就能记一条。";
+
+            _ = _planSync.SyncAsync();
+        }
+
+        /// <summary>把分钟数吸到最接近的固定时长档（5/15/30/45/60/90/120/180）。</summary>
+        private static int NearestDuration(int minutes)
+        {
+            int best = Pieces.Durations[0];
+            foreach (int d in Pieces.Durations)
+            {
+                if (Math.Abs(d - minutes) < Math.Abs(best - minutes)) best = d;
+            }
+            return best;
         }
 
         // ============================================================

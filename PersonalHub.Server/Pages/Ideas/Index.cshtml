@@ -1,0 +1,103 @@
+@page
+@model PersonalHub.Server.Pages.Ideas.IndexModel
+@using personalHub.Server.Analysis
+@{
+    ViewData["Title"] = "想法";
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>想法</h2>
+        <span class="hint">原材料仓库 · 不设处理状态 · 不计完成率 · 攒着不发霉才叫库</span>
+    </div>
+
+    <div class="kpis">
+        <div class="kpi">
+            <div class="label">全部想法</div>
+            <div class="num">@Model.Total</div>
+            <div class="sub">含未分类，含已转目标</div>
+        </div>
+        <div class="kpi">
+            <div class="label">本周新增</div>
+            <div class="num">@Model.ThisWeek</div>
+            <div class="sub">周一 00:00 起（UTC+8）</div>
+        </div>
+        <div class="kpi">
+            <div class="label">已转成目标</div>
+            <div class="num">@Model.Linked</div>
+            <div class="sub">这个出口被用过几次，不考核</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2 style="font-size:14px">按类型</h2>
+        <span class="hint">类型是事后整理的标签，不是必填项</span>
+    </div>
+
+    <div class="filters">
+        <a class="btn sm @(Model.Kind < 0 ? "primary" : "")" href="/ideas">
+            全部 <span style="opacity:.7">@Model.Total</span>
+        </a>
+        @foreach (var k in new[] { 0, 1, 2, 3, 4 })
+        {
+            <a class="btn sm @(Model.Kind == k ? "primary" : "")" href="/ideas?kind=@k">
+                @Model.KindText(k) <span style="opacity:.7">@Model.CountOf(k)</span>
+            </a>
+        }
+    </div>
+</div>
+
+<div class="card">
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty">
+            @(Model.Kind < 0 ? "还没有想法。手机端「记录 → 想法」随手记一条就行。" : "这个类型下还没有想法。")
+        </div>
+    }
+    else
+    {
+        <table class="grid">
+            <thead>
+            <tr>
+                <th style="width:96px">时间</th>
+                <th style="width:88px">类型</th>
+                <th>正文</th>
+                <th style="width:88px">目标</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var i in Model.Items)
+            {
+                <tr>
+                    <td style="white-space:nowrap;color:var(--muted)">@Fmt.ShortDate(i.CreatedAt) @DateTimeOffset.FromUnixTimeMilliseconds(i.CreatedAt).ToOffset(Period.Cst).ToString("HH:mm")</td>
+                    <td><span class="@Model.KindClass(i.Kind)">@Model.KindText(i.Kind)</span></td>
+                    <td style="max-width:560px">
+                        <div style="overflow:hidden;text-overflow:ellipsis" title="@i.Text">
+                            @IndexModel.Preview(i)
+                        </div>
+                    </td>
+                    <td>
+                        @if (string.IsNullOrEmpty(i.GoalId))
+                        {
+                            <span style="color:var(--muted)">—</span>
+                        }
+                        else
+                        {
+                            <a class="btn sm" href="/goals/detail?id=@i.GoalId">查看</a>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+
+        @if (Model.Hidden > 0)
+        {
+            <div class="hint" style="margin-top:12px">
+                还有 @Model.Hidden 条更早的没有渲染（一次最多 300 条）。用上面的类型筛选收窄，或换时间再看。
+            </div>
+        }
+    }
+</div>

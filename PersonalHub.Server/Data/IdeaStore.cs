@@ -176,6 +176,20 @@ namespace personalHub.Server.Data
             }
         }
 
+        /// <summary>
+        /// 已经「转成目标」的条数（goal_id 有值）。
+        /// 注意这不是"转化率"的分母/分子 —— 想法库不考核转化，
+        /// 这个数字只用来确认"这个出口真的被用过"，不是用来催人。
+        /// </summary>
+        public int CountLinked()
+        {
+            lock (_db.Sync)
+            {
+                return _db.Conn.ExecuteScalar<int>(
+                    "SELECT COUNT(*) FROM ideas WHERE deleted = 0 AND goal_id IS NOT NULL AND goal_id <> ''");
+            }
+        }
+
         // ============================================================
         // 工具
         // ============================================================

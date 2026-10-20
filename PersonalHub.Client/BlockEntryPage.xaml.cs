@@ -49,6 +49,15 @@ namespace PersonalHub.Client
         /// <summary>统计区间：today / week。</summary>
         private string _period = "today";
 
+        /// <summary>
+        /// 本页临时指定的归属。null = 跟随"片记忆 → 当前目标"，"" = 明确不归任何目标，其它 = 目标 id。
+        ///
+        /// 为什么要"临时"：片记忆负责"平时自动归对"，这里负责"这一次我想改一下"。
+        /// 临时值不写进偏好，退出页面就恢复自动 —— 否则它就成了新的全局单例，
+        /// 又回到"一次设定管所有片"的老问题。
+        /// </summary>
+        private string? _sessionGoalId;
+
         private bool _allPiecesOpen;
         private bool _busy;
 
@@ -124,11 +133,24 @@ namespace PersonalHub.Client
 
         private void ApplyGoalChip()
         {
-            var current = _activeGoals.FirstOrDefault(g => g.IsCurrent);
+            // 临时指定的目标如果被暂停/删掉了，回到自动，避免继续往一条死线里记
+            if (_sessionGoalId is { Length: > 0 }
+                && !_activeGoals.Any(g => g.Id == _sessionGoalId))
+            {
+                _sessionGoalId = null;
+            }
 
-            GoalChipBtn.Text = current is null ? "未设置" : Short(current.Title);
-            GoalChipBtn.TextColor = current is null ? ChipText : Colors.White;
-            GoalChipBtn.BackgroundColor = current is null ? ChipBg : ChipActiveBg;
+            bool pinned = _sessionGoalId is not null;
+
+            GoalChipBtn.Text = _sessionGoalId switch
+            {
+                null => "自动",
+                "" => "不归目标",
+                _ => Short(GoalNameOf(_sessionGoalId)),
+            };
+
+            GoalChipBtn.TextColor = pinned ? Colors.White : ChipText;
+            GoalChipBtn.BackgroundColor = pinned ? ChipActiveBg : ChipBg;
 
             // 一个目标都没有时才提示；有目标但没钉"当前"不打扰（块照样能记，只是不归目标）
             NoGoalCard.IsVisible = _activeGoals.Count == 0;
@@ -140,9 +162,37 @@ namespace PersonalHub.Client
             return s.Length <= 6 ? s : s.Substring(0, 6) + "…";
         }
 
+        /// <summary>
+        /// 就地切目标（不跳去目标页 —— 跳页等于"改一次归属要离开录入页"，那样没人会改）。
+        ///
+        /// 这里改的是"本页临时指定"，不是偏好：退出页面就恢复"片记忆 → 当前目标"。
+        /// 想永久改某个片的归属，直接点一次它就行（保存时会写进片记忆）。
+        /// </summary>
         private async void OnGoalChipClicked(object sender, EventArgs e)
         {
-            await Shell.Current.GoToAsync(RecordCatalog.GoalRoute);
+            var labels = new List<string> { "自动（每个片记上次的目标）" };
+            labels.AddRange(_activeGoals.Select(g => g.Title));
+            labels.Add("不归目标");
+
+            string pick = await DisplayActionSheet("这次记的归到哪？", "取消", null, labels.ToArray());
+            int idx = labels.IndexOf(pick);
+            if (idx < 0) return;
+
+            _sessionGoalId = idx switch
+            {
+                0 => null,
+                _ when idx == labels.Count - 1 => string.Empty,
+                _ => _activeGoals[idx - 1].Id,
+            };
+
+            ApplyGoalChip();
+
+            StatusLabel.Text = _sessionGoalId switch
+            {
+                null => "已恢复自动：每个片归它上次的目标。",
+                "" => "接下来记的都不归任何目标。",
+                _ => $"接下来记的都归到「{GoalNameOf(_sessionGoalId)}」。",
+            };
         }
 
         private async void OnCreateGoalClicked(object sender, EventArgs e)
@@ -261,8 +311,21 @@ namespace PersonalHub.Client
             string name = _settings.DisplayName(code);
             bool pinned = _settings.Pinned.Contains(code);
 
-            string pick = await DisplayActionSheet(name, "取消", null,
-                pinned ? "取消钉住" : "钉住到前排", "改名", "隐藏这个片");
+            var options = new List<string>
+            {
+                pinned ? "取消钉住" : "钉住到前排",
+                "改名",
+                "隐藏这个片",
+            };
+
+            // 有片记忆时才给"忘记"：没有记忆时这一项点了也没意义
+            string remembered = _settings.GoalFor(code);
+            if (remembered.Length > 0)
+            {
+                options.Add($"忘记归属（{GoalNameOf(remembered)}）");
+            }
+
+            string pick = await DisplayActionSheet(name, "取消", null, options.ToArray());
 
             switch (pick)
             {
@@ -295,6 +358,14 @@ namespace PersonalHub.Client
                     BuildAllPieces();
                     await BuildFrontPiecesAsync();
                     StatusLabel.Text = $"已隐藏「{name}」，历史记录仍在统计里";
+                    break;
+
+                default:
+                    if (pick is not null && pick.StartsWith("忘记归属", StringComparison.Ordinal))
+                    {
+                        _settings.SetGoalFor(code, string.Empty);
+                        StatusLabel.Text = $"已忘记「{name}」的归属，下次记它归到当前目标";
+                    }
                     break;
             }
         }
@@ -408,8 +479,10 @@ namespace PersonalHub.Client
             try
             {
                 long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                var goal = _activeGoals.FirstOrDefault(g => g.IsCurrent);
                 string note = (NoteEntry.Text ?? string.Empty).Trim();
+
+                // 归属：片记忆优先，其次当前目标；本页临时指定的最优先。
+                string goalId = ResolveGoalId(code);
 
                 var block = new LocalBlock
                 {
@@ -417,7 +490,7 @@ namespace PersonalHub.Client
                     PieceCode = code,
                     OccurredAt = now,
                     DurationMin = _duration,
-                    GoalId = goal?.Id ?? string.Empty,
+                    GoalId = goalId,
                     Note = note,
                     Worth = 0,
                     Anomaly = 0,
@@ -431,12 +504,21 @@ namespace PersonalHub.Client
 
                 await _blocks.InsertAsync(block);
                 _settings.SetDuration(code, _duration);
+
+                // 把这次的归属记在这个片上：下次点它就不用再想归哪条线。
+                // 只写本地偏好，不进服务端 —— 它是"默认值"，不是数据。
+                _settings.SetGoalFor(code, goalId);
+
                 NoteEntry.Text = string.Empty;   // 备注随块存走，框回到空
 
-                // 无弹窗、无 Toast：列表里立刻多一行，这就是唯一的反馈
+                // 无弹窗、无 Toast：列表里立刻多一行，这就是唯一的反馈。
+                // 但**必须在状态栏里写明归到哪**，否则归错了根本看不出来。
+                string head = $"已记下 {_settings.DisplayName(code)} {FormatMinutes(_duration)}";
+                string goalText = goalId.Length == 0 ? "未归目标" : "归到 " + GoalNameOf(goalId);
+
                 StatusLabel.Text = string.IsNullOrEmpty(note)
-                    ? $"已记下 {_settings.DisplayName(code)} {FormatMinutes(_duration)}"
-                    : $"已记下 {_settings.DisplayName(code)} {FormatMinutes(_duration)} · {note}";
+                    ? $"{head} · {goalText}"
+                    : $"{head} · {goalText} · {note}";
 
                 await RefreshTodayAsync();
                 await RefreshStatsAsync();
@@ -452,6 +534,35 @@ namespace PersonalHub.Client
                 _busy = false;
             }
         }
+
+        /// <summary>
+        /// 这个块该归到哪个目标。三级优先：本页临时指定 → 片记忆 → 当前目标。
+        ///
+        /// 片记忆指向的目标如果已经暂停/完成/删掉，记忆**自动失效**并回退到当前目标，
+        /// 而不是把新块写进一条死掉的目标里 —— 那种错误在统计里最难发现。
+        /// </summary>
+        private string ResolveGoalId(string code)
+        {
+            // 1. 本页临时指定（null = 没指定，走下面）
+            if (_sessionGoalId is not null)
+            {
+                return _sessionGoalId;
+            }
+
+            // 2. 片记忆：只在目标还活着时才认
+            string remembered = _settings.GoalFor(code);
+            if (remembered.Length > 0
+                && _activeGoals.Any(g => g.Id == remembered && g.Status == 0))
+            {
+                return remembered;
+            }
+
+            // 3. 当前目标（可能为空：没有目标也能记，只是不归任何线）
+            return _activeGoals.FirstOrDefault(g => g.IsCurrent)?.Id ?? string.Empty;
+        }
+
+        private string GoalNameOf(string goalId)
+            => _activeGoals.FirstOrDefault(g => g.Id == goalId)?.Title ?? "（已结束）";
 
         // ============================================================
         // 今日列表
@@ -628,7 +739,8 @@ namespace PersonalHub.Client
                 Day = TodayDay(),
                 PieceCode = code,
                 BudgetMin = Pieces.Durations[bIdx],
-                GoalId = _activeGoals.FirstOrDefault(g => g.IsCurrent)?.Id ?? string.Empty,
+                // 计划也用同一套归属解析：片记忆优先，这样"排进今天"和"点了就记"不会归到两条线
+                GoalId = ResolveGoalId(code),
                 CreatedAt = now,
                 UpdatedAt = now,
                 Deleted = false,
