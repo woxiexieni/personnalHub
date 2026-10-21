@@ -207,7 +207,7 @@ namespace PersonalHub.Client
         /// 每次"又回去了"的时刻，往前/往后 3 小时窗口内找时长最长的那个时间块，
         /// 统计它们落在哪些片后面 —— 人认不出自己的触发，数据可以。
         ///
-        /// 样本 < 10 次不给结论：12 次里的 8 次会被当成规律，那是新的迷信。
+        /// 样本不足 10 次不给结论：12 次里的 8 次会被当成规律，那是新的迷信。
         /// </summary>
         private async Task BuildInsightAsync(int backCount)
         {

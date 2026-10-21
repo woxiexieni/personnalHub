@@ -501,6 +501,12 @@ out/
 # 数据库快照（本地备份，不提交）
 backups/
 
+# ===== 手机端安装包投递目录 =====
+# client-android-release.bat 打包成功后把 apk + latest.json 放进来，
+# 手机浏览器打开 http://<本机IP>:5001/app 下载。
+# 二进制产物，每个 ~19 MB，绝不进仓库。
+updates/
+
 # ===== AI 配置：里面是 API key，绝不进仓库 =====
 # 服务端第一次启动会自动生成这份模板（apiKey 为空），你填完就能用。
 ai.json

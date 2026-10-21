@@ -17,7 +17,7 @@ namespace PersonalHub.Client.Data
     /// 一旦允许手动勾选，就一定会有人忘了勾，数字随即失真。
     /// </summary>
     [Table("plans")]
-    public class LocalPlan : LocalRecordBase
+    public class LocalPlan : LocalRecordBase, IVersioned
     {
         [PrimaryKey]
         public override string Id { get; set; } = string.Empty;

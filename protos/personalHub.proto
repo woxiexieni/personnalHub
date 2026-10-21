@@ -212,6 +212,18 @@ message TodaySummaryResponse {
 service ThingService {
     rpc UploadThings (UploadThingsRequest) returns (UploadThingsResponse);
     rpc GetTodayThings (Empty) returns (ThingList);
+
+    // 恢复专用：全量拉取（不含墓碑）。
+    // 为什么必须有它：这个服务原来只有「今天」一个出口，于是换机/重装之后
+    // 历史上所有事件反思都没有任何办法回到本地 —— 而那是最私密、最难重录的一类数据。
+    // 与 ListBlocks / ListIdeas 的区别只是字段多，用途完全相同：重建本地副本。
+    rpc ListThings (ListThingsRequest) returns (ThingList);
+}
+
+message ListThingsRequest {
+    optional int64 from = 1;   // 含（Unix 毫秒）；0 = 不限
+    optional int64 to = 2;     // 不含（Unix 毫秒）；0 = 不限
+    optional int32 limit = 3;  // 0 = 不限
 }
 
 // 传输的最基本单元：事件反思单元

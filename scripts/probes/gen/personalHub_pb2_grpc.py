@@ -674,6 +674,11 @@ class ThingServiceStub:
                 request_serializer=personalHub__pb2.Empty.SerializeToString,
                 response_deserializer=personalHub__pb2.ThingList.FromString,
                 _registered_method=True)
+        self.ListThings = channel.unary_unary(
+                '/personalhub.ThingService/ListThings',
+                request_serializer=personalHub__pb2.ListThingsRequest.SerializeToString,
+                response_deserializer=personalHub__pb2.ThingList.FromString,
+                _registered_method=True)
 
 
 class ThingServiceServicer:
@@ -698,6 +703,16 @@ class ThingServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListThings(self, request, context):
+        """恢复专用：全量拉取（不含墓碑）。
+        为什么必须有它：这个服务原来只有「今天」一个出口，于是换机/重装之后
+        历史上所有事件反思都没有任何办法回到本地 —— 而那是最私密、最难重录的一类数据。
+        与 ListBlocks / ListIdeas 的区别只是字段多，用途完全相同：重建本地副本。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ThingServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -709,6 +724,11 @@ def add_ThingServiceServicer_to_server(servicer, server):
             'GetTodayThings': grpc.unary_unary_rpc_method_handler(
                     servicer.GetTodayThings,
                     request_deserializer=personalHub__pb2.Empty.FromString,
+                    response_serializer=personalHub__pb2.ThingList.SerializeToString,
+            ),
+            'ListThings': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListThings,
+                    request_deserializer=personalHub__pb2.ListThingsRequest.FromString,
                     response_serializer=personalHub__pb2.ThingList.SerializeToString,
             ),
     }
@@ -772,6 +792,33 @@ class ThingService:
             target,
             '/personalhub.ThingService/GetTodayThings',
             personalHub__pb2.Empty.SerializeToString,
+            personalHub__pb2.ThingList.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListThings(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/personalhub.ThingService/ListThings',
+            personalHub__pb2.ListThingsRequest.SerializeToString,
             personalHub__pb2.ThingList.FromString,
             options,
             channel_credentials,

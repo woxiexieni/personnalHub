@@ -170,9 +170,80 @@ namespace PersonalHub.Client.Data
         }
 
         // ============================================================
-        // 读
+        // 恢复（服务端 → 本地，全量补回）
         // ============================================================
 
+        /// <summary>
+        /// 把服务端的一批记录合并进本地。**只补不删**，按版本号决定谁覆盖谁。
+        ///
+        /// 三条规则，顺序很重要：
+        ///   1. 本地没有 → 直接插入（这就是"换机/重装后数据回来"的唯一来源）
+        ///   2. 本地有但 Synced=false → 跳过。那说明本地这份还没传上去，
+        ///      用服务端的旧版本覆盖它 = 用户刚记的东西凭空消失。
+        ///   3. 本地有且已同步 → 谁的 UpdatedAt 新听谁的。
+        ///
+        /// 为什么和现有的 *MirrorService 不合并：
+        /// 镜像的职责是「对齐最近 30 天」（带墓碑、会清理窗口外的副本），
+        /// 恢复的职责是「把历史全部搬回来」（不带墓碑、绝不删除）。
+        /// 两件事混在一起，就会出现"刚恢复完就被清理规则删掉"这种事。
+        /// </summary>
+        public async Task<RestoreStats> RestoreAsync(IReadOnlyList<T> remote, long syncedAtMs)
+        {
+            await EnsureReadyAsync().ConfigureAwait(false);
+
+            int added = 0, updated = 0, kept = 0;
+
+            foreach (var r in remote)
+            {
+                if (string.IsNullOrEmpty(r.Id)) continue;
+
+                var local = await _db.FindAsync<T>(r.Id).ConfigureAwait(false);
+
+                if (local is null)
+                {
+                    r.Synced = true;
+                    r.SyncedAt = syncedAtMs;
+                    await _db.InsertAsync(r).ConfigureAwait(false);
+                    added++;
+                    continue;
+                }
+
+                // 本地待上传 = 本地是更新的那份，不能碰
+                if (!local.Synced)
+                {
+                    kept++;
+                    continue;
+                }
+
+                long remoteVersion = (r as IVersioned)?.UpdatedAt ?? 0;
+                long localVersion = (local as IVersioned)?.UpdatedAt ?? 0;
+
+                if (remoteVersion > localVersion)
+                {
+                    r.Synced = true;
+                    r.SyncedAt = syncedAtMs;
+                    await _db.InsertOrReplaceAsync(r).ConfigureAwait(false);
+                    updated++;
+                }
+                else
+                {
+                    kept++;
+                }
+            }
+
+            return new RestoreStats(added, updated, kept, remote.Count);
+        }
+
+        /// <summary>本地这一类记录的总条数（含墓碑，用来判断"这台设备是不是空的"）。</summary>
+        public async Task<int> CountAllAsync()
+        {
+            await EnsureReadyAsync().ConfigureAwait(false);
+            return await _db.Table<T>().CountAsync().ConfigureAwait(false);
+        }
+
+        // ============================================================
+        // 读
+        // ============================================================
         public async Task<T?> FindAsync(string id)
         {
             await EnsureReadyAsync().ConfigureAwait(false);
@@ -249,5 +320,12 @@ namespace PersonalHub.Client.Data
         {
             public string name { get; set; } = string.Empty;
         }
+    }
+
+    /// <summary>一类记录的恢复结果。</summary>
+    public sealed record RestoreStats(int Added, int Updated, int Kept, int RemoteTotal)
+    {
+        /// <summary>这一类到底有没有从服务端补进来东西。</summary>
+        public int Touched => Added + Updated;
     }
 }

@@ -141,6 +141,11 @@ namespace PersonHub.Server
 
             // 本地每日快照（VACUUM INTO）。服务端是唯一数据源，没有它一次误删就不可逆。
             builder.Services.AddSingleton<BackupService>();
+
+            // 手机端安装包投递目录（updates/）。发布脚本把新包放进去，
+            // 手机浏览器打开 /app 就能下载安装 —— 换版本不再需要插 USB。
+            builder.Services.AddSingleton<AppReleaseService>();
+
             // 服务端常常连开好几天，所以备份不能只在启动时做一次。
             builder.Services.AddHostedService<BackupWorker>();
 
@@ -192,6 +197,48 @@ namespace PersonHub.Server
                     : Results.NotFound();
             });
 
+            // ============================================================
+            // 手机端安装包的下载入口（这台电脑的局域网地址 + webPort）
+            // ============================================================
+            // 为什么要这几条路由：以前换一个版本要「开电脑 → 插 USB → adb install」，
+            // 而手机本来就连着这台电脑。把包放在服务端，手机浏览器打开 /app 就能装。
+            //
+            // 安全性：这个端口在局域网里谁都能访问，所以跟上面的 /backup/file 一样
+            // 只认投递目录里、文件名严格合规的文件（三重校验见 AppReleaseService.Resolve），
+            // 其余一律 404。
+            app.MapGet("/app", (AppReleaseService releases) =>
+                Results.Content(releases.RenderPage(), "text/html; charset=utf-8"));
+
+            // 机器可读的版本信息。第二步的客户端自更新就靠它判断"要不要下载"。
+            // 没有包时返回 404 + 一个说明，而不是 200 + 空对象 —— 让调用方能分清
+            // "服务端没有新版本"和"这个服务端根本没在管安装包"。
+            app.MapGet("/app/latest.json", (AppReleaseService releases) =>
+            {
+                var r = releases.Latest();
+                if (r is null)
+                    return Results.NotFound(new { ok = false, message = "no package delivered yet" });
+
+                return Results.Json(new
+                {
+                    ok = true,
+                    version = r.Version,
+                    code = r.Code,
+                    file = r.FileName,
+                    size = r.SizeBytes,
+                    sha256 = r.Sha256,
+                    builtAt = r.BuiltAt,
+                    sizeMismatch = r.SizeMismatch,
+                });
+            });
+
+            app.MapGet("/app/download/{name}", (string name, AppReleaseService releases) =>
+            {
+                string? path = releases.Resolve(name);
+                return path is null
+                    ? Results.NotFound()
+                    : Results.File(path, "application/vnd.android.package-archive", name);
+            });
+
             // 启动前打印可连接的地址，方便手机侧排查。
             // 这里主动解析一次 Db：让"表结构迁移"在启动时就跑完。
             // 否则迁移要等到第一个手机请求进来才执行，出错时你只会在手机上看到一个 gRPC 错误码。
@@ -200,6 +247,20 @@ namespace PersonHub.Server
 
             var backup = app.Services.GetRequiredService<BackupService>();
             Console.WriteLine($"[OK] 备份目录: {backup.Directory}（每天 1 份，保留 14 天 + 12 周 + 12 个月）");
+
+            // 安装包投递目录：打印"有没有包 / 是哪一版"，避免"以为投递成功了其实没放进去"。
+            // 这里只读目录、不发网络请求，开销可以忽略。
+            var releases = app.Services.GetRequiredService<AppReleaseService>();
+            var latestRelease = releases.Latest();
+            if (latestRelease is null)
+            {
+                Console.WriteLine($"[--] 安装包: 还没有（目录 {releases.Directory}）");
+                Console.WriteLine("     要投递：先跑 scripts\\client-android-release.bat，打包成功后会自动放进来。");
+            }
+            else
+            {
+                Console.WriteLine($"[OK] 安装包: v{latestRelease.Version} · {latestRelease.SizeText} · {latestRelease.BuiltAtText}");
+            }
 
             // AI：这里只打印"配了没有"，**绝不打印 key**（控制台会被截图、会被复制给别人）。
             var ai = app.Services.GetRequiredService<personalHub.Server.Ai.AiConfig>();
@@ -260,6 +321,12 @@ namespace PersonHub.Server
             foreach (string ip in GetLanAddresses())
             {
                 Console.WriteLine($"                 http://{ip}:{webPort}/");
+            }
+            Console.WriteLine();
+            Console.WriteLine($"   [手机装新版] http://127.0.0.1:{webPort}/app  (手机浏览器打开，下载安装包)");
+            foreach (string ip in GetLanAddresses())
+            {
+                Console.WriteLine($"                 http://{ip}:{webPort}/app");
             }
             Console.WriteLine("============================================================");
         }

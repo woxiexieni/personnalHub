@@ -79,5 +79,32 @@ namespace personalHub.Server.Services
             _logger.LogInformation("GetTodayThings: 返回 {Count} 条", list.Things.Count);
             return Task.FromResult(list);
         }
+
+        /// <summary>
+        /// 全量拉取（恢复用）。
+        ///
+        /// 刻意**不返回墓碑**：这条通道只做「把服务端已有的补回本地」，不承担删除传播。
+        /// 恢复时如果连墓碑一起下发，一个从没同步过的新设备会凭空多出一堆"已删除"行，
+        /// 而那些行在本地是空的 —— 删无可删，只是把界面搞脏。
+        /// 删除的传播归各类型的镜像通道（带 include_deleted 的那几个），职责分开。
+        /// </summary>
+        public override Task<ThingList> ListThings(
+            ListThingsRequest request, ServerCallContext context)
+        {
+            long from = request.From != 0 ? request.From : long.MinValue;
+            long to = request.To != 0 ? request.To : long.MaxValue;
+
+            IEnumerable<Thing> rows = _store.All()
+                .Where(t => t.OccurredAt >= from && t.OccurredAt < to)
+                .OrderByDescending(t => t.OccurredAt);
+
+            if (request.Limit > 0) rows = rows.Take(request.Limit);
+
+            var list = new ThingList();
+            list.Things.AddRange(rows);
+
+            _logger.LogInformation("ListThings: 返回 {Count} 条（恢复通道）", list.Things.Count);
+            return Task.FromResult(list);
+        }
     }
 }

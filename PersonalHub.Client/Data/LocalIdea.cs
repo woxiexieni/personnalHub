@@ -19,7 +19,7 @@ namespace PersonalHub.Client.Data
     /// Kind 允许 0（未分类）：**默认就是 0**。分类是事后整理的动作，不是记录的动作。
     /// </summary>
     [Table("ideas")]
-    public class LocalIdea : LocalRecordBase
+    public class LocalIdea : LocalRecordBase, IVersioned
     {
         [PrimaryKey]
         public override string Id { get; set; } = string.Empty;

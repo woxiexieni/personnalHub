@@ -18,13 +18,35 @@ namespace PersonalHub.Client
     ///     转了目标的可能一直没做成，没转目标的小事也可能直接做完了。
     ///     所以列表里只有"已落实 N 条"这个正数，永远没有"还有 N 条没落实"。
     ///
-    /// 只加载最近 200 条：想法是要长期攒的，全量渲染会在某天突然变卡。
-    /// 需要更早的，用管理端的想法库页（那里有筛选和全文搜索）。
+    /// 「看多少」交给一个范围选择器（见 <see cref="Ranges"/>），而不是一次性全渲染：
+    ///   按数量（最近 100 / 300 条）—— 想"再看一点"，这是最直观的口径
+    ///   按日期（近 7 / 30 天）      —— 想"翻这阵子"，日期才对得上记忆
+    ///   全部                        —— 攒了几年之后偶尔想从头看一遍
+    /// 三种口径共用一个"更早的 100 条"按钮：无论选哪种，渲染都按 100 条一批往后放，
+    /// 一次性把 2000 张卡片塞进 ScrollView 会卡死，而分页查询会让"还有没有更早的"变成猜不准的问题。
+    ///
+    /// 本机没有的，从服务端补（<see cref="IdeaHistoryService"/>）。
+    /// 以前这页只读本地，而想法没有镜像 —— 卸载重装之后服务端明明有 12 条，界面却是空的。
     /// </summary>
     public partial class IdeaListPage : ContentPage
     {
-        /// <summary>一次最多渲染多少条。超过就提示去管理端看更早的。</summary>
-        private const int MaxRender = 200;
+        /// <summary>一批渲染多少条。</summary>
+        private const int PageSize = 100;
+
+        /// <summary>
+        /// 范围口径。Count &gt; 0 = 按数量（最近 N 条）；Days &gt; 0 = 按日期（近 N 天）；
+        /// 两个都是 0 = 全部。
+        /// </summary>
+        private sealed record IdeaRange(string Label, int Count, int Days);
+
+        private static readonly IdeaRange[] Ranges =
+        {
+            new("最近 100 条", 100, 0),
+            new("最近 300 条", 300, 0),
+            new("近 7 天", 0, 7),
+            new("近 30 天", 0, 30),
+            new("全部", 0, 0),
+        };
 
         private static readonly Color ChipBg = Color.FromArgb("#F1EFE8");
         private static readonly Color ChipText = Color.FromArgb("#2C2C2A");
@@ -37,6 +59,7 @@ namespace PersonalHub.Client
         private readonly LocalRecordStore<LocalGoal> _goals;
         private readonly RecordSyncService<LocalIdea> _ideaSync;
         private readonly RecordSyncService<LocalGoal> _goalSync;
+        private readonly IdeaHistoryService _history;
 
         /// <summary>-1 = 全部。</summary>
         private int _filter = -1;
@@ -49,11 +72,21 @@ namespace PersonalHub.Client
         /// </summary>
         private bool _doneOnly;
 
+        /// <summary>当前范围。默认按数量取最近 100 条：想"再看一点"比想"某一天"常见得多。</summary>
+        private IdeaRange _range = Ranges[0];
+
+        /// <summary>这一轮可见上限。改范围或改筛选时重置成一批。</summary>
+        private int _renderLimit = PageSize;
+
+        /// <summary>上一张卡片属于哪一天（自然日起点，毫秒）。null = 还没有，或时间未知那组。</summary>
+        private long? _lastDayKey;
+
         public IdeaListPage(
             LocalRecordStore<LocalIdea> ideas,
             LocalRecordStore<LocalGoal> goals,
             RecordSyncService<LocalIdea> ideaSync,
-            RecordSyncService<LocalGoal> goalSync)
+            RecordSyncService<LocalGoal> goalSync,
+            IdeaHistoryService history)
         {
             InitializeComponent();
 
@@ -61,14 +94,37 @@ namespace PersonalHub.Client
             _goals = goals;
             _ideaSync = ideaSync;
             _goalSync = goalSync;
+            _history = history;
 
             BuildFilterChips();
+            RangeBtn.Text = $"范围：{_range.Label}";
         }
 
         protected override async void OnAppearing()
         {
             base.OnAppearing();
+
+            // 先渲染本机已有的（离线也立刻有内容），再问服务端要本机没有的。
             await LoadAsync();
+            await PullFromServerAsync();
+        }
+
+        /// <summary>
+        /// 从服务端补本机没有的想法。失败什么都不做 —— 这页本来就有本地那份。
+        /// </summary>
+        private async Task PullFromServerAsync()
+        {
+            var r = await _history.PullAsync();
+
+            if (r.Added > 0 || r.Updated > 0)
+            {
+                await LoadAsync();
+                SyncLabel.Text = $"服务端共 {r.RemoteTotal} 条，补回 {r.Added} 条。";
+                return;
+            }
+
+            // 没变化就不留字：这行是"解释这一页从哪来的"，不是状态监视器
+            SyncLabel.Text = r.Ok ? string.Empty : "这次没连上服务端 —— 这页只有本机记的。";
         }
 
         // ============================================================
@@ -123,6 +179,7 @@ namespace PersonalHub.Client
             _doneOnly = !_doneOnly;
             StyleDoneChip(chip);
 
+            _renderLimit = PageSize;   // 换了视角就回到第一批
             await LoadAsync();
         }
 
@@ -163,7 +220,57 @@ namespace PersonalHub.Client
                 if (child is Button c && c.CommandParameter is int k) StyleFilterChip(c, k);
             }
 
+            _renderLimit = PageSize;
             await LoadAsync();
+        }
+
+        // ============================================================
+        // 范围（看多少）
+        // ============================================================
+
+        /// <summary>
+        /// 一个按钮 + 一个 ActionSheet，而不是把五个档位做成 chips 铺在顶上。
+        ///
+        /// 理由：范围不是筛选条件。筛选（类型、已落实）是"我想看哪一类"，
+        /// 会反复切；范围是"这页显示到哪儿"，选一次能管很久。
+        /// 把它做成第二排 chips 会让顶上两排挤在一起，而且每排都在抢同一个视觉权重。
+        /// </summary>
+        private async void OnRangeClicked(object? sender, EventArgs e)
+        {
+            var labels = Ranges.Select(r => r.Label).ToArray();
+            string pick = await DisplayActionSheet("显示多少", "取消", null, labels);
+
+            if (string.IsNullOrEmpty(pick) || pick == "取消") return;
+
+            var range = Ranges.FirstOrDefault(r => r.Label == pick);
+            if (range is null) return;
+
+            _range = range;
+            _renderLimit = PageSize;
+            RangeBtn.Text = $"范围：{_range.Label}";
+
+            await LoadAsync();
+        }
+
+        /// <summary>
+        /// 只解析范围，不改数组顺序 —— 排序永远是"新的在上"。
+        ///
+        /// 为什么不给"最早的在上"：想法库的用法是"最近在想什么"，
+        /// 倒着读一年前的想法不是任何人会做的事；多一个开关只多一个要想的状态。
+        /// </summary>
+        private List<LocalIdea> ApplyRange(List<LocalIdea> all)
+        {
+            var ordered = all.OrderByDescending(x => x.CreatedAt).ToList();
+
+            if (_range.Count > 0) return ordered.Take(_range.Count).ToList();
+
+            if (_range.Days > 0)
+            {
+                var (from, _) = Period.LastDays(_range.Days);
+                return ordered.Where(x => x.CreatedAt >= from).ToList();
+            }
+
+            return ordered;
         }
 
         // ============================================================
@@ -172,51 +279,140 @@ namespace PersonalHub.Client
 
         private async Task LoadAsync()
         {
-            var all = await _ideas.GetByRangeAsync(0, long.MaxValue);
+            var snap = await QueryAsync();
 
-            var filtered = _filter < 0
-                ? all
-                : all.Where(x => x.Kind == _filter).ToList();
+            var render = snap.Filtered.Take(_renderLimit).ToList();
 
-            if (_doneOnly) filtered = filtered.Where(x => x.Done).ToList();
-
-            // 已按 CreatedAt 倒序（GetByRangeAsync 用 DayTimestamp 排序），这里再兜一次
-            filtered = filtered.OrderByDescending(x => x.CreatedAt).ToList();
-
-            var render = filtered.Take(MaxRender).ToList();
-
+            _lastDayKey = null;          // 整页重建，日期分节从头算
             IdeaRows.Children.Clear();
-            foreach (var idea in render)
-            {
-                IdeaRows.Children.Add(BuildCard(idea));
-            }
+            RenderWithDayHeaders(render);
+
+            // 还有没显示的才给按钮。全部显示完就不留一个永远点不动的"更早"
+            MoreBtn.IsVisible = snap.Filtered.Count > render.Count;
 
             EmptyLabel.IsVisible = render.Count == 0;
-            EmptyLabel.Text = all.Count == 0
+            EmptyLabel.Text = snap.All.Count == 0
                 ? "库里还是空的。回上一页写一句就有一条 —— 不需要组织语言。"
-                : _doneOnly
-                    ? "还没有标成「已落实」的想法。它不是待办，标不标都行。"
-                    : "这个筛选下还没有想法。";
+                : snap.Scope.Count == 0
+                    ? $"{_range.Label}里没有想法。换个范围就能看到更早的。"
+                    : _doneOnly
+                        ? "这个范围里还没有标成「已落实」的想法。它不是待办，标不标都行。"
+                        : "这个筛选下还没有想法。";
 
-            CountLabel.Text = all.Count == 0
+            CountLabel.Text = snap.All.Count == 0
                 ? string.Empty
-                : BuildCountText(all, filtered, render);
+                : BuildCountText(snap, render);
 
             await RefreshStatusAsync();
         }
 
-        private static string BuildCountText(List<LocalIdea> all, List<LocalIdea> filtered, List<LocalIdea> render)
-        {
-            int unclassified = all.Count(x => x.Kind == IdeaKinds.Unclassified);
-            int converted = all.Count(x => !string.IsNullOrEmpty(x.GoalId));
-            int done = all.Count(x => x.Done);
+        private sealed record Snapshot(List<LocalIdea> All, List<LocalIdea> Scope, List<LocalIdea> Filtered);
 
-            string head = $"共 {all.Count} 条";
-            if (filtered.Count != all.Count) head += $" · 当前筛选 {filtered.Count} 条";
+        /// <summary>
+        /// 读库 + 套范围 + 套筛选。范围先切、筛选后套（原因见 LoadAsync 里的注释）。
+        /// 抽出来是因为「更早」也要重算一遍，两边必须用同一个口径。
+        /// </summary>
+        private async Task<Snapshot> QueryAsync()
+        {
+            var all = await _ideas.GetByRangeAsync(0, long.MaxValue);
+            var scope = ApplyRange(all);
+
+            var filtered = _filter < 0
+                ? scope
+                : scope.Where(x => x.Kind == _filter).ToList();
+
+            if (_doneOnly) filtered = filtered.Where(x => x.Done).ToList();
+
+            return new Snapshot(all, scope, filtered);
+        }
+
+        /// <summary>
+        /// 再放一批出来。**追加而不是重建**：重建会把 ScrollView 顶回最上面，
+        /// 用户点了底部的"更早"却被弹回最新一条，等于每次都要重新滑一遍。
+        /// </summary>
+        private async void OnShowMoreClicked(object? sender, EventArgs e)
+        {
+            int already = _renderLimit;
+            _renderLimit += PageSize;
+
+            var snap = await QueryAsync();
+            var extra = snap.Filtered.Skip(already).Take(PageSize).ToList();
+
+            RenderWithDayHeaders(extra);
+
+            MoreBtn.IsVisible = snap.Filtered.Count > already + extra.Count;
+            CountLabel.Text = BuildCountText(snap, snap.Filtered.Take(already + extra.Count).ToList());
+        }
+
+        /// <summary>
+        /// 按天分段渲染。卡片上的时间只留"14:32"，日期交给分节标题 ——
+        /// 一行长列表里每张卡都重复写一次"10月19日"，扫起来反而看不出跳过了一天。
+        /// </summary>
+        private void RenderWithDayHeaders(List<LocalIdea> render)
+        {
+            foreach (var idea in render)
+            {
+                long? day = idea.CreatedAt > 0
+                    ? Period.DayStartOf(idea.CreatedAt).ToUnixTimeMilliseconds()
+                    : null;
+
+                if (day != _lastDayKey)
+                {
+                    IdeaRows.Children.Add(BuildDayHeader(day));
+                    _lastDayKey = day;
+                }
+
+                IdeaRows.Children.Add(BuildCard(idea));
+            }
+        }
+
+        private static View BuildDayHeader(long? dayStart)
+        {
+            string text;
+
+            if (dayStart is null)
+            {
+                text = "时间未知";
+            }
+            else
+            {
+                var d = DateTimeOffset.FromUnixTimeMilliseconds(dayStart.Value).ToOffset(Period.Cst).Date;
+                var today = DateTimeOffset.UtcNow.ToOffset(Period.Cst).Date;
+
+                text = d == today ? "今天"
+                     : d == today.AddDays(-1) ? "昨天"
+                     : d.Year == today.Year ? d.ToString("M月d日")
+                     : d.ToString("yyyy年M月d日");
+            }
+
+            return new Label
+            {
+                Text = text,
+                FontSize = 11,
+                FontAttributes = FontAttributes.Bold,
+                TextColor = Color.FromArgb("#8A8A8E"),
+                Margin = new Thickness(2, 10, 0, 0),
+            };
+        }
+
+
+        private string BuildCountText(Snapshot snap, List<LocalIdea> render)
+        {
+            int unclassified = snap.Scope.Count(x => x.Kind == IdeaKinds.Unclassified);
+            int converted = snap.Scope.Count(x => !string.IsNullOrEmpty(x.GoalId));
+            int done = snap.Scope.Count(x => x.Done);
+
+            // 头一段永远先说"这一页是什么口径"：范围一换，条数变化才有解释，
+            // 否则用户看到 12 条 → 3 条，会以为数据丢了。
+            string head = snap.Filtered.Count == snap.Scope.Count
+                ? $"{_range.Label} · {snap.Filtered.Count} 条"
+                : $"{_range.Label} · 当前筛选 {snap.Filtered.Count} / {snap.Scope.Count} 条";
+
+            if (snap.Scope.Count != snap.All.Count) head += $" · 库里共 {snap.All.Count} 条";
             if (unclassified > 0) head += $" · 未分类 {unclassified} 条";
             if (converted > 0) head += $" · 已转成目标 {converted} 条";
             if (done > 0) head += $" · 已落实 {done} 条";
-            if (render.Count < filtered.Count) head += $" · 只显示最近 {render.Count} 条";
+            if (render.Count < snap.Filtered.Count) head += $" · 显示 {render.Count} 条";
 
             return head;
         }
@@ -234,7 +430,8 @@ namespace PersonalHub.Client
                 MaxLines = 4,
             }));
 
-            string meta = $"{IdeaKinds.LabelOf(idea.Kind)} · {FormatWhen(idea.CreatedAt)}";
+            // 卡片上只写几点几分：日期由上面的分节标题给，不重复
+            string meta = $"{IdeaKinds.LabelOf(idea.Kind)} · {FormatClock(idea.CreatedAt)}";
             if (!string.IsNullOrEmpty(idea.GoalId)) meta += " · 已转成目标";
 
             // 已落实单独占一行：混进上面那行灰字里，一眼扫过去根本看不见，
@@ -319,17 +516,11 @@ namespace PersonalHub.Client
             return DateTimeOffset.FromUnixTimeMilliseconds(ms).ToOffset(Period.Cst).ToString("M月d日");
         }
 
-        private static string FormatWhen(long ms)
+        /// <summary>「14:32」。日期在分节标题上，这里只给时刻；没有时间戳就留空。</summary>
+        private static string FormatClock(long ms)
         {
             if (ms <= 0) return "时间未知";
-
-            var t = DateTimeOffset.FromUnixTimeMilliseconds(ms).ToOffset(Period.Cst);
-            var today = DateTimeOffset.UtcNow.ToOffset(Period.Cst).Date;
-
-            if (t.Date == today) return $"今天 {t:HH:mm}";
-            if (t.Date == today.AddDays(-1)) return $"昨天 {t:HH:mm}";
-            if (t.Year == today.Year) return t.ToString("M月d日");
-            return t.ToString("yyyy年M月d日");
+            return DateTimeOffset.FromUnixTimeMilliseconds(ms).ToOffset(Period.Cst).ToString("HH:mm");
         }
 
         // ============================================================

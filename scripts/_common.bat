@@ -50,4 +50,24 @@ if not defined PH_VERSION set "PH_VERSION=1.0.0"
 set "PH_CODE="
 for /f "tokens=1,2,3 delims=." %%a in ("%PH_VERSION%") do set /a PH_CODE=%%a*10000+%%b*100+%%c
 
+REM ---- locate adb (platform-tools) -----------------------------------------
+REM adb is almost never on PATH on a Windows dev box: Visual Studio installs it
+REM under the Android SDK and only uses the full path internally. The old
+REM scripts all failed with "adb was not found" because of that, so the search
+REM lives here once and every script keeps calling plain "adb".
+where adb >nul 2>&1
+if not errorlevel 1 goto :adb_done
+
+for %%P in (
+    "%LOCALAPPDATA%\Android\Sdk\platform-tools"
+    "C:\Program Files (x86)\Android\android-sdk\platform-tools"
+    "C:\Program Files\Android\android-sdk\platform-tools"
+) do (
+    if exist "%%~P\adb.exe" (
+        set "PATH=%%~P;%PATH%"
+        goto :adb_done
+    )
+)
+
+:adb_done
 exit /b 0

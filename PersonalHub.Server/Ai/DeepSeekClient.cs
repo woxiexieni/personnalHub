@@ -66,7 +66,10 @@ namespace personalHub.Server.Ai
                     model = cfg.Model,
                     messages = Msgs(system, user),
                     temperature = 0.6,
-                    max_tokens = 900,
+                    // 3000 而不是 900：deepseek-flash 这类**推理型**模型会先写思维链
+                    // （实测一句"拆成 JSON"就烧掉 535 个 reasoning token），
+                    // 900 会被思维链吃光，content 直接是空的。见 §31。
+                    max_tokens = 3000,
                     stream = false,
                     response_format = new { type = "json_object" },
                 }
@@ -75,7 +78,7 @@ namespace personalHub.Server.Ai
                     model = cfg.Model,
                     messages = Msgs(system, user),
                     temperature = 0.6,
-                    max_tokens = 900,
+                    max_tokens = 1500,
                     stream = false,
                 };
 
@@ -101,7 +104,11 @@ namespace personalHub.Server.Ai
                 string? content = ExtractContent(body);
                 if (string.IsNullOrWhiteSpace(content))
                 {
-                    return new LlmReply(false, string.Empty, "模型返回里没有 content", 0);
+                    // 区分两种"没 content"：被截断（max_tokens 用完）和结构不对。
+                    // 这一条是实测踩出来的：推理型模型会先吐 reasoning_content，
+                    // 预算不够时 content 就是空的，而 finish_reason 会明确写着 length。
+                    return new LlmReply(false, string.Empty,
+                        IsTruncated(body) ? "输出被截断（max_tokens 用完，思维链占掉了）" : "模型返回里没有 content", 0);
                 }
 
                 return new LlmReply(true, content!, string.Empty, 0);
@@ -138,6 +145,23 @@ namespace personalHub.Server.Ai
             catch
             {
                 return null;
+            }
+        }
+
+        /// <summary>choices[0].finish_reason 是不是 length（= 被 max_tokens 截断）。</summary>
+        private static bool IsTruncated(string body)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                if (!doc.RootElement.TryGetProperty("choices", out var choices)) return false;
+                if (choices.GetArrayLength() == 0) return false;
+                return choices[0].TryGetProperty("finish_reason", out var fr)
+                    && string.Equals(fr.GetString(), "length", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
             }
         }
 

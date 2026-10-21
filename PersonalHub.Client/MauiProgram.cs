@@ -67,6 +67,17 @@ namespace PersonalHub.Client
             // 只负责"从服务端拉下来把本地副本对齐"，上传仍然归 RecordSyncService。
             builder.Services.AddSingleton<LocalCacheService>();
 
+            // 恢复：把服务端的全部历史搬回本地（换机 / 重装用）。
+            // 与上面两个镜像服务不是一回事：镜像只管最近 30 天，这个管"全部历史"。
+            // 2026-10-21：界面上那个"数据与恢复"页撤掉了（用户不需要一个要自己记得点的入口），
+            // 改成**本机为空时自动跑一次** —— 见 StartupRestoreService。
+            builder.Services.AddSingleton<RestoreService>();
+            builder.Services.AddSingleton<StartupRestoreService>();
+
+            // 想法的"服务端 → 本机"对齐：想法以前只有上传、没有镜像，
+            // 于是卸载重装之后服务端明明有数据、界面却是空的（用户 2026-10-21 报的问题）。
+            builder.Services.AddSingleton<IdeaHistoryService>();
+
             // 时间块 / 目标的"服务端 → 本地"对齐（与 LocalCacheService 同一思路，独立因为表不同）。
             builder.Services.AddSingleton<BlockMirrorService>();
 

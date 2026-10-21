@@ -3,6 +3,22 @@ using SQLite;
 namespace PersonalHub.Client.Data
 {
     /// <summary>
+    /// 「带版本号的记录」。
+    ///
+    /// 为什么不在 <see cref="LocalRecordBase"/> 上直接放一个 abstract UpdatedAt：
+    /// 那会强迫每个子类都改成 override，动了 8 个已跑通的模型；
+    /// 而这些类本来就有同名同类型的普通属性，加个接口就能隐式实现，零侵入。
+    ///
+    /// 用处只有一个：<see cref="LocalRecordStore{T}.RestoreAsync"/> 要能泛型地比较版本。
+    /// 恢复的地基是「谁新听谁的」，没有版本字段就没法判新旧 —— 只能盲覆盖，
+    /// 那样本地刚记、还没上传的那条会被服务端的旧版本抹掉。
+    /// </summary>
+    public interface IVersioned
+    {
+        long UpdatedAt { get; }
+    }
+
+    /// <summary>
     /// 所有本地记录的公共基类。
     /// 提供主键、同步状态、按天分组所需的时间戳。
     /// </summary>
@@ -64,7 +80,7 @@ namespace PersonalHub.Client.Data
     /// 约定：SpentAt / CreatedAt / SyncedAt 均为 Unix 毫秒时间戳。
     /// </summary>
     [Table("records")]
-    public class LocalRecord: LocalRecordBase
+    public class LocalRecord : LocalRecordBase, IVersioned
     {
         [PrimaryKey]
         public override string Id { get; set; } = string.Empty;
@@ -126,7 +142,7 @@ namespace PersonalHub.Client.Data
 
 
     [Table("ThingsRecords")]
-    public class ThingRecord :LocalRecordBase
+    public class ThingRecord : LocalRecordBase, IVersioned
     {
 
         [PrimaryKey]//自增
@@ -246,7 +262,7 @@ namespace PersonalHub.Client.Data
     /// R2.5 的计时、R3 的复盘、R4 的计划都只用界面 + 接口，不再动表。
     /// </summary>
     [Table("blocks")]
-    public class LocalBlock : LocalRecordBase
+    public class LocalBlock : LocalRecordBase, IVersioned
     {
         [PrimaryKey]
         public override string Id { get; set; } = string.Empty;
@@ -309,7 +325,7 @@ namespace PersonalHub.Client.Data
     /// 存下来会在删块或改归属之后永久错掉，而且错得看不出来。
     /// </summary>
     [Table("goals")]
-    public class LocalGoal : LocalRecordBase
+    public class LocalGoal : LocalRecordBase, IVersioned
     {
         [PrimaryKey]
         public override string Id { get; set; } = string.Empty;

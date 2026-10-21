@@ -106,6 +106,7 @@ namespace PersonalHub.Client.Services
                             ? $"进行中 {active.Count} 个 · 本周 {BlockEntryPage.FormatMinutes(minutes)}"
                             : $"进行中 {active.Count} 个 · 本周还没动";
                     }),
+
             };
         }
     }

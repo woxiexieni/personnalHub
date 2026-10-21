@@ -78,6 +78,10 @@ namespace PersonalHub.Client
             Routing.RegisterRoute(
                 OverviewCatalog.WeekReviewRoute,
                 new ServiceRouteFactory(typeof(WeekReviewPage)));
+
+            // 以前这里还有一个「数据与恢复」页。2026-10-21 撤掉：
+            // 它把"数据会不会丢"变成一件要用户记得去做的事。
+            // 现在由 StartupRestoreService 在本机为空时自动跑一次，没有入口。
         }
     }
 

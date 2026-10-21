@@ -11,7 +11,7 @@ namespace PersonalHub.Client.Data
     /// 模式回答"我对这类事的反应"，一季度两三个、要写四段。合表会互相污染。
     /// </summary>
     [Table("patterns")]
-    public class LocalPattern : LocalRecordBase
+    public class LocalPattern : LocalRecordBase, IVersioned
     {
         [PrimaryKey]
         public override string Id { get; set; } = string.Empty;
@@ -56,7 +56,7 @@ namespace PersonalHub.Client.Data
     /// 这是一天 0~1 次的动作，多一个字段就少一半点击。
     /// </summary>
     [Table("practices")]
-    public class LocalPractice : LocalRecordBase
+    public class LocalPractice : LocalRecordBase, IVersioned
     {
         [PrimaryKey]
         public override string Id { get; set; } = string.Empty;

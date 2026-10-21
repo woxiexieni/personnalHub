@@ -14,10 +14,29 @@
                         Wrap="Wrap" Direction="Row"
                         JustifyContent="Start" AlignItems="Start"/>
 
+            <!-- 范围 + 同步状态占一行：它们都是"这一页在显示什么"的说明，不是筛选条件 -->
+            <HorizontalStackLayout Spacing="10">
+                <Button x:Name="RangeBtn"
+                        Text="范围：最近 100 条"
+                        FontSize="12" HeightRequest="30" Padding="12,0" CornerRadius="15"
+                        BackgroundColor="#F1EFE8" TextColor="#2C2C2A"
+                        Clicked="OnRangeClicked"/>
+                <Label x:Name="SyncLabel" Text="" FontSize="11"
+                       TextColor="{StaticResource Gray500}"
+                       VerticalOptions="Center" LineBreakMode="TailTruncation"/>
+            </HorizontalStackLayout>
+
             <Label x:Name="CountLabel" Text="" FontSize="11"
-                   TextColor="{StaticResource Gray500}"/>
+                   TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
 
             <VerticalStackLayout x:Name="IdeaRows" Spacing="8"/>
+
+            <!-- 只有"范围里还有更早的"才出现。不显示"共多少条未读"那种数字 —— 那是积压 -->
+            <Button x:Name="MoreBtn" Text="更早的 100 条"
+                    IsVisible="False"
+                    FontSize="12" HeightRequest="36" Padding="14,0" CornerRadius="10"
+                    BackgroundColor="#F1EFE8" TextColor="#2C2C2A"
+                    Clicked="OnShowMoreClicked"/>
 
             <Label x:Name="EmptyLabel" Text="" FontSize="12"
                    TextColor="{StaticResource Gray500}" IsVisible="False"
