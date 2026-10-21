@@ -107,29 +107,41 @@ namespace PersonalHub.Client.Services
             => _state.LastDuration.TryGetValue(code, out int d) && d > 0 ? d : 30;
 
         /// <summary>
-        /// 这个片上次归到哪个目标（空 = 没有记忆）。
+        /// 这个片上次归到哪个目标。
         ///
         /// 为什么归属要挂在"片"上而不是全局一个"当前目标"：
         /// 片和目标本来就是强关联的 ——「写代码」几乎总归 PersonalHub，「读书」归另一条线。
         /// 用一次的选择换后面所有次都不用选，且**不增加任何一次点击**。
         ///
-        /// 这只是"默认值的改进"，不是"绑定"：目标被暂停/删掉时调用方会回退到当前目标，
-        /// 所以它永远不会把块写进一条已经死掉的目标里。
+        /// 空串有两种含义，靠 <see cref="HasGoalFor"/> 区分：
+        ///   有记忆且为空串 = 上次明确选了「不归目标」，这是一次真实的选择，要记住；
+        ///   没有记忆       = 从没选过。
+        /// 这两个必须分开，否则"不归目标"记不住，下次又被系统塞回某个目标。
         /// </summary>
         public string GoalFor(string code)
             => _state.GoalFor.TryGetValue(code, out var id) ? id ?? string.Empty : string.Empty;
 
-        /// <summary>记住这个片的归属；传空 = 忘掉（下次回退到当前目标）。</summary>
+        /// <summary>这个片有没有归属记忆（"明确不归目标"也算有）。</summary>
+        public bool HasGoalFor(string code) => _state.GoalFor.ContainsKey(code);
+
+        /// <summary>
+        /// 记住这个片的归属。空串 = 记住「这个片明确不归任何目标」。
+        ///
+        /// 为什么空串也要存下来、而不是把记忆删掉：删掉等于"没选过"，
+        /// 下次录入就会走兜底、又被归进某个目标 —— 用户明明选过"不归"，
+        /// 结果被系统改回去，这就是"我选了但没用"。
+        /// 真的要清除记忆用 <see cref="ForgetGoal"/>。
+        /// </summary>
         public void SetGoalFor(string code, string goalId)
         {
-            if (string.IsNullOrEmpty(goalId))
-            {
-                _state.GoalFor.Remove(code);
-            }
-            else
-            {
-                _state.GoalFor[code] = goalId;
-            }
+            _state.GoalFor[code] = goalId ?? string.Empty;
+            Save();
+        }
+
+        /// <summary>彻底忘掉这个片的归属，回到"从没选过"的状态。</summary>
+        public void ForgetGoal(string code)
+        {
+            _state.GoalFor.Remove(code);
             Save();
         }
 

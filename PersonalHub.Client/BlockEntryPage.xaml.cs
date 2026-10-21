@@ -50,11 +50,13 @@ namespace PersonalHub.Client
         private string _period = "today";
 
         /// <summary>
-        /// 本页临时指定的归属。null = 跟随"片记忆 → 当前目标"，"" = 明确不归任何目标，其它 = 目标 id。
+        /// 本页临时指定的归属。null = 跟随片记忆，"" = 明确不归任何目标，其它 = 目标 id。
         ///
         /// 为什么要"临时"：片记忆负责"平时自动归对"，这里负责"这一次我想改一下"。
-        /// 临时值不写进偏好，退出页面就恢复自动 —— 否则它就成了新的全局单例，
-        /// 又回到"一次设定管所有片"的老问题。
+        /// 它只活在这一页 —— 否则它就成了新的全局单例，又回到"一次设定管所有片"的老问题。
+        ///
+        /// 但**点一次就写进片记忆**：这次改的归属，下次点同一个片直接沿用。
+        /// 也就是说它改的是"这个片的默认值"，不是"全局默认值"。
         /// </summary>
         private string? _sessionGoalId;
 
@@ -144,7 +146,7 @@ namespace PersonalHub.Client
 
             GoalChipBtn.Text = _sessionGoalId switch
             {
-                null => "自动",
+                null => "按片记忆",
                 "" => "不归目标",
                 _ => Short(GoalNameOf(_sessionGoalId)),
             };
@@ -165,12 +167,12 @@ namespace PersonalHub.Client
         /// <summary>
         /// 就地切目标（不跳去目标页 —— 跳页等于"改一次归属要离开录入页"，那样没人会改）。
         ///
-        /// 这里改的是"本页临时指定"，不是偏好：退出页面就恢复"片记忆 → 当前目标"。
-        /// 想永久改某个片的归属，直接点一次它就行（保存时会写进片记忆）。
+        /// 这里改的是"本页临时指定"，不是全局偏好：退出页面就回到"按片记忆"。
+        /// 但它**会写进片记忆**（保存时落盘）：这次把这个片归到哪，下次点它还归到哪。
         /// </summary>
         private async void OnGoalChipClicked(object sender, EventArgs e)
         {
-            var labels = new List<string> { "自动（每个片记上次的目标）" };
+            var labels = new List<string> { "按片记忆（每个片沿用上次的选择）" };
             labels.AddRange(_activeGoals.Select(g => g.Title));
             labels.Add("不归目标");
 
@@ -189,9 +191,9 @@ namespace PersonalHub.Client
 
             StatusLabel.Text = _sessionGoalId switch
             {
-                null => "已恢复自动：每个片归它上次的目标。",
-                "" => "接下来记的都不归任何目标。",
-                _ => $"接下来记的都归到「{GoalNameOf(_sessionGoalId)}」。",
+                null => "已恢复：每个片沿用它上次归的目标，没记过的不归。",
+                "" => "接下来记的都不归任何目标，且会记在这个片上。",
+                _ => $"接下来记的都归到「{GoalNameOf(_sessionGoalId)}」，且会记在这个片上。",
             };
         }
 
@@ -318,11 +320,14 @@ namespace PersonalHub.Client
                 "隐藏这个片",
             };
 
-            // 有片记忆时才给"忘记"：没有记忆时这一项点了也没意义
-            string remembered = _settings.GoalFor(code);
-            if (remembered.Length > 0)
+            // 有片记忆时才给"忘记"：没有记忆时这一项点了也没意义。
+            // 「明确不归目标」也是一种记忆，同样要能清掉。
+            if (_settings.HasGoalFor(code))
             {
-                options.Add($"忘记归属（{GoalNameOf(remembered)}）");
+                string remembered = _settings.GoalFor(code);
+                options.Add(remembered.Length > 0
+                    ? $"忘记归属（{GoalNameOf(remembered)}）"
+                    : "忘记归属（当前：不归目标）");
             }
 
             string pick = await DisplayActionSheet(name, "取消", null, options.ToArray());
@@ -363,8 +368,8 @@ namespace PersonalHub.Client
                 default:
                     if (pick is not null && pick.StartsWith("忘记归属", StringComparison.Ordinal))
                     {
-                        _settings.SetGoalFor(code, string.Empty);
-                        StatusLabel.Text = $"已忘记「{name}」的归属，下次记它归到当前目标";
+                        _settings.ForgetGoal(code);
+                        StatusLabel.Text = $"已忘掉「{name}」的归属：下次记它不再沿用，点「目标」可重新指定";
                     }
                     break;
             }
@@ -481,8 +486,8 @@ namespace PersonalHub.Client
                 long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 string note = (NoteEntry.Text ?? string.Empty).Trim();
 
-                // 归属：片记忆优先，其次当前目标；本页临时指定的最优先。
-                string goalId = ResolveGoalId(code);
+                // 归属：本页临时指定 → 片记忆（上次选的）→ 不归目标。不猜。
+                string goalId = ResolveGoalId(code, out string goalReason);
 
                 var block = new LocalBlock
                 {
@@ -512,9 +517,19 @@ namespace PersonalHub.Client
                 NoteEntry.Text = string.Empty;   // 备注随块存走，框回到空
 
                 // 无弹窗、无 Toast：列表里立刻多一行，这就是唯一的反馈。
-                // 但**必须在状态栏里写明归到哪**，否则归错了根本看不出来。
+                // 但**必须在状态栏里写明归到哪、以及凭什么归的**，否则归错了根本看不出来。
+                // 归错看不见 = 统计一直是错的，而人一直以为是对的。
                 string head = $"已记下 {_settings.DisplayName(code)} {FormatMinutes(_duration)}";
-                string goalText = goalId.Length == 0 ? "未归目标" : "归到 " + GoalNameOf(goalId);
+                string goalText = goalId.Length == 0
+                    ? $"未归目标（{goalReason}）"
+                    : $"归到 {GoalNameOf(goalId)}（{goalReason}）";
+
+                // 这个片第一次记：额外指一下入口 —— 归属是"选一次就一直沿用"的，
+                // 不说明的话，用户会以为每次都要手动选，白点很多次。
+                if (goalId.Length == 0 && !_settings.HasGoalFor(code))
+                {
+                    goalText += " · 点上面「目标」指定一次，以后就记住了";
+                }
 
                 StatusLabel.Text = string.IsNullOrEmpty(note)
                     ? $"{head} · {goalText}"
@@ -536,29 +551,57 @@ namespace PersonalHub.Client
         }
 
         /// <summary>
-        /// 这个块该归到哪个目标。三级优先：本页临时指定 → 片记忆 → 当前目标。
+        /// 这个块该归到哪个目标。规则只有一条：**沿用这个片上次的选择**。
         ///
-        /// 片记忆指向的目标如果已经暂停/完成/删掉，记忆**自动失效**并回退到当前目标，
-        /// 而不是把新块写进一条死掉的目标里 —— 那种错误在统计里最难发现。
+        /// 这里刻意**没有"兜底到当前目标"**。原来那级兜底看着贴心，实际是个陷阱：
+        /// 只要片没有记忆（或者记忆被"不归目标"清掉了），每个新块都会被静默塞进
+        /// 当时那个"当前目标"，用户根本没选过 —— 归对了没人夸，归错了要一条条改回去。
+        /// 系统猜的归属，代价全在用户这边。
+        ///
+        /// 三级优先：
+        ///   1. 本页临时指定（点「目标」chip 改的那次）；
+        ///   2. 片记忆 —— 上次归哪就归哪，包括上次选的「不归目标」；
+        ///   3. 都没有 → 不归目标。
+        ///
+        /// 片记忆指向的目标如果已经暂停/完成/删掉：不归，并通过 <paramref name="reason"/>
+        /// 说出来。不偷偷换成别的目标 —— 换成一个用户没选过的，跟猜是一样的错。
         /// </summary>
-        private string ResolveGoalId(string code)
+        private string ResolveGoalId(string code, out string reason)
         {
             // 1. 本页临时指定（null = 没指定，走下面）
             if (_sessionGoalId is not null)
             {
+                reason = _sessionGoalId.Length == 0 ? "本次指定不归目标" : "本次指定";
                 return _sessionGoalId;
             }
 
-            // 2. 片记忆：只在目标还活着时才认
-            string remembered = _settings.GoalFor(code);
-            if (remembered.Length > 0
-                && _activeGoals.Any(g => g.Id == remembered && g.Status == 0))
+            // 2. 片记忆
+            if (_settings.HasGoalFor(code))
             {
-                return remembered;
+                string remembered = _settings.GoalFor(code);
+
+                // 上次明确选了「不归目标」—— 这也是一次选择，照办
+                if (remembered.Length == 0)
+                {
+                    reason = "沿用上次：不归目标";
+                    return string.Empty;
+                }
+
+                // 记忆里的目标还活着才认
+                if (_activeGoals.Any(g => g.Id == remembered && g.Status == 0))
+                {
+                    reason = "沿用上次";
+                    return remembered;
+                }
+
+                // 目标已经结束/删掉：不归，让用户自己重新选一次
+                reason = $"上次归的「{GoalNameOf(remembered)}」已结束，这次没归";
+                return string.Empty;
             }
 
-            // 3. 当前目标（可能为空：没有目标也能记，只是不归任何线）
-            return _activeGoals.FirstOrDefault(g => g.IsCurrent)?.Id ?? string.Empty;
+            // 3. 从没选过 —— 不猜，就让它空着
+            reason = "还没归过目标";
+            return string.Empty;
         }
 
         private string GoalNameOf(string goalId)
@@ -740,7 +783,7 @@ namespace PersonalHub.Client
                 PieceCode = code,
                 BudgetMin = Pieces.Durations[bIdx],
                 // 计划也用同一套归属解析：片记忆优先，这样"排进今天"和"点了就记"不会归到两条线
-                GoalId = ResolveGoalId(code),
+                GoalId = ResolveGoalId(code, out _),
                 CreatedAt = now,
                 UpdatedAt = now,
                 Deleted = false,

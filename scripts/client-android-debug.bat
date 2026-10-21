@@ -21,6 +21,12 @@ if errorlevel 1 goto :fail
 echo.
 echo [OK] APK: %APK%
 for %%F in ("%APK%") do echo      size: %%~zF bytes
+echo.
+echo [i] Copy THIS file - not the one without "-Signed" in its name.
+echo     "com.companyname.personalhub.client.apk" sitting next to it carries
+echo     NO signature at all. Android refuses to install it, and the reflex
+echo     fix people reach for is to uninstall the app first, which wipes the
+echo     local database together with everything that never reached the server.
 
 REM ---- try to push it to a phone that is plugged in over USB ----
 where adb >nul 2>&1
@@ -37,13 +43,26 @@ if errorlevel 1 (
     goto :done
 )
 
+REM ---- snapshot the database first: a cover install keeps it, a mis-step
+REM      does not, and "just uninstall it" is exactly the mis-step ----
+echo.
+echo [i] backing up the phone database first...
+set PH_NO_PAUSE=1
+call "%~dp0phone-db.bat" backup
+
 echo.
 echo [i] installing to the connected device...
 adb install -r "%APK%"
 if errorlevel 1 (
     echo.
-    echo [!] install failed. If the signatures differ, uninstall first:
-    echo     adb uninstall com.companyname.personalhub.client
+    echo [!] Install failed. Do NOT jump to "adb uninstall" - that deletes the
+    echo     local database. A backup was just written to backups\phone\.
+    echo     Check these first:
+    echo       1. is it the -Signed.apk?  the plain .apk is unsigned and always
+    echo          fails, no matter how many times you retry;
+    echo       2. still failing - the signatures really differ. Back up, then:
+    echo            phone-db.bat backup
+    echo            adb uninstall com.companyname.personalhub.client
 )
 
 :done

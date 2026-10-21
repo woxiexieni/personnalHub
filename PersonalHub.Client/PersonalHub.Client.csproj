@@ -46,14 +46,28 @@
 	</PropertyGroup>
 
 	<!--
-	  Release 配置：官方推荐的「裁剪 + assembly store」组合，体积最小。
-	  这里默认用现成的调试签名库签 Release 包 —— 免去自建 keystore，
-	  且与已安装的 Debug 包同一签名，可直接覆盖升级、不用先卸载。
-	  （只适合自己手机装；要正式发版请跑 scripts\create-keystore.bat，
-	   它会让下面的 Import 生效并覆盖这几行。）
+	  Release 配置：官方推荐的「裁剪 + assembly store」组合，体积最小（~18 MB）。
+	  Debug 是 ~120 MB，别拿它发给别人。
 	-->
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net8.0-android|AnyCPU'">
 		<AndroidPackageFormat>apk</AndroidPackageFormat>
+	</PropertyGroup>
+
+	<!--
+	  ===== 签名：Debug 和 Release 必须签成同一把钥匙 =====
+	  两边签名一致 → 装新包是"覆盖升级"，系统保留 app 私有目录里的 SQLite，
+	  时间块、账单、想法一条都不丢。
+	  签名对不上 → 手机只给一条路：先卸载再装。而卸载会把私有目录连库一起删掉，
+	  当天没同步上去的数据就永久没了（2026-10-21 真实丢过一次）。
+
+	  所以这里**不给 Debug 留"用默认签名"的余地**。默认签名看着省心，但它在
+	  debug.keystore 丢失 / 换机器 / 重装 SDK 时会自动换一把新钥匙，且全程无提示，
+	  等你发现时已经卸载过了。两边都显式指向同一个库，行为才可预期。
+
+	  要正式发版：跑 scripts\create-keystore.bat 生成 local-signing.props，
+	  下面的 Import 会覆盖这几行 —— 注意那会让签名变化，现有手机必须卸载一次。
+	-->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
 		<AndroidKeyStore>true</AndroidKeyStore>
 		<AndroidSigningKeyStore>$(LocalAppData)\Xamarin\Mono for Android\debug.keystore</AndroidSigningKeyStore>
 		<AndroidSigningStorePass>android</AndroidSigningStorePass>
