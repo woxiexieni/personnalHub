@@ -28,7 +28,7 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Grid.Column="0" Text="其余三段建好后在详情里补"
                                FontSize="11" TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
-                        <Button Grid.Column="1" Text="建" WidthRequest="60" HeightRequest="34"
+                        <Button Grid.Column="1" Text="建" WidthRequest="60" HeightRequest="40"
                                 Clicked="OnCreateClicked"/>
                     </Grid>
                 </VerticalStackLayout>

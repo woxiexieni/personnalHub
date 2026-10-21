@@ -31,7 +31,6 @@ namespace personalHub.Server.Services
                 {
                     Ok = true,
                     ServerVersion = "PersonalHub Server v1.0.0"
-
                 }
 
                 );
