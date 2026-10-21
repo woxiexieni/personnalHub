@@ -248,6 +248,8 @@ namespace Personalhub
             CreatedAt = p.CreatedAt,
             UpdatedAt = p.UpdatedAt,
             Deleted = p.Deleted,
+            Done = p.Done,
+            DoneAt = p.Done ? p.DoneAt : 0,
         };
 
         /// <summary>镜像下载用：不设 Synced（下载 ≠ 已上传）。</summary>
@@ -260,6 +262,8 @@ namespace Personalhub
             CreatedAt = p.CreatedAt,
             UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
             Deleted = p.Deleted,
+            Done = p.Done,
+            DoneAt = p.Done ? p.DoneAt : 0,
         };
     }
 }

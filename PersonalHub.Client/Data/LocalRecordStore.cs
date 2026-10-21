@@ -32,6 +32,12 @@ namespace PersonalHub.Client.Data
             ("records",       "Deleted",   "INTEGER NOT NULL DEFAULT 0"),
             ("ThingsRecords", "UpdatedAt", "INTEGER NOT NULL DEFAULT 0"),
             ("ThingsRecords", "Deleted",   "INTEGER NOT NULL DEFAULT 0"),
+
+            // R6.1：想法「已落实」。ideas 表是 R6 建的，手机上已经有一批行，
+            // CreateTable 补出来的列是「可空、无默认值」→ 老行是 NULL →
+            // 读进 bool / long 属性会直接抛异常（不是悄悄变 false）。必须显式补 DEFAULT 并回填。
+            ("ideas",         "Done",      "INTEGER NOT NULL DEFAULT 0"),
+            ("ideas",         "DoneAt",    "INTEGER NOT NULL DEFAULT 0"),
         };
 
         /// <summary>

@@ -5,15 +5,18 @@ using PersonalHub.Client.Services;
 namespace PersonalHub.Client
 {
     /// <summary>
-    /// 想法库（R6）：看 + 整理 + 「转成目标」。
+    /// 想法库（R6）：看 + 整理 + 「转成目标」+「已落实」。
     ///
-    /// 三条设计约束：
+    /// 四条设计约束：
     ///  1. **不显示"未处理 N 条"**。想法库不是待办清单，一旦有积压计数，
     ///     人就会开始有"要清空它"的压力，然后放弃记录。
     ///  2. **不做自动生成目标**。只有用户自己点「转成目标」。
     ///     系统判断不了哪条想法值得做，判断错了代价是"多了一堆假目标"，比没有更糟。
     ///  3. **文字点开看全**（TextPeek），不进第二层详情页 —— 想法本身就只有一段话，
     ///     再包一层详情页等于让用户点两次才能看完一段话。
+    ///  4. **「已落实」是回看的标记，不是流程状态**。它和「转成目标」互不推导：
+    ///     转了目标的可能一直没做成，没转目标的小事也可能直接做完了。
+    ///     所以列表里只有"已落实 N 条"这个正数，永远没有"还有 N 条没落实"。
     ///
     /// 只加载最近 200 条：想法是要长期攒的，全量渲染会在某天突然变卡。
     /// 需要更早的，用管理端的想法库页（那里有筛选和全文搜索）。
@@ -27,6 +30,9 @@ namespace PersonalHub.Client
         private static readonly Color ChipText = Color.FromArgb("#2C2C2A");
         private static readonly Color ChipActiveBg = Color.FromArgb("#185FA5");
 
+        /// <summary>已落实用的绿。与「计划行动」同色：落实本来就是"计划那类想法"的终点。</summary>
+        private static readonly Color DoneColor = Color.FromArgb("#3B6D11");
+
         private readonly LocalRecordStore<LocalIdea> _ideas;
         private readonly LocalRecordStore<LocalGoal> _goals;
         private readonly RecordSyncService<LocalIdea> _ideaSync;
@@ -34,6 +40,14 @@ namespace PersonalHub.Client
 
         /// <summary>-1 = 全部。</summary>
         private int _filter = -1;
+
+        /// <summary>
+        /// 只看已落实的。
+        ///
+        /// 它和「未处理」是两回事：这里只是"回看我做成了哪些"的视角开关，
+        /// 关掉的时候不会告诉你"还有几条没落实" —— 想法库不给人积压感。
+        /// </summary>
+        private bool _doneOnly;
 
         public IdeaListPage(
             LocalRecordStore<LocalIdea> ideas,
@@ -70,6 +84,46 @@ namespace PersonalHub.Client
             {
                 AddFilterChip(k.Kind, k.Label);
             }
+
+            AddDoneChip();
+        }
+
+        /// <summary>
+        /// 「已落实」开关。它是**独立于类型**的一维筛选，不是第五种类型 ——
+        /// 塞进类型 chips 里会让"未分类"和"已落实"看起来互斥，而它们根本不是一回事。
+        /// </summary>
+        private void AddDoneChip()
+        {
+            var chip = new Button
+            {
+                Text = "✓ 已落实",
+                FontSize = 12,
+                HeightRequest = 32,
+                Padding = new Thickness(13, 0),
+                CornerRadius = 16,
+                Margin = new Thickness(0, 0, 8, 8),
+            };
+
+            StyleDoneChip(chip);
+            chip.Clicked += OnDoneFilterClicked;
+            FilterChips.Children.Add(chip);
+        }
+
+        private void StyleDoneChip(Button chip)
+        {
+            chip.BackgroundColor = _doneOnly ? DoneColor : ChipBg;
+            chip.TextColor = _doneOnly ? Colors.White : ChipText;
+            chip.BorderWidth = 0;
+        }
+
+        private async void OnDoneFilterClicked(object? sender, EventArgs e)
+        {
+            if (sender is not Button chip) return;
+
+            _doneOnly = !_doneOnly;
+            StyleDoneChip(chip);
+
+            await LoadAsync();
         }
 
         private void AddFilterChip(int kind, string label)
@@ -124,6 +178,8 @@ namespace PersonalHub.Client
                 ? all
                 : all.Where(x => x.Kind == _filter).ToList();
 
+            if (_doneOnly) filtered = filtered.Where(x => x.Done).ToList();
+
             // 已按 CreatedAt 倒序（GetByRangeAsync 用 DayTimestamp 排序），这里再兜一次
             filtered = filtered.OrderByDescending(x => x.CreatedAt).ToList();
 
@@ -138,7 +194,9 @@ namespace PersonalHub.Client
             EmptyLabel.IsVisible = render.Count == 0;
             EmptyLabel.Text = all.Count == 0
                 ? "库里还是空的。回上一页写一句就有一条 —— 不需要组织语言。"
-                : "这个类型下还没有想法。";
+                : _doneOnly
+                    ? "还没有标成「已落实」的想法。它不是待办，标不标都行。"
+                    : "这个筛选下还没有想法。";
 
             CountLabel.Text = all.Count == 0
                 ? string.Empty
@@ -151,11 +209,13 @@ namespace PersonalHub.Client
         {
             int unclassified = all.Count(x => x.Kind == IdeaKinds.Unclassified);
             int converted = all.Count(x => !string.IsNullOrEmpty(x.GoalId));
+            int done = all.Count(x => x.Done);
 
             string head = $"共 {all.Count} 条";
             if (filtered.Count != all.Count) head += $" · 当前筛选 {filtered.Count} 条";
             if (unclassified > 0) head += $" · 未分类 {unclassified} 条";
             if (converted > 0) head += $" · 已转成目标 {converted} 条";
+            if (done > 0) head += $" · 已落实 {done} 条";
             if (render.Count < filtered.Count) head += $" · 只显示最近 {render.Count} 条";
 
             return head;
@@ -174,15 +234,27 @@ namespace PersonalHub.Client
                 MaxLines = 4,
             }));
 
-            var kindColor = IdeaKinds.ColorOf(idea.Kind);
             string meta = $"{IdeaKinds.LabelOf(idea.Kind)} · {FormatWhen(idea.CreatedAt)}";
             if (!string.IsNullOrEmpty(idea.GoalId)) meta += " · 已转成目标";
+
+            // 已落实单独占一行：混进上面那行灰字里，一眼扫过去根本看不见，
+            // 而"这条我到底做没做成"恰恰是回头翻想法库时唯一想确认的事。
+            if (idea.Done)
+            {
+                info.Children.Add(new Label
+                {
+                    Text = "✓ 已落实" + (idea.DoneAt > 0 ? " · " + FormatDay(idea.DoneAt) : string.Empty),
+                    FontSize = 11,
+                    TextColor = DoneColor,
+                    FontAttributes = FontAttributes.Bold,
+                });
+            }
 
             info.Children.Add(new Label
             {
                 Text = meta,
                 FontSize = 11,
-                TextColor = kindColor,
+                TextColor = IdeaKinds.ColorOf(idea.Kind),
             });
 
             var actions = new VerticalStackLayout { Spacing = 6, VerticalOptions = LayoutOptions.Start };
@@ -238,6 +310,13 @@ namespace PersonalHub.Client
                 Padding = new Thickness(14, 10),
                 Content = grid,
             };
+        }
+
+        /// <summary>「10月21日」这种短日期，给"落实时间"用 —— 它只需要到天。</summary>
+        private static string FormatDay(long ms)
+        {
+            if (ms <= 0) return string.Empty;
+            return DateTimeOffset.FromUnixTimeMilliseconds(ms).ToOffset(Period.Cst).ToString("M月d日");
         }
 
         private static string FormatWhen(long ms)
@@ -328,11 +407,20 @@ namespace PersonalHub.Client
             var idea = await _ideas.FindAsync(id);
             if (idea is null) return;
 
+            // 菜单项跟着当前状态变：已经落实的给"取消已落实"，没落实的给"标记已落实"。
+            // 用两个不同的词而不是一个开关项，是因为开关项要人先读一遍才知道现在是哪一边。
+            string doneAction = idea.Done ? "取消已落实" : "标记已落实";
+
             string pick = await DisplayActionSheet(
-                Shorten(idea.Text, 24), "取消", null, "改类型", "删除");
+                Shorten(idea.Text, 24), "取消", null, doneAction, "改类型", "删除");
 
             switch (pick)
             {
+                case "标记已落实":
+                case "取消已落实":
+                    await ToggleDoneAsync(idea);
+                    break;
+
                 case "改类型":
                     await ChangeKindAsync(idea);
                     break;
@@ -341,6 +429,38 @@ namespace PersonalHub.Client
                     await DeleteAsync(idea);
                     break;
             }
+        }
+
+        // ============================================================
+        // 已落实
+        // ============================================================
+
+        /// <summary>
+        /// 打勾 / 取消「已落实」。
+        ///
+        /// 只改这一个标记，不动正文、不动类型、不动 GoalId ——
+        /// "这条想法我做了"和"这条想法变成了目标"是两件独立的事，谁也不推导谁。
+        ///
+        /// 时间的口径：本地先记一个 now，服务端 <see cref="IdeaStore"/> 在 done=1 且
+        /// done_at=0 时会再补一次，两端算出同一个值（差几十毫秒不影响按天显示）。
+        /// </summary>
+        private async Task ToggleDoneAsync(LocalIdea idea)
+        {
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            idea.Done = !idea.Done;
+            idea.DoneAt = idea.Done ? now : 0;
+            idea.UpdatedAt = now;
+            idea.Synced = false;
+
+            await _ideas.UpdateAsync(idea);
+            await LoadAsync();
+
+            StatusLabel.Text = idea.Done
+                ? "标成已落实了。回头翻库的时候一眼就能看见。"
+                : "已取消落实标记。";
+
+            _ = _ideaSync.SyncAsync();
         }
 
         private async Task ChangeKindAsync(LocalIdea idea)

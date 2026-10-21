@@ -43,7 +43,8 @@ namespace personalHub.Server.Services
                 request.Kind,
                 request.From,
                 request.To,
-                request.IncludeDeleted));
+                request.IncludeDeleted,
+                request.Done));
 
             return Task.FromResult(list);
         }

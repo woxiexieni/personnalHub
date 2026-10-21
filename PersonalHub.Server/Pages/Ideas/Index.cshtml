@@ -8,7 +8,7 @@
 <div class="card">
     <div class="card-head">
         <h2>想法</h2>
-        <span class="hint">原材料仓库 · 不设处理状态 · 不计完成率 · 攒着不发霉才叫库</span>
+        <span class="hint">原材料仓库 · 不算完成率 · 攒着不发霉才叫库 ·「已落实」只是回看用的标记</span>
     </div>
 
     <div class="kpis">
@@ -25,7 +25,12 @@
         <div class="kpi">
             <div class="label">已转成目标</div>
             <div class="num">@Model.Linked</div>
-            <div class="sub">这个出口被用过几次，不考核</div>
+            <div class="sub">打算做（这个出口被用过几次）</div>
+        </div>
+        <div class="kpi">
+            <div class="label">已落实</div>
+            <div class="num">@Model.DoneCount</div>
+            <div class="sub">真的做成了，只看不考核</div>
         </div>
     </div>
 </div>
@@ -42,7 +47,7 @@
         </a>
         @foreach (var k in new[] { 0, 1, 2, 3, 4 })
         {
-            <a class="btn sm @(Model.Kind == k ? "primary" : "")" href="/ideas?kind=@k">
+            <a class="btn sm @(Model.Kind == k ? "primary" : "")" href="/ideas?kind=@k&done=@Model.Done">
                 @Model.KindText(k) <span style="opacity:.7">@Model.CountOf(k)</span>
             </a>
         }
@@ -50,10 +55,40 @@
 </div>
 
 <div class="card">
+    <div class="card-head">
+        <h2 style="font-size:14px">按落实情况</h2>
+        <span class="hint">「转成目标」= 打算做，「已落实」= 真做了，两件事</span>
+    </div>
+
+    <div class="filters">
+        <a class="btn sm @(Model.Done < 0 ? "primary" : "")" href="/ideas?kind=@Model.Kind">全部</a>
+        <a class="btn sm @(Model.Done == 1 ? "primary" : "")" href="/ideas?kind=@Model.Kind&done=1">
+            已落实 <span style="opacity:.7">@Model.DoneCount</span>
+        </a>
+        <a class="btn sm @(Model.Done == 0 ? "primary" : "")" href="/ideas?kind=@Model.Kind&done=0">还没落实</a>
+    </div>
+</div>
+
+<div class="card">
     @if (Model.Items.Count == 0)
     {
         <div class="empty">
-            @(Model.Kind < 0 ? "还没有想法。手机端「记录 → 想法」随手记一条就行。" : "这个类型下还没有想法。")
+            @if (Model.Kind < 0 && Model.Done < 0)
+            {
+                <text>还没有想法。手机端「记录 → 想法」随手记一条就行。</text>
+            }
+            else if (Model.Done == 1)
+            {
+                <text>还没有标成「已落实」的想法。手机端想法库里长按单条可以标。</text>
+            }
+            else if (Model.Done == 0)
+            {
+                <text>这个筛选下没有「还没落实」的想法了。</text>
+            }
+            else
+            {
+                <text>这个类型下还没有想法。</text>
+            }
         </div>
     }
     else
@@ -64,6 +99,7 @@
                 <th style="width:96px">时间</th>
                 <th style="width:88px">类型</th>
                 <th>正文</th>
+                <th style="width:104px">落实</th>
                 <th style="width:88px">目标</th>
             </tr>
             </thead>
@@ -73,10 +109,20 @@
                 <tr>
                     <td style="white-space:nowrap;color:var(--muted)">@Fmt.ShortDate(i.CreatedAt) @DateTimeOffset.FromUnixTimeMilliseconds(i.CreatedAt).ToOffset(Period.Cst).ToString("HH:mm")</td>
                     <td><span class="@Model.KindClass(i.Kind)">@Model.KindText(i.Kind)</span></td>
-                    <td style="max-width:560px">
+                    <td style="max-width:520px">
                         <div style="overflow:hidden;text-overflow:ellipsis" title="@i.Text">
                             @IndexModel.Preview(i)
                         </div>
+                    </td>
+                    <td>
+                        @if (i.Done)
+                        {
+                            <span class="tag done" title="标记于 @Fmt.DateTimeText(i.DoneAt)">@IndexModel.DoneText(i)</span>
+                        }
+                        else
+                        {
+                            <span style="color:var(--muted)">—</span>
+                        }
                     </td>
                     <td>
                         @if (string.IsNullOrEmpty(i.GoalId))

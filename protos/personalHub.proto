@@ -532,6 +532,18 @@ message Idea {
     optional int64 created_at = 5;
     optional int64 updated_at = 6;         // 版本比较；0 = 未知版本，直接接受
     optional bool deleted = 7 [default = false];
+
+    // ---- R6.1：已落实 ----
+    // 与 goal_id 是两个**独立**的动作，不要互相推断：
+    //   goal_id 有值 = 这条被挑出来做成目标了（打算做，还没做）
+    //   done = 1     = 它真的落地了（做完了 / 变成事实了）
+    // 没转目标的想法照样可以「已落实」（想法本身可能就是一件小事，为它建目标是负担）；
+    // 转了目标的也可能一直没做完。所以两个标记都要留。
+    //
+    // 但仍然刻意**没有**「未处理 / 处理中」：已落实是唯一一个"事后回看"的标记，
+    // 它不是流程状态，所以列表里不会出现「还有 N 条没处理」这种积压计数。
+    optional bool done = 8 [default = false];
+    optional int64 done_at = 9;            // 标记落实的时刻；0 = 没标过（取消落实时清零）
 }
 
 message UploadIdeasRequest { repeated Idea ideas = 1; }
@@ -547,6 +559,7 @@ message ListIdeasRequest {
     optional int64 from = 2;                 // 含（Unix 毫秒）
     optional int64 to = 3;                   // 不含
     optional bool include_deleted = 4 [default = false];
+    optional int32 done = 5 [default = -1];  // -1 全部 / 0 未落实 / 1 已落实
 }
 
 message IdeaList { repeated Idea ideas = 1; }

@@ -34,6 +34,10 @@ namespace PersonalHub.Server.Pages.Ideas
         [BindProperty(SupportsGet = true)]
         public int Kind { get; set; } = -1;
 
+        /// <summary>-1 = 全部，0 = 未落实，1 = 已落实。</summary>
+        [BindProperty(SupportsGet = true)]
+        public int Done { get; set; } = -1;
+
         public IReadOnlyList<Idea> Items { get; private set; } = Array.Empty<Idea>();
 
         public IReadOnlyDictionary<int, int> Counts { get; private set; }
@@ -47,6 +51,9 @@ namespace PersonalHub.Server.Pages.Ideas
         /// <summary>已经转成目标的条数。</summary>
         public int Linked { get; private set; }
 
+        /// <summary>已经落实的条数。</summary>
+        public int DoneCount { get; private set; }
+
         /// <summary>当前筛选下还有多少条没渲染出来。</summary>
         public int Hidden { get; private set; }
 
@@ -55,12 +62,13 @@ namespace PersonalHub.Server.Pages.Ideas
             Counts = _ideas.CountByKind();
             Total = Counts.Values.Sum();
             Linked = _ideas.CountLinked();
+            DoneCount = _ideas.CountDone();
 
             // 本周新增用时间窗查，不读全表：想法库会越来越长。
             ThisWeek = _ideas.List(-1, WeekStartMs(), 0, false).Count;
 
             // List 已按 created_at 倒序，这里只截前 PageSize 条。
-            var page = _ideas.List(Kind, 0, 0, false);
+            var page = _ideas.List(Kind, 0, 0, false, Done);
             Items = page.Take(PageSize).ToList();
             Hidden = Math.Max(0, page.Count - Items.Count);
         }
@@ -86,6 +94,10 @@ namespace PersonalHub.Server.Pages.Ideas
             4 => "tag income",   // 淡绿
             _ => "tag",          // 灰
         };
+
+        /// <summary>已落实的展示文案。「已落实」后面不带日期时也成立（老数据只有标记没时间）。</summary>
+        public static string DoneText(Idea i)
+            => i.DoneAt > 0 ? "已落实 " + Fmt.ShortDate(i.DoneAt) : "已落实";
 
         /// <summary>正文预览：表格里放全文会把行撑到几屏，超出的用 title 兜。</summary>
         public static string Preview(Idea i)

@@ -41,5 +41,18 @@ namespace personalHub.Server.Data
 
         [Column("deleted")]
         public int Deleted { get; set; }
+
+        /// <summary>0 未落实 / 1 已落实。</summary>
+        [Column("done")]
+        public int Done { get; set; }
+
+        /// <summary>
+        /// 标记落实的时刻（Unix 毫秒）；0 = 没标过。
+        ///
+        /// 与 done 分开存而不是"用 updated_at 代替"：updated_at 是版本比较字段，
+        /// 改一次类型它就变一次，拿它当落实时间会得到"最后一次改动的时间"，答案是错的。
+        /// </summary>
+        [Column("done_at")]
+        public long DoneAt { get; set; }
     }
 }

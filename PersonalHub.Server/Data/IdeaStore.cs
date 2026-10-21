@@ -95,6 +95,19 @@ namespace personalHub.Server.Data
 
             if (p.UpdatedAt == 0) p.UpdatedAt = now;
 
+            // 落实时间的口径统一放在服务端：客户端只说"done 是真是假"。
+            // 否则手机标一次、电脑标一次，两端的 done_at 会各算一遍，将来对不上。
+            if (p.Done)
+            {
+                if (p.DoneAt == 0) p.DoneAt = now;
+            }
+            else
+            {
+                // 取消落实必须把时间清掉：留着上一次的时间，列表里就会出现一条
+                // "看着落实过、其实已经取消"的记录，而且看不出来。
+                p.DoneAt = 0;
+            }
+
             var row = ToRow(p);
             if (old is not null) row.Deleted = old.Deleted;   // 更新不能顺手复活墓碑
 
@@ -128,7 +141,8 @@ namespace personalHub.Server.Data
         // 读
         // ============================================================
 
-        public IReadOnlyList<Idea> List(int kind, long from, long to, bool includeDeleted)
+        /// <param name="done">-1 全部 / 0 未落实 / 1 已落实。</param>
+        public IReadOnlyList<Idea> List(int kind, long from, long to, bool includeDeleted, int done = -1)
         {
             // 拼 SQL 而不是在内存里过滤：想法库是要长期攒的（可能上万条），
             // 全表读出来再筛会在某一天突然变慢，而且慢得没有明显征兆。
@@ -153,6 +167,12 @@ namespace personalHub.Server.Data
             {
                 where.Add("created_at < ?");
                 args.Add(to);
+            }
+
+            if (done >= 0)
+            {
+                where.Add("done = ?");
+                args.Add(done == 0 ? 0 : 1);
             }
 
             string sql = "SELECT * FROM ideas";
@@ -190,6 +210,22 @@ namespace personalHub.Server.Data
             }
         }
 
+        /// <summary>
+        /// 已落实条数。
+        ///
+        /// 它和 <see cref="CountLinked"/> 一样只是"回看用"的数，不是 KPI：
+        /// 想法库不考核"落实率"，也不会拿它去催人 —— 一旦开始比高低，
+        /// 人就会去标那些其实没落实的想法，这个数就彻底没意义了。
+        /// </summary>
+        public int CountDone()
+        {
+            lock (_db.Sync)
+            {
+                return _db.Conn.ExecuteScalar<int>(
+                    "SELECT COUNT(*) FROM ideas WHERE deleted = 0 AND done = 1");
+            }
+        }
+
         // ============================================================
         // 工具
         // ============================================================
@@ -203,6 +239,8 @@ namespace personalHub.Server.Data
             CreatedAt = p.CreatedAt,
             UpdatedAt = p.UpdatedAt,
             Deleted = p.Deleted ? 1 : 0,
+            Done = p.Done ? 1 : 0,
+            DoneAt = p.Done ? p.DoneAt : 0,
         };
 
         private static Idea ToProto(IdeaRow r) => new()
@@ -214,6 +252,8 @@ namespace personalHub.Server.Data
             CreatedAt = r.CreatedAt,
             UpdatedAt = r.UpdatedAt,
             Deleted = r.Deleted != 0,
+            Done = r.Done != 0,
+            DoneAt = r.Done != 0 ? r.DoneAt : 0,
         };
 
         /// <summary>GROUP BY 的返回行。</summary>

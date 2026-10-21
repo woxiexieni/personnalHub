@@ -33,6 +33,19 @@ namespace PersonalHub.Client.Data
         /// <summary>「转成目标」之后回填；空 = 还没转化。它只做标记，不代表想法"完成了"。</summary>
         public string GoalId { get; set; } = string.Empty;
 
+        /// <summary>
+        /// 已经落实（不是"打算做"，是真的做完了）。
+        ///
+        /// 与 GoalId 是**两个独立**的标记，不互相推断：
+        ///   转了目标的可能一直没做完；没转目标的小事照样可以直接落实。
+        /// 它不是流程状态 —— 想法库里不会出现「还有 N 条没处理」这种计数，
+        /// 这个勾选只在"回头翻"的时候有意义。
+        /// </summary>
+        public bool Done { get; set; }
+
+        /// <summary>标记落实的时刻（Unix 毫秒）；0 = 没标过。取消落实时清 0。</summary>
+        public long DoneAt { get; set; }
+
         public long CreatedAt { get; set; }
 
         public long UpdatedAt { get; set; }

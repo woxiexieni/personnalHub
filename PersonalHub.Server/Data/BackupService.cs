@@ -199,7 +199,10 @@ namespace personalHub.Server.Data
                     SQLiteOpenFlags.ReadOnly | SQLiteOpenFlags.FullMutex);
 
                 var result = new Dictionary<string, int>(StringComparer.Ordinal);
-                foreach (var table in new[] { "records", "blocks", "goals", "things", "categories" })
+                // ideas 必须在这里：VACUUM INTO 备份的是整个库，想法本来就在备份里，
+                // 但列表页按这个清单显示条数 —— 漏掉它会让人以为"想法没被备份"，
+                // 于是在真要恢复的时候不敢动手。
+                foreach (var table in new[] { "records", "blocks", "goals", "things", "categories", "ideas" })
                 {
                     try
                     {

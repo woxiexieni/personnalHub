@@ -103,6 +103,13 @@ namespace personalHub.Server.Data
             EnsureColumn("things",  "updated_at", "INTEGER NOT NULL DEFAULT 0", "created_at");
             EnsureColumn("things",  "deleted",    "INTEGER NOT NULL DEFAULT 0", "0");
 
+            // R6.1：想法「已落实」。
+            // 老库里 ideas 表已经存在（R6 建的），CreateTable 补出来的列是「可空、无默认值」，
+            // 老行会是 NULL —— 读进 int/long 属性会直接抛异常（不是显示成 0）。
+            // 所以这里必须显式 ALTER 带 DEFAULT 并回填，和 records / things 同一个道理。
+            EnsureColumn("ideas",   "done",       "INTEGER NOT NULL DEFAULT 0", "0");
+            EnsureColumn("ideas",   "done_at",    "INTEGER NOT NULL DEFAULT 0", "0");
+
             // 老数据的 updated_at 用 created_at 兜底。留在 0 会让首次版本比较失效
             // （0 < 任何值 → 老记录永远被判定为"过期"，管理端改一次就被拒）。
             Conn.Execute("UPDATE records SET updated_at = created_at WHERE updated_at = 0");
