@@ -705,19 +705,21 @@ namespace PersonalHub.Client
                 {
                     // 预算取这个目标在这个片上的中位时长，再吸到最近的固定档 ——
                     // 平均会被一次马拉松拉飞，中位数不会。
+                    // 按 Canonical 匹配：合并片之后，"午睡"和"睡觉"的历史要算同一个中位数。
+                    code = Pieces.Canonical(top);
                     var durations = blocks
-                        .Where(b => b.PieceCode == top)
+                        .Where(b => Pieces.Canonical(b.PieceCode) == code)
                         .Select(b => b.DurationMin)
                         .OrderBy(x => x)
                         .ToList();
 
-                    code = top;
                     budget = NearestDuration(durations[durations.Count / 2]);
                 }
             }
 
             // 3. 今天已经排过同一个片就不重复排（同名两行会让人以为记错了）
-            if (todayPlans.Any(p => p.PieceCode == code))
+            // 比较也用 Canonical：昨天排的是旧代号、今天排的是新片，其实是同一件事。
+            if (todayPlans.Any(p => Pieces.Canonical(p.PieceCode) == Pieces.Canonical(code)))
             {
                 StatusLabel.Text = $"今天已经排过「{_settings.DisplayName(code)}」了，直接去时间块页点它就行。";
                 return;

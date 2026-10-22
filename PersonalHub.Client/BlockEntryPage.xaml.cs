@@ -60,7 +60,6 @@ namespace PersonalHub.Client
         /// </summary>
         private string? _sessionGoalId;
 
-        private bool _allPiecesOpen;
         private bool _busy;
 
         /// <summary>长按抑制窗口：长按后 800ms 内的 Clicked 一律忽略（见 OnPiecePressed）。</summary>
@@ -99,7 +98,6 @@ namespace PersonalHub.Client
             if (_duration <= 0) _duration = 30;
 
             BuildDurationChips();
-            BuildAllPieces();
             ApplyPeriodStyle();
         }
 
@@ -214,7 +212,8 @@ namespace PersonalHub.Client
 
         private async Task BuildFrontPiecesAsync()
         {
-            // 前排空位按"最近 7 天点得最多的片"补 —— 钉子优先，频次只填空
+            // 12 个片全部铺开：钉子置顶，其余按"最近 7 天点得最多"补位。
+            // 不再有"前排 6 个 + 展开"，因为片少了之后那个展开动作本身比扫一眼更贵。
             var (from, to) = Period.LastDays(7);
             var freq = await _blocks.ClickFrequencyAsync(from, to);
 
@@ -224,38 +223,17 @@ namespace PersonalHub.Client
             {
                 FrontPieces.Children.Add(MakePieceButton(p, big: true));
             }
+
+            int hidden = _settings.HiddenCount;
+            UnhideBtn.IsVisible = hidden > 0;
+            UnhideBtn.Text = $"有 {hidden} 个片被隐藏 · 点这里全部恢复";
         }
 
-        private void BuildAllPieces()
+        private async void OnUnhideAllClicked(object sender, EventArgs e)
         {
-            AllPiecesPanel.Children.Clear();
-
-            foreach (var group in Pieces.GroupOrder)
-            {
-                var pieces = Pieces.All.Where(p => p.Group == group && !_settings.IsHidden(p.Code)).ToList();
-                if (pieces.Count == 0) continue;
-
-                AllPiecesPanel.Children.Add(new Label
-                {
-                    Text = group,
-                    FontSize = 11,
-                    TextColor = Color.FromArgb("#8A8A8E"),
-                    Margin = new Thickness(0, 8, 0, 2),
-                });
-
-                var flex = new FlexLayout
-                {
-                    Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap,
-                    Direction = Microsoft.Maui.Layouts.FlexDirection.Row,
-                };
-
-                foreach (var p in pieces)
-                {
-                    flex.Children.Add(MakePieceButton(p, big: false));
-                }
-
-                AllPiecesPanel.Children.Add(flex);
-            }
+            _settings.UnhideAll();
+            await BuildFrontPiecesAsync();
+            StatusLabel.Text = "已恢复显示全部片";
         }
 
         private Button MakePieceButton(Piece p, bool big)
@@ -311,11 +289,11 @@ namespace PersonalHub.Client
         private async Task ShowPieceMenuAsync(string code)
         {
             string name = _settings.DisplayName(code);
-            bool pinned = _settings.Pinned.Contains(code);
+            bool pinned = _settings.IsPinned(code);
 
             var options = new List<string>
             {
-                pinned ? "取消钉住" : "钉住到前排",
+                pinned ? "取消钉住" : "钉到最前",
                 "改名",
                 "隐藏这个片",
             };
@@ -335,12 +313,11 @@ namespace PersonalHub.Client
             switch (pick)
             {
                 case "取消钉住":
-                case "钉住到前排":
+                case "钉到最前":
                     if (!_settings.TogglePin(code))
                     {
-                        StatusLabel.Text = "前排最多钉 6 个，先取消一个";
+                        StatusLabel.Text = "最多钉 6 个，先取消一个";
                     }
-                    BuildAllPieces();
                     await BuildFrontPiecesAsync();
                     break;
 
@@ -353,16 +330,14 @@ namespace PersonalHub.Client
                     if (!string.IsNullOrWhiteSpace(input))
                     {
                         _settings.Rename(code, input);
-                        BuildAllPieces();
                         await BuildFrontPiecesAsync();
                     }
                     break;
 
                 case "隐藏这个片":
                     _settings.SetHidden(code, true);
-                    BuildAllPieces();
                     await BuildFrontPiecesAsync();
-                    StatusLabel.Text = $"已隐藏「{name}」，历史记录仍在统计里";
+                    StatusLabel.Text = $"已隐藏「{name}」，历史记录仍在统计里（下面有「全部恢复」）";
                     break;
 
                 default:
@@ -373,13 +348,6 @@ namespace PersonalHub.Client
                     }
                     break;
             }
-        }
-
-        private void OnToggleAllPiecesClicked(object sender, EventArgs e)
-        {
-            _allPiecesOpen = !_allPiecesOpen;
-            AllPiecesPanel.IsVisible = _allPiecesOpen;
-            MorePiecesBtn.Text = _allPiecesOpen ? "收起 ▴" : "全部事情片 ▾";
         }
 
         // ============================================================
@@ -680,7 +648,11 @@ namespace PersonalHub.Client
             foreach (var plan in _todayPlans)
             {
                 int actual = todayBlocks
-                    .Where(b => b.PieceCode == plan.PieceCode)
+                    // 按别名比较：计划排的是旧代号、实际记的是新片（或反过来），
+                    // 用 == 直接比会让"计划 vs 实际"永远显示 0，看着像一条都没做。
+                    .Where(b => string.Equals(Pieces.Canonical(b.PieceCode),
+                                              Pieces.Canonical(plan.PieceCode),
+                                              StringComparison.Ordinal))
                     .Sum(b => Math.Max(0, b.DurationMin));
 
                 var (status, color) = PlanStatus(plan.BudgetMin, actual);
@@ -792,7 +764,7 @@ namespace PersonalHub.Client
             };
 
             await _plans.InsertAsync(plan);
-            StatusLabel.Text = $"今天加了「{plan.PieceCode}」，{FormatMinutes(plan.BudgetMin)}";
+            StatusLabel.Text = $"今天加了「{_settings.DisplayName(plan.PieceCode)}」，{FormatMinutes(plan.BudgetMin)}";
 
             await RefreshTodayAsync();
             _ = SyncAndRefreshAsync();
@@ -1288,9 +1260,19 @@ namespace PersonalHub.Client
         {
             StatsPanel.Children.Clear();
 
-            int max = pieces.Count == 0 ? 1 : Math.Max(1, pieces.Max(p => p.Minutes));
+            // 按别名归并：nap→睡觉、doc/meeting→干活、video/game/show/scroll→娱乐…
+            // 服务端不知道片清单，只按历史 code 分组返回；归并在客户端做，服务端零改动。
+            // 不归并的话，合并片之后统计里会同时出现「午睡 11h」和「睡觉 3h」两行，看着像假的。
+            var merged = pieces
+                .Where(p => p.Minutes > 0 && !string.IsNullOrEmpty(p.PieceCode))
+                .GroupBy(p => Pieces.Canonical(p.PieceCode), StringComparer.Ordinal)
+                .Select(g => (PieceCode: g.Key, Minutes: g.Sum(x => x.Minutes), Count: g.Sum(x => x.Count)))
+                .OrderByDescending(x => x.Minutes)
+                .ToList();
 
-            foreach (var p in pieces.Where(x => x.Minutes > 0))
+            int max = merged.Count == 0 ? 1 : Math.Max(1, merged.Max(p => p.Minutes));
+
+            foreach (var p in merged)
             {
                 string name = _settings.DisplayName(p.PieceCode);
                 double ratio = totalMinutes > 0 ? (double)p.Minutes / totalMinutes : 0;
@@ -1334,7 +1316,7 @@ namespace PersonalHub.Client
                 StatsPanel.Children.Add(grid);
             }
 
-            if (pieces.Count == 0)
+            if (merged.Count == 0)
             {
                 StatsPanel.Children.Add(new Label
                 {

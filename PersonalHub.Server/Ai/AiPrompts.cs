@@ -57,7 +57,7 @@ namespace personalHub.Server.Ai
                 6. 材料不足（比如没有任何历史）就返回空数组，不要硬编。
 
                 只输出 JSON，格式：
-                {"options":[{"action":"读第 3 章，写 3 条笔记","piece":"book","minutes":30}]}
+                {"options":[{"action":"读第 3 章，写 3 条笔记","piece":"learn","minutes":30}]}
                 """;
 
             var sb = new StringBuilder();
