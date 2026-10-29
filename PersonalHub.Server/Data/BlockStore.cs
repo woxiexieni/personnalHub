@@ -182,7 +182,12 @@ namespace personalHub.Server.Data
             }
         }
 
-        /// <summary>区间内按片聚合（分钟降序）。时长 0 的块不计入分钟，但计入条数。</summary>
+        /// <summary>
+        /// 区间内按片聚合（分钟降序）。时长 0 的块不计入分钟，但计入条数。
+        ///
+        /// 返回前按 <see cref="Pieces.Canonical"/> 归并旧代号：库里同时存在 nap 和 sleep 时，
+        /// 不归并会在页面上出现两行都叫「睡觉」的统计，看着像数据错了。
+        /// </summary>
         public IReadOnlyList<PieceAggregate> AggregateByPiece(long from, long to)
         {
             lock (_db.Sync)
@@ -195,6 +200,10 @@ namespace personalHub.Server.Data
                         "GROUP BY piece_code ORDER BY minutes DESC, cnt DESC",
                         from, to)
                     .Select(r => new PieceAggregate(r.code ?? string.Empty, r.minutes, r.cnt))
+                    .GroupBy(a => Pieces.Canonical(a.PieceCode), StringComparer.Ordinal)
+                    .Select(g => new PieceAggregate(g.Key, g.Sum(x => x.Minutes), g.Sum(x => x.Count)))
+                    .OrderByDescending(a => a.Minutes)
+                    .ThenByDescending(a => a.Count)
                     .ToList();
             }
         }

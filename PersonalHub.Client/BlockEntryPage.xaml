@@ -105,24 +105,26 @@
                         Wrap="Wrap" Direction="Row"
                         JustifyContent="Start" AlignItems="Start"/>
 
-            <!-- ============ 前排 6 片（钉子优先，其余按 7 天频次补位） ============ -->
-            <Label Text="点一下就记下（长按可钉住 / 改名）" FontSize="12"
+            <!-- ============ 全部片：12 个一屏铺开，不再分"前排 / 展开"两层 ============ -->
+            <Label Text="点一下就记下（长按可钉到最前 / 改名 / 隐藏）" FontSize="12"
                    TextColor="{StaticResource Gray500}" Margin="0,4,0,0"/>
             <FlexLayout x:Name="FrontPieces"
                         Wrap="Wrap" Direction="Row"
                         JustifyContent="Start" AlignItems="Start"/>
 
-            <Button x:Name="MorePiecesBtn"
-                    Text="全部事情片 ▾"
-                    FontSize="12"
-                    HeightRequest="34"
+            <!-- 隐藏是单向操作的话，用户手一滑就再也找不回来。所以永远留一条回去的路。 -->
+            <Button x:Name="UnhideBtn"
+                    Text="有小片被隐藏 · 点这里全部恢复"
+                    IsVisible="False"
+                    FontSize="11"
+                    HeightRequest="30"
+                    Padding="12,0"
                     BackgroundColor="Transparent"
-                    TextColor="{StaticResource Gray500}"
+                    TextColor="#185FA5"
                     BorderWidth="1"
                     BorderColor="{StaticResource Gray300}"
-                    Clicked="OnToggleAllPiecesClicked"/>
-
-            <VerticalStackLayout x:Name="AllPiecesPanel" IsVisible="False" Spacing="4"/>
+                    HorizontalOptions="Start"
+                    Clicked="OnUnhideAllClicked"/>
 
             <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
 
