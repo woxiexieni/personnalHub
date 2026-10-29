@@ -1,3 +1,4 @@
+using Microsoft.Maui.Controls.Shapes;
 using PersonalHub.Client.Controls;
 using PersonalHub.Client.Data;
 using PersonalHub.Client.Services;
@@ -107,13 +108,18 @@ namespace PersonalHub.Client
         {
             base.OnAppearing();
 
-            // 五个都在读同一个本地库、互不依赖 → 并行，别串着等。
+            // 都在读同一个本地库、互不依赖 → 并行，别串着等。
             // 串行时每段各有一次 open/查询开销，叠起来就是"进页面要顿一下"。
             await Task.WhenAll(
                 LoadGoalsAsync(),
                 BuildFrontPiecesAsync(),
                 RefreshTodayAsync(),
                 RefreshPracticeAsync());
+
+            // 备注候选池单独串行读：五个任务同时抢同一个 SQLite 连接时要排队，
+            // 一旦某次被超时打断，异常被 catch 吞掉，池子就是空的 ——
+            // 表现是"打字什么都不浮出来"，而且完全没有报错，最难查。
+            await LoadNotePoolAsync();
 
             await RefreshStatsAsync();
 
@@ -538,6 +544,9 @@ namespace PersonalHub.Client
                 await RefreshTodayAsync();
                 await RefreshStatsAsync();
 
+                // 刚写的备注立刻进候选池：下次打个头两个字就能补全
+                await LoadNotePoolAsync();
+
                 _ = SyncAndRefreshAsync();
             }
             catch (Exception ex)
@@ -547,6 +556,295 @@ namespace PersonalHub.Client
             finally
             {
                 _busy = false;
+            }
+        }
+
+        // ============================================================
+        // 备注相关性提示（像代码补全：边打边筛）
+        // ============================================================
+
+        /// <summary>一次最多浮出几条。多了会把时长档和片推出屏幕。</summary>
+        private const int MaxNoteMatches = 5;
+
+        /// <summary>候选一行最多显示几个字，超出截断；真正填进去的是全文。</summary>
+        private const int NoteMatchChars = 18;
+
+        /// <summary>池子里的一条：备注全文 + 用过几次 + 最后一次用的时间。</summary>
+        private sealed record NotePoolItem(string Text, int Uses, long LastUsed);
+
+        /// <summary>
+        /// 页面级的候选池。**进页面查一次库就够了**，之后每次按键只在内存里筛。
+        /// 每敲一个字都去查一次 SQLite，输入会明显不跟手，而备注本来就只有几十条。
+        /// </summary>
+        private List<NotePoolItem> _notePool = new();
+
+        /// <summary>程序往框里填字时置位，避免填完又触发过滤、把列表重新弹出来。</summary>
+        private bool _suppressNoteFilter;
+
+        /// <summary>打字停顿多久后才重筛。每键都重建整页布局，手会感觉页面在抖。</summary>
+        private const int NoteFilterDelayMs = 120;
+
+        private CancellationTokenSource? _noteFilterCts;
+        private bool _notePoolLoading;
+
+        /// <summary>上一次渲染用的「输入 + 结果集」，一样就不重建，省掉一次整页重排。</summary>
+        private string _lastFilterKey = string.Empty;
+
+        /// <summary>
+        /// 把 30 天内写过的备注一次性捞进内存，去重并统计用过几次。
+        ///
+        /// 范围取 30 天，和本地保留窗口一致（<see cref="BlockMirrorService.WindowDays"/>）。
+        /// 更早的备注不该再往补全里塞 —— 半年写一次的「换轮胎」浮出来只会干扰。
+        /// </summary>
+        private async Task LoadNotePoolAsync()
+        {
+            try
+            {
+                var (from, to) = Period.LastDays(BlockMirrorService.WindowDays);
+                var rows = await _blocks.GetByRangeAsync(from, to);
+
+                _notePool = rows
+                    .Where(r => !r.Deleted && !string.IsNullOrWhiteSpace(r.Note))
+                    .Select(r => new { Text = r.Note.Trim(), r.OccurredAt })
+                    .GroupBy(x => x.Text, StringComparer.Ordinal)
+                    .Select(g => new NotePoolItem(g.Key, g.Count(), g.Max(x => x.OccurredAt)))
+                    .ToList();
+            }
+            catch
+            {
+                // 补全只是提速手段：读失败就当没有，绝不能因此打不开录入页。
+                // 但**别把已有的池子清空** —— 打字中途补加载失败时清空，
+                // 等于把用户眼前的候选全撤掉，表现就是"刚才还有，突然没了"。
+            }
+
+            // 池子更新后，如果框里已经有字，顺手重筛一次
+            if (!string.IsNullOrWhiteSpace(NoteEntry.Text)) ApplyNoteFilter();
+        }
+
+        /// <summary>
+        /// 懒加载兜底：进页面那次要是没读出来（并发抢连接被吞），
+        /// 打字时再补一次，总比一直不出候选强。
+        /// </summary>
+        private async Task EnsureNotePoolAsync()
+        {
+            if (_notePoolLoading || _notePool.Count > 0) return;
+
+            _notePoolLoading = true;
+            try
+            {
+                await LoadNotePoolAsync();
+            }
+            finally
+            {
+                _notePoolLoading = false;
+            }
+        }
+
+        /// <summary>
+        /// 按已输入的内容，把池子里相关的备注筛出来浮在框下面。
+        ///
+        /// 排序是这个提示好不好用的关键：
+        ///   1. **前缀命中** 排在 包含命中 前面 —— 打「理」时「理发」应该压过「楼下理发店」，
+        ///      因为打字的人通常是从第一个字开始想的；
+        ///   2. 同一档里按用过次数、再按最近用过 —— 常用写法自然浮到最上面。
+        ///
+        /// 已输入和某条备注**完全一样**时，只把那一条从候选里去掉，不影响其他候选
+        /// （打「吃」时「吃饭」还得出来）。
+        /// </summary>
+        private void ApplyNoteFilter()
+        {
+            string input = (NoteEntry.Text ?? string.Empty).Trim();
+
+            if (input.Length == 0 || _notePool.Count == 0)
+            {
+                HideNoteSuggestions();
+                return;
+            }
+
+            // 只把「和输入一模一样」的那一条排除，其余照常显示。
+            //
+            // 原来这里是：一发现完全相等就把**整个列表**收起 —— 池子里只要存在一条叫「吃」的，
+            // 打「吃」就什么都不出，哪怕同时还该提示「吃饭」。中文里单字备注
+            // （吃、睡、读、跑）太常见，这条规则几乎必然踩到：
+            // 2026-10-29 就是「吃」把「吃饭」顶掉了，看起来像功能完全没做。
+            var matches = _notePool
+                .Where(p => !string.Equals(p.Text, input, StringComparison.Ordinal))
+                .Where(p => p.Text.Contains(input, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(p => p.Text.StartsWith(input, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenByDescending(p => p.Uses)
+                .ThenByDescending(p => p.LastUsed)
+                .Take(MaxNoteMatches)
+                .ToList();
+
+            // 结果没变就不重建。重建一次会让整页重新测量，
+            // 而这一页有 6 个片 + 时长档 + 今日列表，白重排一次的抖动是看得见的。
+            string key = input + "\u0001" + string.Join("\u0001", matches.Select(m => m.Text));
+            if (key == _lastFilterKey && NoteSuggestions.IsVisible) return;
+            _lastFilterKey = key;
+
+            NoteSuggestions.Children.Clear();
+
+            if (matches.Count == 0)
+            {
+                NoteSuggestions.IsVisible = false;
+                return;
+            }
+
+            foreach (var item in matches)
+            {
+                NoteSuggestions.Children.Add(BuildNoteMatchRow(item, input));
+            }
+
+            NoteSuggestions.IsVisible = true;
+        }
+
+        private void HideNoteSuggestions()
+        {
+            _lastFilterKey = string.Empty;
+
+            if (NoteSuggestions.Children.Count == 0 && !NoteSuggestions.IsVisible) return;
+
+            NoteSuggestions.Children.Clear();
+            NoteSuggestions.IsVisible = false;
+        }
+
+        /// <summary>
+        /// 一行候选：左边备注（命中的那截加粗），右边淡色标用过的次数。
+        /// 用次数而不是时间做副信息，因为它直接回答"这条是不是我常用的写法"。
+        /// </summary>
+        private Border BuildNoteMatchRow(NotePoolItem item, string input)
+        {
+            string shown = item.Text.Length <= NoteMatchChars
+                ? item.Text
+                : item.Text[..NoteMatchChars] + "…";
+
+            var text = new FormattedString();
+            int hit = shown.IndexOf(input, StringComparison.OrdinalIgnoreCase);
+
+            // Span 必须自己带颜色。不给的话它会走主题默认前景色 —— 深色主题下是浅色，
+            // 压在这条浅米色候选上等于没字（2026-10-29 截图就是这个）。
+            Span Make(string s, bool bold = false) => new()
+            {
+                Text = s,
+                TextColor = ChipText,
+                FontAttributes = bold ? FontAttributes.Bold : FontAttributes.None,
+            };
+
+            if (hit < 0)
+            {
+                text.Spans.Add(Make(shown));
+            }
+            else
+            {
+                // 命中那截单独加粗，一眼看出是哪里对上的
+                if (hit > 0) text.Spans.Add(Make(shown[..hit]));
+                text.Spans.Add(Make(shown.Substring(hit, input.Length), bold: true));
+
+                int rest = hit + input.Length;
+                if (rest < shown.Length) text.Spans.Add(Make(shown[rest..]));
+            }
+
+            var grid = new Grid
+            {
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition { Width = GridLength.Star },
+                    new ColumnDefinition { Width = GridLength.Auto },
+                },
+                ColumnSpacing = 8,
+            };
+
+            grid.Add(new Label
+            {
+                FormattedText = text,
+                FontSize = 13,
+                TextColor = ChipText,
+                LineBreakMode = LineBreakMode.TailTruncation,
+                VerticalOptions = LayoutOptions.Center,
+            }, 0);
+
+            grid.Add(new Label
+            {
+                Text = $"用过 {item.Uses} 次",
+                FontSize = 11,
+                // 浅米底上 #8A8A8E 只有 3 出头，眯眼看就是一片糊；压深一档
+                TextColor = Color.FromArgb("#6B6760"),
+                VerticalOptions = LayoutOptions.Center,
+            }, 1);
+
+            var row = new Border
+            {
+                StrokeThickness = 0,
+                BackgroundColor = ChipBg,
+                StrokeShape = new RoundRectangle { CornerRadius = 8 },
+                Padding = new Thickness(10, 6),
+                Content = grid,
+            };
+
+            var tap = new TapGestureRecognizer { CommandParameter = item.Text };
+            tap.Tapped += OnNoteMatchTapped;
+            row.GestureRecognizers.Add(tap);
+
+            return row;
+        }
+
+        /// <summary>
+        /// 点候选 = 整条填进去（光标放到末尾），然后收起列表。
+        /// 只填不保存 —— 备注跟着哪一次记录走，得等点片那一下才算数。
+        /// </summary>
+        private void OnNoteMatchTapped(object? sender, TappedEventArgs e)
+        {
+            if (sender is not TapGestureRecognizer tap
+                || tap.CommandParameter is not string text) return;
+
+            _suppressNoteFilter = true;   // 填完别再触发一次过滤，把列表重新弹出来
+            NoteEntry.Text = text;
+            NoteEntry.CursorPosition = text.Length;
+            _suppressNoteFilter = false;
+
+            NoteSuggestions.Children.Clear();
+            NoteSuggestions.IsVisible = false;
+        }
+
+        private async void OnNoteTextChanged(object? sender, TextChangedEventArgs e)
+        {
+            if (_suppressNoteFilter) return;
+
+            // 清空要立刻生效：删完字候选还挂在那儿，看着像卡住了
+            if (string.IsNullOrWhiteSpace(NoteEntry.Text))
+            {
+                _noteFilterCts?.Cancel();
+                HideNoteSuggestions();
+                return;
+            }
+
+            // 停顿才筛。每敲一个键就「清空 + 重建 N 行」会让整页重新测量，
+            // 而这一页有 6 个片 + 时长档 + 今日列表，白重排一次肉眼就能看见抖。
+            _noteFilterCts?.Cancel();
+            var cts = new CancellationTokenSource();
+            _noteFilterCts = cts;
+
+            try
+            {
+                await Task.Delay(NoteFilterDelayMs, cts.Token);
+            }
+            catch (TaskCanceledException)
+            {
+                return;   // 后面又敲了一个字，这次作废
+            }
+
+            if (cts.IsCancellationRequested) return;
+
+            try
+            {
+                // 进页面那次没读出来就在这儿补一次，否则永远不出候选、还没有任何报错
+                if (_notePool.Count == 0) await EnsureNotePoolAsync();
+
+                ApplyNoteFilter();
+            }
+            catch
+            {
+                // 补全出问题不能把录入页带下去
             }
         }
 
@@ -1011,6 +1309,7 @@ namespace PersonalHub.Client
 
             await _blocks.UpdateAsync(row);
             await RefreshTodayAsync();
+            await LoadNotePoolAsync();   // 备注改了，补全池跟着变
             _ = SyncAndRefreshAsync();
         }
 
@@ -1142,6 +1441,22 @@ namespace PersonalHub.Client
                     FontSize = 13,
                     LineBreakMode = LineBreakMode.TailTruncation,
                 }));
+
+                // 备注：晚上复盘时最要紧的就是这一行。
+                // 「短视频 · 30分钟」这种抬头，事后根本想不起看的是什么；
+                // 备注是这条记录里唯一说明「具体是什么事」的东西，必须跟着行走，
+                // 否则评价的时候只能凭猜，猜错了「值得/别做了」就是错的。
+                if (!string.IsNullOrWhiteSpace(r.Note))
+                {
+                    info.Children.Add(TextPeek.Attach(new Label
+                    {
+                        Text = r.Note.Trim(),
+                        FontSize = 11,
+                        TextColor = Color.FromArgb("#8A8A8E"),
+                        LineBreakMode = LineBreakMode.TailTruncation,
+                        MaxLines = 2,
+                    }));
+                }
 
                 // 只在「值得」时写的那一句经验，跟着行显示
                 if (!string.IsNullOrEmpty(r.Lesson))

@@ -85,13 +85,19 @@
                 </VerticalStackLayout>
             </Border>
 
-            <!-- ============ 可选备注：空着不影响 1 次点击，想写就先写再点片 ============ -->
+            <!-- ============ 可选备注：空着不影响 1 次点击，想写就先写再点片 ============
+                 下面那块是「相关性提示」：一边打一边按已输入的内容去筛以前写过的备注，
+                 像代码补全那样浮出几条，点一条直接填完。
+                 空输入时什么都不显示 —— 它不是"常用列表"，只有你开始打才有东西出来。 -->
             <Border Style="{StaticResource FieldBorder}">
                 <Editor x:Name="NoteEntry"
                         Style="{StaticResource FieldEditor}"
                         Placeholder="备注（可选）：比如「理发」"
-                        MaxLength="200"/>
+                        MaxLength="200"
+                        TextChanged="OnNoteTextChanged"/>
             </Border>
+
+            <VerticalStackLayout x:Name="NoteSuggestions" Spacing="2" IsVisible="False"/>
 
             <!-- ============ 时长档 ============ -->
             <Label Text="时长" FontSize="12" TextColor="{StaticResource Gray500}"/>

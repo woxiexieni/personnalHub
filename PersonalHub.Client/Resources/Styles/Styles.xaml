@@ -162,8 +162,13 @@
         <Setter Property="FontSize" Value="14" />
         <Setter Property="BackgroundColor" Value="Transparent" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource White}}" />
-        <!-- 隐式 Editor 样式的 PlaceholderColor 是 Gray200，浅色主题下几乎看不见提示文字 -->
-        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}" />
+        <!--
+            隐式 Editor 样式的 PlaceholderColor 是 Gray200，浅色主题下几乎看不见。
+            深色主题下改回 Gray500(#6E6E6E) 同样看不见 —— 深底上那点对比度大约 3.5:1，
+            一低头看手机就糊成一片，用户会以为"这个框没有提示"。
+            所以两边都往对比度高的一档走：浅色用 Gray500，深色用 Gray400(#919191)。
+        -->
+        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}" />
     </Style>
 
     <Style TargetType="Frame">
