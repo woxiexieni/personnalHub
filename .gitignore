@@ -511,9 +511,16 @@ updates/
 # 服务端第一次启动会自动生成这份模板（apiKey 为空），你填完就能用。
 ai.json
 
-# ===== 签名密钥：绝不进仓库 =====
+# ===== 签名密钥 =====
+# 正式签名库与密码文件绝不进仓库：
 # scripts/create-keystore.bat 生成的正式签名库与密码文件。
 # 丢了它 = 已发布的应用永远无法更新；泄露它 = 别人能冒名发你的包。
 *.keystore
 *.jks
 local-signing.props
+
+# 例外：调试签名库必须入库。
+# 它是 Android 的"公开调试钥匙"，密码就是 android/android，没有保密价值。
+# 放进仓库是为了让多台开发机签出同一个证书 —— 否则 A 机打的包装到手机后，
+# B 机打的包永远报"签名冲突"，只能卸载重装，卸载就会丢本地数据。
+!PersonalHub.Client/signing/debug.keystore
