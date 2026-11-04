@@ -243,6 +243,13 @@ namespace PersonalHub.Client.Data
         /// <summary>软删标记。查询默认过滤。</summary>
         public override bool Deleted { get; set; }
 
+        /// <summary>
+        /// 挂到的问题卡 id（空 = 独立事件）。
+        /// 问题卡 v1 纯本地，这列不同步到服务端（ThingUploader 的显式映射不含它）——
+        /// 换机后关联会丢，事件本体不丢。v2 问题卡上服务端时一起补。
+        /// </summary>
+        public string ProblemId { get; set; } = string.Empty;
+
         // 分组时间 = 事件发生时间（基类 DayKey 会用 Timestamp 换算，这里不需要再写一遍）
         public override long Timestamp => OccurredAt;
 

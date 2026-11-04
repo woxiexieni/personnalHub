@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.ProblemEditPage"
+             Title="问题卡">
+
+    <!--
+        建卡 / 编辑问题卡。
+        闸 1 就在这页：判据写不出"怎么算解决"，保存按钮不放行 ——
+        拦掉"我执行力低怎么办"这类永远关不掉的伪问题（那叫模式，归模式页管）。
+    -->
+    <ScrollView>
+        <VerticalStackLayout Padding="24,20" Spacing="10" MaximumWidthRequest="720">
+
+            <Label
+                Text="什么事老出问题？"
+                FontSize="15"
+                FontAttributes="Bold"/>
+            <Entry
+                x:Name="TitleEntry"
+                Placeholder="例：对重要的人说话不过脑，事后必后悔"/>
+
+            <!-- 分类：与事件卡共用词表，可空。再点一下取消 -->
+            <Label Text="分类（可空，再点一下取消）" FontSize="12" TextColor="{StaticResource Gray500}"/>
+            <FlexLayout
+                x:Name="TagChips"
+                Wrap="Wrap"
+                JustifyContent="Start"
+                AlignItems="Start"/>
+
+            <!-- AI 建议立卡时带的上下文（只读参考） -->
+            <VerticalStackLayout x:Name="DraftContext" IsVisible="False" Spacing="4">
+                <Label Text="AI 从事件卡带来的上下文：" FontSize="12" TextColor="{StaticResource Gray500}"/>
+                <Label
+                    x:Name="DraftFactsLabel"
+                    FontSize="13"
+                    LineBreakMode="WordWrap"
+                    TextColor="{StaticResource Gray500}"/>
+            </VerticalStackLayout>
+
+            <Label
+                Text="怎么才算解决了？（判据，必填）"
+                FontSize="15"
+                FontAttributes="Bold"/>
+            <Label
+                Text="一句话、可验证。写不出来 = 它不是问题，是性格底色，去模式页攒样本。"
+                FontSize="12"
+                TextColor="{StaticResource Gray500}"/>
+            <Border Style="{StaticResource FieldBorder}">
+                <Editor
+                    x:Name="CriteriaEditor"
+                    Style="{StaticResource FieldEditor}"
+                    Placeholder="例：连续 3 次重要对话，事后没有『这句话不该说』的记录"
+                    AutoSize="TextChanges"
+                    HeightRequest="70"/>
+            </Border>
+
+            <Label
+                Text="现在打算试什么招？（第一招）"
+                FontSize="15"
+                FontAttributes="Bold"/>
+            <Label
+                Text="这招没用不等于没用 —— 到时候换招就是，环再转一圈。"
+                FontSize="12"
+                TextColor="{StaticResource Gray500}"/>
+            <Border Style="{StaticResource FieldBorder}">
+                <Editor
+                    x:Name="AttemptEditor"
+                    Style="{StaticResource FieldEditor}"
+                    Placeholder="例：评价改成提问，钱的事直接做或不做、不说"
+                    AutoSize="TextChanges"
+                    HeightRequest="60"/>
+            </Border>
+
+            <Button
+                x:Name="SaveBtn"
+                Text="建卡（判据必填）"
+                Clicked="OnSaveClicked"
+                HorizontalOptions="Fill"/>
+
+            <Label
+                x:Name="StatusLabel"
+                Text=""
+                LineBreakMode="WordWrap"/>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

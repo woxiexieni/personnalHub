@@ -272,6 +272,259 @@ namespace personalHub.Server.Ai
         }
 
         // ============================================================
+        // D. 事件卡：自由文字 → 结构化事件草稿（R7）
+        // ============================================================
+
+        /// <summary>一次最多拆出几张事件卡。再多说明用户把一周都倒进来了，
+        /// 应该让他分几次打——一张超长确认页没人看得完。</summary>
+        public const int MaxEventsPerCall = 3;
+
+        /// <summary>事件卡提取的校验结果行（已通过校验，可直接给客户端）。</summary>
+        public sealed record EventDraftRow(
+            int Index, string Title, string Emotion, string Tag,
+            string Facts, string Action, string InitialThought, string Result, string Question);
+
+        /// <summary>新模式草案（只提示，不自动建）。</summary>
+        public sealed record PatternDraftRow(string Title, string Reason);
+
+        /// <summary>事件卡 → 问题/模式 的路由（id 已对照请求清单校验过）。</summary>
+        public sealed record EventRouteRow(
+            int EventIndex, string MatchProblemId, string MatchPatternId, PatternDraftRow? NewPattern,
+            string SuggestedAttempt = "");
+
+        public static (string System, string User) ExtractEvents(
+            string rawText,
+            IReadOnlyList<(string Id, string Title)> problems,
+            IReadOnlyList<(string Id, string Title)> patterns,
+            IReadOnlyList<string> tagOptions,
+            IReadOnlyList<string> emotionOptions)
+        {
+            const string system = """
+                你是一个记录整理员，不是心理咨询师。用户会随手打一段话——乱序、带情绪、几句抱怨混在一起。
+                任务：把这段话**拆成最多 3 张事件卡**，每张卡描述一件真实发生的事。
+
+                硬性要求：
+                1. 只整理用户写出来的内容。facts 只准搬运/缩写原文，一个字都不许编。
+                   原文没写的字段留空字符串，不要猜、不要补全。
+                2. 一段话里可能是多件事，按"不同时间/不同对象"拆开；也可能只是一件事。
+                3. 别人的评价、自己的总结（"我总是……"这种没有具体时间地点的话）不是事件，
+                   不要做成事件卡。
+                4. emotion 必须从给定列表里挑；tag 必须从给定列表里挑。
+                5. question 每张卡最多一个，不超过 20 个字，只问"当时"的事实（帮助分清
+                   是没注意到还是不会应对），不问感受、不给建议。没有值得问的就留空。
+                6. 最多 3 张。拆不出来就返回空数组。
+                7. 命中 match_problem_id 时，可以给一条 suggested_attempt（≤30字）：
+                   针对"这一件事"给一个具体可做的应对动作，不是人生建议。
+                   说不出具体动作就留空，宁缺毋滥。
+
+                只输出 JSON，格式：
+                {"events":[{"event_index":0,"title":"...","emotion":"...","tag":"...","facts":"...","action":"...","initial_thought":"...","result":"...","question":"..."}],
+                 "routes":[{"event_index":0,"match_problem_id":"","match_pattern_id":"","suggested_attempt":"","new_pattern":{"title":"","reason":""}}]}
+                """;
+
+            var sb = new StringBuilder();
+            sb.AppendLine("固定标签（tag 只准从这里挑）：");
+            sb.AppendLine(string.Join("、", tagOptions));
+            sb.AppendLine("固定情绪（emotion 只准从这里挑）：");
+            sb.AppendLine(string.Join("、", emotionOptions));
+
+            if (problems.Count > 0)
+            {
+                sb.AppendLine("用户已经在跟进的「问题卡」（如果某件事明显属于其中之一，把它的 id 填进 match_problem_id）：");
+                foreach (var p in problems) sb.AppendLine($"- {p.Id}｜{OneLine(p.Title, 40)}");
+            }
+
+            if (patterns.Count > 0)
+            {
+                sb.AppendLine("用户已有的「行为模式」（明显像其中之一就填 match_pattern_id）：");
+                foreach (var p in patterns) sb.AppendLine($"- {p.Id}｜{OneLine(p.Title, 40)}");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("用户打的原文：");
+            sb.AppendLine(OneLine(rawText, 2000));
+
+            return (system, sb.ToString());
+        }
+
+        /// <summary>
+        /// 校验提取结果。纪律与 ParseNextSteps 相同：
+        ///   - facts 为空的整张丢（说明在编）；id 对不上请求清单的整条丢；
+        ///   - emotion/tag 不在固定列表里的整张丢（不确定的归类宁可不给）；
+        ///   - 路由三选一，都不沾边就丢弃这条路由（事件卡本身仍然有效）。
+        /// 返回空 events = 这次没生成，调用方返回 ok=false。
+        /// </summary>
+        public static (List<EventDraftRow> Events, List<EventRouteRow> Routes) ParseEvents(
+            string raw,
+            IReadOnlyList<(string Id, string Title)> problems,
+            IReadOnlyList<(string Id, string Title)> patterns,
+            IReadOnlyList<string> tagOptions,
+            IReadOnlyList<string> emotionOptions)
+        {
+            var events = new List<EventDraftRow>();
+            var routes = new List<EventRouteRow>();
+            if (!TryRoot(raw, out var root)) return (events, routes);
+
+            var tags = new HashSet<string>(tagOptions, StringComparer.Ordinal);
+            var emotions = new HashSet<string>(emotionOptions, StringComparer.Ordinal);
+            var problemIds = new HashSet<string>(problems.Select(p => p.Id), StringComparer.Ordinal);
+            var patternIds = new HashSet<string>(patterns.Select(p => p.Id), StringComparer.Ordinal);
+
+            if (root.TryGetProperty("events", out var arr) && arr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var el in arr.EnumerateArray())
+                {
+                    string facts = OneLine(Str(el, "facts"), 300);
+                    if (facts.Length == 0) continue;                 // 没有事实 = 在编，整张丢
+
+                    string emotion = Str(el, "emotion").Trim();
+                    string tag = Str(el, "tag").Trim();
+                    if (!emotions.Contains(emotion)) continue;       // 编出来的情绪整张丢
+                    if (!tags.Contains(tag)) continue;
+
+                    string title = OneLine(Str(el, "title"), 20);
+                    if (title.Length == 0) title = OneLine(facts, 15);
+
+                    events.Add(new EventDraftRow(
+                        Int(el, "event_index"),
+                        title,
+                        emotion,
+                        tag,
+                        facts,
+                        OneLine(Str(el, "action"), 120),
+                        OneLine(Str(el, "initial_thought"), 120),
+                        OneLine(Str(el, "result"), 120),
+                        OneLine(Str(el, "question"), 40)));
+
+                    if (events.Count >= MaxEventsPerCall) break;
+                }
+            }
+
+            if (events.Count == 0) return (events, routes);
+
+            var validIndexes = events.Select(e => e.Index).ToHashSet();
+
+            if (root.TryGetProperty("routes", out var rArr) && rArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var el in rArr.EnumerateArray())
+                {
+                    int idx = Int(el, "event_index");
+                    if (!validIndexes.Contains(idx)) continue;       // 对不上事件序号的路由丢
+
+                    string problemId = Str(el, "match_problem_id").Trim();
+                    string patternId = Str(el, "match_pattern_id").Trim();
+                    if (!problemIds.Contains(problemId)) problemId = string.Empty;
+                    if (!patternIds.Contains(patternId)) patternId = string.Empty;
+
+                    PatternDraftRow? draft = null;
+                    if (el.TryGetProperty("new_pattern", out var np) && np.ValueKind == JsonValueKind.Object)
+                    {
+                        string npTitle = OneLine(Str(np, "title"), 12);
+                        string npReason = OneLine(Str(np, "reason"), 40);
+                        if (npTitle.Length > 0) draft = new PatternDraftRow(npTitle, npReason);
+                    }
+
+                    // 三选一都不沾边 → 这条路由没有信息量，丢弃
+                    if (problemId.Length == 0 && patternId.Length == 0 && draft is null) continue;
+
+                    // 建议试法只对命中的问题卡有意义（模式不需要"试法"）
+                    string suggestedAttempt = problemId.Length > 0 ? OneLine(Str(el, "suggested_attempt"), 30) : string.Empty;
+
+                    routes.Add(new EventRouteRow(idx, problemId, patternId, draft, suggestedAttempt));
+                }
+            }
+
+            return (events, routes);
+        }
+
+        // ============================================================
+        // E. AI 周回看：扫近期事件卡 → 主动发现用户自己意识不到的重复苗头
+        // ============================================================
+
+        /// <summary>一次回看最多给几条发现。多了没人看，和事件卡一个道理。</summary>
+        public const int MaxFindingsPerReview = 3;
+
+        /// <summary>回看结果行（已通过校验）。</summary>
+        public sealed record ReviewFindingRow(
+            string Title, string Reason, bool SuggestProblem, string SuggestedCriteria, string SuggestedAttempt);
+
+        public static (string System, string User) ReviewEvents(
+            IReadOnlyList<(string Day, string Title, string Facts)> events,
+            IReadOnlyList<(string Id, string Title)> problems,
+            IReadOnlyList<(string Id, string Title)> patterns)
+        {
+            const string system = """
+                你是一个记录分析员。用户记录了一段时间的事件卡，但他自己经常意识不到
+                "某些事在反复发生"——人对自己盲区里的事是看不见的，这正是你的任务。
+
+                任务：从这批事件里找出**重复出现的苗头**。注意：
+                1. 只依据给出的 facts，一个字都不许编。事件不够多（少于 5 条）或
+                   看不出任何重复，就返回空数组——不要硬凑发现。
+                2. 已经在"用户跟进的问题卡"清单里的事，不算新发现，不要重复报。
+                3. 每条发现给 title（≤12字，说现象不说评价，例如"和熟人说话不过脑"，
+                   不说"情商低"）和 reason（≤60字，点出是哪几天、哪几件事像）。
+                4. suggest_problem=true 只给"正在造成实际损失、值得马上改"的；
+                   只是性格特点或样本还少的，给 false（先进模式页攒样本）。
+                5. suggested_criteria（≤40字）：如果建议立卡，给一个"怎么算解决"的
+                   草案——必须是可验证的行为标准，不是"变得更好"这种空话。
+                6. suggested_attempt（≤30字，可空）：给一个具体可做的应对动作。
+                7. 最多 3 条。宁缺毋滥。
+
+                只输出 JSON，格式：
+                {"findings":[{"title":"...","reason":"...","suggest_problem":true,"suggested_criteria":"...","suggested_attempt":"..."}]}
+                """;
+
+            var sb = new StringBuilder();
+
+            if (problems.Count > 0)
+            {
+                sb.AppendLine("用户已在跟进的问题卡（这些不算新发现）：");
+                foreach (var p in problems) sb.AppendLine($"- {OneLine(p.Title, 40)}");
+            }
+            if (patterns.Count > 0)
+            {
+                sb.AppendLine("用户已有的行为模式：");
+                foreach (var p in patterns) sb.AppendLine($"- {OneLine(p.Title, 40)}");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("近期事件卡：");
+            foreach (var e in events)
+            {
+                sb.AppendLine($"- {e.Day}｜{OneLine(e.Title, 20)}｜{OneLine(e.Facts, 150)}");
+            }
+
+            return (system, sb.ToString());
+        }
+
+        /// <summary>校验回看结果：title/reason 为空丢、清单外的事不报、最多 3 条。</summary>
+        public static List<ReviewFindingRow> ParseReview(string raw)
+        {
+            var findings = new List<ReviewFindingRow>();
+            if (!TryRoot(raw, out var root)) return findings;
+            if (!root.TryGetProperty("findings", out var arr) || arr.ValueKind != JsonValueKind.Array)
+                return findings;
+
+            foreach (var el in arr.EnumerateArray())
+            {
+                string title = OneLine(Str(el, "title"), 12);
+                string reason = OneLine(Str(el, "reason"), 60);
+                if (title.Length == 0 || reason.Length == 0) continue;   // 缺名字或缺依据 = 没信息量
+
+                findings.Add(new ReviewFindingRow(
+                    title,
+                    reason,
+                    Bool(el, "suggest_problem"),
+                    OneLine(Str(el, "suggested_criteria"), 40),
+                    OneLine(Str(el, "suggested_attempt"), 30)));
+
+                if (findings.Count >= MaxFindingsPerReview) break;
+            }
+
+            return findings;
+        }
+
+        // ============================================================
         // 小工具
         // ============================================================
 
@@ -313,6 +566,20 @@ namespace personalHub.Server.Ai
                 JsonValueKind.Number => v.GetInt32(),
                 JsonValueKind.String => int.TryParse(v.GetString(), out int n) ? n : 0,
                 _ => 0,
+            };
+        }
+
+        /// <summary>模型对布尔字段可能给 true/"true"/1，统一兜住。</summary>
+        private static bool Bool(JsonElement el, string name)
+        {
+            if (el.ValueKind != JsonValueKind.Object) return false;
+            if (!el.TryGetProperty(name, out var v)) return false;
+            return v.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.Number => v.GetInt32() != 0,
+                JsonValueKind.String => bool.TryParse(v.GetString(), out var b) && b,
+                _ => false,
             };
         }
 

@@ -44,6 +44,11 @@ namespace PersonalHub.Client
             // R6：想法（原材料仓库，与"行动"无关）
             builder.Services.AddSingleton(new LocalRecordStore<LocalIdea>(dbPath));
 
+            // R7.1：问题卡 —— 控制环的"还债"层。
+            // 刻意**不注册** uploader / RecordSyncService：v1 纯本地，
+            // 服务端保持无状态（问题和模式清单随请求带给 AI，不落服务端）。
+            builder.Services.AddSingleton(new LocalRecordStore<LocalProblem>(dbPath));
+
             // ===== 上传器：每类记录一个（proto 差异全部关在这里）=====
             builder.Services.AddSingleton<IRecordUploader<LocalRecord>, RecordUploader>();
             builder.Services.AddSingleton<IRecordUploader<ThingRecord>, ThingUploader>();
@@ -100,7 +105,8 @@ namespace PersonalHub.Client
             builder.Services.AddTransient<TimeOverviewPage>(); // 目录 → 时间概览
             builder.Services.AddTransient<WeekReviewPage>();   // 目录 → 这周回顾（周对比，0 输入）
             builder.Services.AddTransient<RecordEntryPage>();   // 目录 → 账单
-            builder.Services.AddTransient<RecordDothingPage>(); // 目录 → 事件反思
+            builder.Services.AddTransient<RecordDothingPage>(); // 目录 → 事件卡（录入）
+            builder.Services.AddTransient<EventListPage>();     // 目录 → 事件卡库（全量 + 筛选）
             builder.Services.AddTransient<BlockEntryPage>();    // 目录 → 时间块（R2 主入口）
             builder.Services.AddTransient<GoalListPage>();      // 时间块页顶部 → 目标
             builder.Services.AddTransient<GoalDetailPage>();    // 目标列表 → 详情（带 ?id=）
@@ -109,6 +115,8 @@ namespace PersonalHub.Client
             builder.Services.AddTransient<PatternDetailPage>(); // 模式列表 → 详情（带 ?id=）
             builder.Services.AddTransient<IdeaEntryPage>();     // 目录 → 想法（记一条）
             builder.Services.AddTransient<IdeaListPage>();      // 目录 → 想法库（列表 + 转成目标）
+            builder.Services.AddTransient<ProblemListPage>();   // 目录 → 问题卡（R7.1）
+            builder.Services.AddTransient<ProblemEditPage>();   // 问题卡列表/AI 建议立卡 → 建卡/编辑
 
             var app = builder.Build();
 

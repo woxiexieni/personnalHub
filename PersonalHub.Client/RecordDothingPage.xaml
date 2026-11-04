@@ -2,14 +2,22 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="PersonalHub.Client.RecordDothingPage"
-             Title="事件反思">
+             Title="事件卡">
+
+    <!--
+        R7 改版：8 个必填字段的表单废掉了（没人填 = 没人复盘）。
+        新流程：想到什么打什么 → AI 拆成事件卡草稿 → 逐张确认保存。
+        老的 ThingRecord 表原样不动，只是录入路径换了。
+    -->
     <ScrollView>
         <VerticalStackLayout Padding="24,20" Spacing="12">
+
             <Label
-                Text="事件反思"
+                Text="事件卡"
                 Style="{StaticResource Headline}"
                 SemanticProperties.HeadingLevel="Level1"/>
-            <!-- ============ 同步状态条【完全复用原有逻辑】 ============ -->
+
+            <!-- ============ 同步状态条【沿用原有逻辑】 ============ -->
             <Border
                 Stroke="{StaticResource Gray300}"
                 StrokeThickness="1"
@@ -37,115 +45,115 @@
                 </Grid>
             </Border>
 
-            <!-- ============ 1.事件标题（必填） ============ -->
-            <Label Text="事件标题" Style="{StaticResource SubHeadline}"/>
+            <!-- ============ 1. 输入区：像跟人说话一样打字 ============ -->
+            <Label
+                Text="想到什么打什么"
+                Style="{StaticResource SubHeadline}"/>
+            <Label
+                Text="乱序、带情绪、骂街都行。几件事混在一起没关系，AI 会拆开。"
+                FontSize="12"
+                TextColor="{StaticResource Gray500}"/>
             <Border Style="{StaticResource FieldBorder}">
                 <Editor
-                    x:Name="TitleEntry"
+                    x:Name="RawInput"
                     Style="{StaticResource FieldEditor}"
-                    Placeholder="一句话概括这件事（必填）"
-                    MaxLength="120"/>
+                    Placeholder="例：前天拍照对姐姐没礼貌，刚才跟zqq打电话又杠起来，说了不少蠢话……"
+                    AutoSize="TextChanges"
+                    HeightRequest="120"/>
             </Border>
 
-            <!-- ============ 2.事件标签（分类Picker，单选） ============ -->
-            <Label Text="事件标签" Style="{StaticResource SubHeadline}"/>
-            <Picker x:Name="TagPicker" Title="请选择标签（必填）"/>
-
-            <!-- ============ 3.当时情绪（情绪下拉Picker） ============ -->
-            <Label Text="事发时情绪" Style="{StaticResource SubHeadline}"/>
-            <Picker x:Name="EmotionPicker" Title="请选择情绪（必填）"/>
-
-            <!-- ============ 4.事件发生时间 日期+时间 ============ -->
-            <Label Text="事件发生时间" Style="{StaticResource SubHeadline}"/>
+            <!-- 这些事大概什么时候发生的（一张批共用，保存前可改） -->
+            <Label Text="大概时间（这批卡共用，可改）" FontSize="12" TextColor="{StaticResource Gray500}"/>
             <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                 <DatePicker x:Name="EventDatePicker" Grid.Column="0" Format="yyyy-MM-dd"/>
                 <TimePicker x:Name="EventTimePicker" Grid.Column="1" Format="HH:mm"/>
             </Grid>
 
-            <!-- ============ 5.事件简述【客观事实，多行】 ============ -->
-            <Label Text="事件简述（只写客观事实）" Style="{StaticResource SubHeadline}"/>
-            <Editor
-                x:Name="FactEditor"
-                Placeholder="客观描述发生了什么，不带主观评价（必填）"
-                AutoSize="TextChanges"
-                HeightRequest="80"/>
-
-            <!-- ============ 6.事发当时想法 ============ -->
-            <Label Text="事发那一刻的想法" Style="{StaticResource SubHeadline}"/>
-            <Editor
-                x:Name="ThoughtEditor"
-                Placeholder="当时脑子里是怎么想的（必填）"
-                AutoSize="TextChanges"
-                HeightRequest="80"/>
-
-            <!-- ============ 7.你采取的行动 ============ -->
-            <Label Text="当时采取的行动" Style="{StaticResource SubHeadline}"/>
-            <Editor
-                x:Name="ActionEditor"
-                Placeholder="这件事里你做了哪些行为（必填）"
-                AutoSize="TextChanges"
-                HeightRequest="80"/>
-
-            <!-- ============ 8.事件最终结果 ============ -->
-            <Label Text="事件最终结果" Style="{StaticResource SubHeadline}"/>
-            <Editor
-                x:Name="ResultEditor"
-                Placeholder="这件事最后走向、带来的后果（必填）"
-                AutoSize="TextChanges"
-                HeightRequest="80"/>
-
-            <!-- ============ 9.复盘反思 ============ -->
-            <Label Text="复盘反思：优点与不足" Style="{StaticResource SubHeadline}"/>
-            <Editor
-                x:Name="ReviewEditor"
-                Placeholder="回头看，哪些做得好，哪些存在不足（必填）"
-                AutoSize="TextChanges"
-                HeightRequest="100"/>
-
-            <!-- ============ 10.后续行动计划 ============ -->
-            <Label Text="后续行动计划" Style="{StaticResource SubHeadline}"/>
-            <Editor
-                x:Name="PlanEditor"
-                Placeholder="下次遇到同类场景，准备怎么处理（必填）"
-                AutoSize="TextChanges"
-                HeightRequest="100"/>
-
-            <!-- ============ 保存按钮、状态提示 ============ -->
             <Button
-                x:Name="SaveBtn"
-                Text="保存到本地"
-                Clicked="OnSaveClicked"
+                x:Name="ExtractBtn"
+                Text="交给 AI 整理"
+                Clicked="OnExtractClicked"
+                HorizontalOptions="Fill"/>
+
+            <!-- AI 挂了 / 没网的时候：原文先落本地，不丢 -->
+            <Button
+                x:Name="SaveRawBtn"
+                Text="AI 整理不了，先存原文（待整理）"
+                Clicked="OnSaveRawClicked"
                 HorizontalOptions="Fill"
-                Margin="0,4,0,0"/>
+                IsVisible="False"/>
+
             <Label
                 x:Name="StatusLabel"
                 Text=""
                 LineBreakMode="WordWrap"/>
-            <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,10"/>
 
-            <!-- ============ 底部列表：今日反思记录 ============ -->
-            <Label
-                Text="今日反思记录"
-                Style="{StaticResource SubHeadline}"/>
+            <!-- ============ 2. AI 草稿卡（逐张确认，代码动态生成） ============ -->
+            <VerticalStackLayout x:Name="DraftCards" Spacing="14"/>
+
+            <!-- ============ 3. 今日事件卡 ============ -->
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,10"/>
+            <Grid ColumnDefinitions="*,Auto">
+                <Label
+                    Grid.Column="0"
+                    Text="今日事件卡"
+                    Style="{StaticResource SubHeadline}"
+                    VerticalOptions="Center"/>
+                <Button
+                    Grid.Column="1"
+                    Text="全部事件卡 ›"
+                    FontSize="12"
+                    Padding="8,2"
+                    BackgroundColor="Transparent"
+                    TextColor="{StaticResource Primary}"
+                    Clicked="OnOpenEventListClicked"/>
+            </Grid>
             <CollectionView x:Name="TodayReflectList" HeightRequest="300">
                 <CollectionView.EmptyView>
-                    <Label Text="今天还没有反思记录" HorizontalOptions="Center" Margin="0,20"/>
+                    <Label Text="今天还没有事件卡" HorizontalOptions="Center" Margin="0,20"/>
                 </CollectionView.EmptyView>
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
-                        <Grid ColumnDefinitions="*,Auto" Padding="0,8">
-                            <VerticalStackLayout Grid.Column="0" Spacing="2">
-                                <Label Text="{Binding Title}" FontSize="14" LineBreakMode="TailTruncation"/>
-                                <HorizontalStackLayout Spacing="8">
-                                    <Label Text="{Binding EventTime}" FontSize="12" TextColor="{StaticResource Gray500}"/>
-                                    <Label Text="{Binding SyncText}" FontSize="12" TextColor="{Binding SyncColor}"/>
-                                </HorizontalStackLayout>
+                        <Grid RowDefinitions="Auto,Auto" Padding="0,8">
+                            <!-- 行头：点一下 = 展开/收起明细 -->
+                            <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnThingTapped" CommandParameter="{Binding}"/>
+                                </Grid.GestureRecognizers>
+                                <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                    <Label Text="{Binding Title}" FontSize="14" LineBreakMode="TailTruncation"/>
+                                    <HorizontalStackLayout Spacing="8">
+                                        <Label Text="{Binding EventTime}" FontSize="12" TextColor="{StaticResource Gray500}"/>
+                                        <Label Text="{Binding SyncText}" FontSize="12" TextColor="{Binding SyncColor}"/>
+                                    </HorizontalStackLayout>
+                                </VerticalStackLayout>
+                                <Label
+                                    Grid.Column="1"
+                                    Text="{Binding Tag}"
+                                    FontSize="14"
+                                    VerticalOptions="Center"/>
+                                <Label
+                                    Grid.Column="2"
+                                    Text="{Binding Arrow}"
+                                    FontSize="12"
+                                    TextColor="{StaticResource Gray500}"
+                                    VerticalOptions="Center"/>
+                            </Grid>
+                            <!-- 明细：默认收起，点行头展开 -->
+                            <VerticalStackLayout
+                                Grid.Row="1"
+                                IsVisible="{Binding IsExpanded}"
+                                Spacing="4"
+                                Padding="12,8,0,0">
+                                <Label Text="{Binding Detail}" FontSize="13" LineBreakMode="WordWrap"/>
+                                <Button
+                                    Text="原文填回输入框，重新交给 AI"
+                                    FontSize="12"
+                                    Padding="10,4"
+                                    HorizontalOptions="Start"
+                                    IsVisible="{Binding IsPending}"
+                                    Clicked="OnRefillRawClicked"/>
                             </VerticalStackLayout>
-                            <Label
-                                Grid.Column="1"
-                                Text="{Binding Tag}"
-                                FontSize="14"
-                                VerticalOptions="Center"/>
                         </Grid>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>

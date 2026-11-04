@@ -38,6 +38,12 @@ namespace PersonalHub.Client.Data
             // 读进 bool / long 属性会直接抛异常（不是悄悄变 false）。必须显式补 DEFAULT 并回填。
             ("ideas",         "Done",      "INTEGER NOT NULL DEFAULT 0"),
             ("ideas",         "DoneAt",    "INTEGER NOT NULL DEFAULT 0"),
+
+            // R7.1：事件卡挂问题卡。老行补空串，避免 NULL 穿到字符串字段。
+            ("ThingsRecords", "ProblemId", "TEXT NOT NULL DEFAULT ''"),
+
+            // R7.2：问题卡加分类标签（与事件卡共用词表）。老行补空串。
+            ("problems",      "Tag",       "TEXT NOT NULL DEFAULT ''"),
         };
 
         /// <summary>
@@ -295,6 +301,14 @@ namespace PersonalHub.Client.Data
                 .Where(r => r.Synced == false)
                 .CountAsync()
                 .ConfigureAwait(false);
+        }
+
+        /// <summary>取全部记录（含墓碑）。只给"表很小"的类型用（模式、目标这类），
+        /// 账单/事件那种几千行的表不要调它。</summary>
+        public async Task<List<T>> GetAllAsync()
+        {
+            await EnsureReadyAsync().ConfigureAwait(false);
+            return await _db.Table<T>().ToListAsync().ConfigureAwait(false);
         }
 
         // ============================================================

@@ -251,6 +251,181 @@ namespace personalHub.Server.Services
         }
 
         // ============================================================
+        // D. 事件卡：自由文字 → 结构化事件草稿（R7）
+        // ============================================================
+        //
+        // 与前三个方法最大的不同：**服务端无状态**。
+        // 问题卡 / 模式清单是客户端从本地 SQLite 带来的，服务端不存也不查——
+        // v1 不为此建表、不建同步链路。服务端在这里只是"读过上下文的整理员"。
+
+        public override async Task<ExtractEventsReply> ExtractEvents(
+            ExtractEventsRequest request, ServerCallContext context)
+        {
+            var resp = new ExtractEventsReply();
+
+            var cfg = _config.Current;
+            if (!cfg.Configured)
+            {
+                resp.ErrorMsg = cfg.Hint;
+                return resp;
+            }
+
+            string rawText = (request.RawText ?? string.Empty).Trim();
+            if (rawText.Length < 10)
+            {
+                resp.ErrorMsg = "写得太短了，多打两句才能整理出东西。";
+                return resp;
+            }
+
+            var problems = request.KnownProblems
+                .Where(p => !string.IsNullOrWhiteSpace(p.Id))
+                .Select(p => (p.Id, p.Title ?? string.Empty))
+                .ToList();
+            var patterns = request.KnownPatterns
+                .Where(p => !string.IsNullOrWhiteSpace(p.Id))
+                .Select(p => (p.Id, p.Title ?? string.Empty))
+                .ToList();
+            var tags = request.TagOptions.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
+            var emotions = request.EmotionOptions.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
+
+            if (tags.Count == 0 || emotions.Count == 0)
+            {
+                resp.ErrorMsg = "客户端没带标签/情绪选项，无法校验。";
+                return resp;
+            }
+
+            var (system, user) = AiPrompts.ExtractEvents(rawText, problems, patterns, tags, emotions);
+
+            var reply = await _llm.ChatJsonAsync(cfg, system, user, context.CancellationToken)
+                .ConfigureAwait(false);
+
+            if (!reply.Ok)
+            {
+                resp.ErrorMsg = reply.Error;
+                Log("事件卡", $"{rawText.Length} 字", reply);
+                return resp;
+            }
+
+            // 第一个参数是模型返回的 JSON（ParseEvents 内部 TryRoot 解析它），
+            // 不是用户原文——传错的话校验永远 0 张卡。
+            var (events, routes) = AiPrompts.ParseEvents(reply.Content, problems, patterns, tags, emotions);
+            Log("事件卡", $"{rawText.Length} 字", reply, $"→ {events.Count} 张卡 / {routes.Count} 条路由");
+
+            if (events.Count == 0)
+            {
+                resp.ErrorMsg = "这次没整理出事件卡（返回不合规）。原文可以先存着，回头再试。";
+                return resp;
+            }
+
+            resp.Ok = true;
+            foreach (var e in events)
+            {
+                resp.Events.Add(new EventDraft
+                {
+                    EventIndex = e.Index,
+                    Title = e.Title,
+                    Emotion = e.Emotion,
+                    Tag = e.Tag,
+                    Facts = e.Facts,
+                    Action = e.Action,
+                    InitialThought = e.InitialThought,
+                    Result = e.Result,
+                    Question = e.Question,
+                });
+            }
+
+            foreach (var r in routes)
+            {
+                var dto = new EventRoute { EventIndex = r.EventIndex };
+                if (r.MatchProblemId.Length > 0) dto.MatchProblemId = r.MatchProblemId;
+                if (r.MatchPatternId.Length > 0) dto.MatchPatternId = r.MatchPatternId;
+                if (r.NewPattern is { } np)
+                {
+                    dto.NewPattern = new PatternDraft { Title = np.Title, Reason = np.Reason };
+                }
+                if (r.SuggestedAttempt.Length > 0) dto.SuggestedAttempt = r.SuggestedAttempt;
+                resp.Routes.Add(dto);
+            }
+
+            return resp;
+        }
+
+        /// <summary>
+        /// AI 周回看：近 30 天事件卡 → 重复苗头。防盲区用的——用户自己意识不到
+        /// "某些事在反复发生"，这是这个系统里唯一主动开口的功能（手动触发，一次调用）。
+        /// 服务端照旧无状态：事件和已有问题/模式清单都由客户端带来。
+        /// </summary>
+        public override async Task<ReviewEventsReply> ReviewEvents(
+            ReviewEventsRequest request, ServerCallContext context)
+        {
+            var resp = new ReviewEventsReply();
+
+            var cfg = _config.Current;
+            if (!cfg.Configured)
+            {
+                resp.ErrorMsg = cfg.Hint;
+                return resp;
+            }
+
+            var events = request.Events
+                .Where(e => !string.IsNullOrWhiteSpace(e.Facts))
+                .Select(e => (e.Day ?? string.Empty, e.Title ?? string.Empty, e.Facts))
+                .ToList();
+
+            if (events.Count < 5)
+            {
+                resp.ErrorMsg = $"事件卡太少（{events.Count} 张，至少 5 张）。先照常打几天事件卡，攒够样本再来回看。";
+                return resp;
+            }
+
+            var problems = request.KnownProblems
+                .Where(p => !string.IsNullOrWhiteSpace(p.Id))
+                .Select(p => (p.Id, p.Title ?? string.Empty))
+                .ToList();
+            var patterns = request.KnownPatterns
+                .Where(p => !string.IsNullOrWhiteSpace(p.Id))
+                .Select(p => (p.Id, p.Title ?? string.Empty))
+                .ToList();
+
+            var (system, user) = AiPrompts.ReviewEvents(events, problems, patterns);
+
+            var reply = await _llm.ChatJsonAsync(cfg, system, user, context.CancellationToken)
+                .ConfigureAwait(false);
+
+            if (!reply.Ok)
+            {
+                resp.ErrorMsg = reply.Error;
+                Log("周回看", $"{events.Count} 张事件卡", reply);
+                return resp;
+            }
+
+            var findings = AiPrompts.ParseReview(reply.Content);
+            Log("周回看", $"{events.Count} 张事件卡", reply, $"→ {findings.Count} 条发现");
+
+            if (findings.Count == 0)
+            {
+                resp.ErrorMsg = "这批事件里没看出明显重复——不硬凑。继续攒，样本够了再回看。";
+                return resp;
+            }
+
+            resp.Ok = true;
+            foreach (var f in findings)
+            {
+                var dto = new ReviewFinding
+                {
+                    Title = f.Title,
+                    Reason = f.Reason,
+                    SuggestedCriteria = f.SuggestedCriteria,
+                    SuggestedAttempt = f.SuggestedAttempt,
+                };
+                if (f.SuggestProblem) dto.SuggestProblem = true;
+                resp.Findings.Add(dto);
+            }
+
+            return resp;
+        }
+
+        // ============================================================
         // 日志
         // ============================================================
 

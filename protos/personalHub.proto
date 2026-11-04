@@ -595,6 +595,11 @@ service AiService {
     rpc SuggestNextSteps (SuggestNextStepsRequest) returns (SuggestNextStepsResponse);
     rpc FindRepeatingEvaluations (FindRepeatingRequest) returns (PatternProposalList);
     rpc CommentWeek (WeekFacts) returns (WeekComment);
+    // R7 事件卡：把用户随手打的自由文字整理成结构化事件卡草稿。
+    // 服务端无状态：问题卡/模式清单由客户端随请求带来，服务端不存。
+    rpc ExtractEvents (ExtractEventsRequest) returns (ExtractEventsReply);
+    // AI 周回看：近 30 天事件卡 → 重复苗头/建议立卡（防盲区，手动触发，一次调用）。
+    rpc ReviewEvents (ReviewEventsRequest) returns (ReviewEventsReply);
 }
 
 message AiStatusResponse {
@@ -659,5 +664,82 @@ message WeekFacts {
 message WeekComment {
     optional bool ok = 1 [default = false];
     optional string text = 2;         // 一句话，≤40 字
+    optional string error_msg = 3;
+}
+
+// ============ R7 事件卡：自由文字 → 结构化事件草稿 ============
+
+// 客户端本地的"已知清单"条目。服务端只用来给模型做参照 + 校验 id 合法性，不入库。
+message KnownRef {
+    optional string id = 1;
+    optional string title = 2;
+}
+
+message ExtractEventsRequest {
+    optional string raw_text = 1;             // 用户打的原文，原样
+    repeated KnownRef known_problems = 2;     // 本地问题卡（v1 可能是空的）
+    repeated KnownRef known_patterns = 3;     // 本地行为模式
+    repeated string tag_options = 4;          // 固定标签（客户端单一事实来源，模型只准从里面挑）
+    repeated string emotion_options = 5;      // 固定情绪（同上）
+}
+
+message EventDraft {
+    optional int32 event_index = 1;   // 在本次返回里的序号，路由靠它对应
+    optional string title = 2;        // ≤15 字，给列表看
+    optional string emotion = 3;      // 必须是客户端给的固定情绪之一
+    optional string tag = 4;          // 必须是客户端给的固定标签之一
+    optional string facts = 5;        // 客观事实（模型只准搬/缩用户原文，不准编）
+    optional string action = 6;       // 当时做了什么，可空
+    optional string initial_thought = 7; // 当时的想法，可空
+    optional string result = 8;       // 结果，可空
+    optional string question = 9;     // 追问（≤40 字，每卡最多一个），可空
+}
+
+message PatternDraft {
+    optional string title = 1;        // ≤12 字
+    optional string reason = 2;       // 为什么像（≤40 字），给确认页看
+}
+
+// 路由：这张事件卡和已有问题/模式的关系。三选一，服务端校验 id 必须来自请求清单。
+message EventRoute {
+    optional int32 event_index = 1;
+    optional string match_problem_id = 2;     // 命中已有问题卡
+    optional string match_pattern_id = 3;     // 命中已有模式
+    optional PatternDraft new_pattern = 4;    // 谁都不像 → 新模式草案（只提示，不自动建）
+    optional string suggested_attempt = 5;    // 命中问题卡时的建议试法（一键采纳；闸1只锁判据，不管这格）
+}
+
+message ExtractEventsReply {
+    optional bool ok = 1 [default = false];
+    repeated EventDraft events = 2;
+    repeated EventRoute routes = 3;
+    optional string error_msg = 4;
+}
+
+// ---- AI 周回看：扫近期事件卡，主动发现用户自己意识不到的重复苗头（防盲区）----
+
+message ReviewEvent {
+    optional string day = 1;       // "MM-dd"，展示用
+    optional string title = 2;
+    optional string facts = 3;     // 事件卡的事实段（AI 主要看这个，防标题情绪误导）
+}
+
+message ReviewEventsRequest {
+    repeated ReviewEvent events = 1;          // 近 30 天事件卡（客户端裁剪后送）
+    repeated KnownRef known_problems = 2;     // 进行中的问题卡
+    repeated KnownRef known_patterns = 3;     // 已有模式
+}
+
+message ReviewFinding {
+    optional string title = 1;                // 苗头/问题的名字（≤12字）
+    optional string reason = 2;               // 为什么：点了哪几天的事（≤60字）
+    optional bool suggest_problem = 3 [default = false]; // true=建议立问题卡 false=先攒模式样本
+    optional string suggested_criteria = 4;   // 建议立卡时的判据草案（仅草案，用户必须改）
+    optional string suggested_attempt = 5;    // 建议试法草案（可空）
+}
+
+message ReviewEventsReply {
+    optional bool ok = 1 [default = false];
+    repeated ReviewFinding findings = 2;
     optional string error_msg = 3;
 }
