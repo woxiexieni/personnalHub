@@ -17,6 +17,7 @@ namespace PersonalHub.Client
     public partial class ProblemEditPage : ContentPage
     {
         private readonly LocalRecordStore<LocalProblem> _store;
+        private readonly RecordSyncService<LocalProblem> _problemSync;
 
         /// <summary>
         /// AI 建议立卡时带的草稿（RecordDothingPage / 问题卡列表的周回看 导航前塞进来）。
@@ -35,10 +36,11 @@ namespace PersonalHub.Client
         /// <summary>当前选中的分类（空 = 不分类）。词表与事件卡共用。</summary>
         private string _tag = string.Empty;
 
-        public ProblemEditPage(LocalRecordStore<LocalProblem> store)
+        public ProblemEditPage(LocalRecordStore<LocalProblem> store, RecordSyncService<LocalProblem> problemSync)
         {
             InitializeComponent();
             _store = store;
+            _problemSync = problemSync;
             BuildTagChips();
         }
 
@@ -171,6 +173,9 @@ namespace PersonalHub.Client
                         Synced = false,
                     });                            // 同上，UI 事件处理器里禁止 ConfigureAwait(false)
                 }
+
+                // 保存即触发上传（fire-and-forget）：SyncAsync 内部先 Ping，连不上静默放弃。
+                _ = _problemSync.SyncAsync();
 
                 await Shell.Current.GoToAsync("..");
             }

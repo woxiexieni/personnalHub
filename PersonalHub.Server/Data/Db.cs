@@ -85,6 +85,9 @@ namespace personalHub.Server.Data
 
             // R6：想法（原材料仓库，与"行动"无关）
             Conn.CreateTable<IdeaRow>();
+
+            // R7.2：问题卡（从纯本地升级上来，管理端可看 + 可备份）
+            Conn.CreateTable<ProblemRow>();
         }
 
         /// <summary>
@@ -110,6 +113,9 @@ namespace personalHub.Server.Data
             EnsureColumn("ideas",   "done",       "INTEGER NOT NULL DEFAULT 0", "0");
             EnsureColumn("ideas",   "done_at",    "INTEGER NOT NULL DEFAULT 0", "0");
 
+            // R7.2：事件卡挂问题卡。老行补空串（NULL 穿进 string 字段会变成空引用）。
+            EnsureColumn("things",  "problem_id", "TEXT NOT NULL DEFAULT ''", "''");
+
             // 老数据的 updated_at 用 created_at 兜底。留在 0 会让首次版本比较失效
             // （0 < 任何值 → 老记录永远被判定为"过期"，管理端改一次就被拒）。
             Conn.Execute("UPDATE records SET updated_at = created_at WHERE updated_at = 0");
@@ -134,6 +140,11 @@ namespace personalHub.Server.Data
             // 所以索引带 created_at；单列 kind 没用（几乎不会只按类型查而不排序）。
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_ideas_created ON ideas(created_at)");
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_ideas_kind    ON ideas(kind, created_at)");
+
+            // R7.2：问题卡按"状态 + 更新时间"翻，事件卡按 problem_id 反查证据。
+            // 这张表一辈子只有几十上百行，索引只为将来证据统计不扫全表。
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_problems_status  ON problems(status, updated_at)");
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_things_problem   ON things(problem_id)");
 
             SeedCategories();
         }

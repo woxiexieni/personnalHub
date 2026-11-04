@@ -20,6 +20,7 @@ namespace PersonalHub.Client
         private readonly LocalRecordStore<ThingRecord> _things;
         private readonly LocalRecordStore<LocalPattern> _patterns;
         private readonly AiAssistService _ai;
+        private readonly RecordSyncService<LocalProblem> _problemSync;
         private bool _reviewBusy;
 
         /// <summary>当前分类筛选（空 = 全部）。只影响显示，不改数据。</summary>
@@ -32,13 +33,15 @@ namespace PersonalHub.Client
             LocalRecordStore<LocalProblem> problems,
             LocalRecordStore<ThingRecord> things,
             LocalRecordStore<LocalPattern> patterns,
-            AiAssistService ai)
+            AiAssistService ai,
+            RecordSyncService<LocalProblem> problemSync)
         {
             InitializeComponent();
             _problems = problems;
             _things = things;
             _patterns = patterns;
             _ai = ai;
+            _problemSync = problemSync;
             BuildFilterChips();
         }
 
@@ -362,6 +365,7 @@ namespace PersonalHub.Client
             p.AttemptCount++;
             p.UpdatedAt = p.AttemptStartedAt;
             await _problems.UpdateAsync(p);
+            _ = _problemSync.SyncAsync();   // 换招也算改了卡，同步上去
             await RefreshAsync();
             StatusLabel.Text = "换招完成。环再转一圈。";
         }
@@ -403,6 +407,7 @@ namespace PersonalHub.Client
             p.UpdatedAt = p.ClosedAt;
             if (!string.IsNullOrWhiteSpace(note)) p.ClosingNote = note.Trim();
             await _problems.UpdateAsync(p);
+            _ = _problemSync.SyncAsync();   // 关卡/放弃同样同步上去
             await RefreshAsync();
         }
     }

@@ -1,0 +1,154 @@
+@page
+@model PersonalHub.Server.Pages.Problems.IndexModel
+@using personalHub.Server.Analysis
+@{
+    ViewData["Title"] = "问题卡";
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>问题卡</h2>
+        <span class="hint">控制环的「评估」层 · 判据是闸门，试法是这一圈在试的招，证据是事件卡反挂</span>
+    </div>
+
+    <div class="kpis">
+        <div class="kpi">
+            <div class="label">进行中</div>
+            <div class="num">@Model.CountActive</div>
+            <div class="sub">还欠着的债</div>
+        </div>
+        <div class="kpi">
+            <div class="label">已解决</div>
+            <div class="num">@Model.CountSolved</div>
+            <div class="sub">「我改掉过一个毛病」的书面证据</div>
+        </div>
+        <div class="kpi">
+            <div class="label">证据合计</div>
+            <div class="num">@Model.EvidenceTotal</div>
+            <div class="sub">挂在问题下的事件卡总数</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2 style="font-size:14px">按状态</h2>
+        <span class="hint">「放弃」也算收获：认了它不是真问题，比一直挂着强</span>
+    </div>
+
+    <div class="filters">
+        <a class="btn sm @(Model.Status < 0 ? "primary" : "")" href="/problems">
+            全部 <span style="opacity:.7">@(Model.CountActive + Model.CountSolved + Model.CountDropped)</span>
+        </a>
+        <a class="btn sm @(Model.Status == 0 ? "primary" : "")" href="/problems?status=0">
+            进行中 <span style="opacity:.7">@Model.CountActive</span>
+        </a>
+        <a class="btn sm @(Model.Status == 1 ? "primary" : "")" href="/problems?status=1">
+            已解决 <span style="opacity:.7">@Model.CountSolved</span>
+        </a>
+        <a class="btn sm @(Model.Status == 2 ? "primary" : "")" href="/problems?status=2">
+            放弃 <span style="opacity:.7">@Model.CountDropped</span>
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty">
+            @if (Model.CountActive + Model.CountSolved + Model.CountDropped == 0)
+            {
+                <text>还没有问题卡。翻车时打一张事件卡，AI 会提议立卡 —— 判据写不出来就别立。</text>
+            }
+            else
+            {
+                <text>这个状态下没有问题卡。</text>
+            }
+        </div>
+    }
+    else
+    {
+        <table class="grid">
+            <thead>
+            <tr>
+                <th style="width:180px">问题</th>
+                <th style="width:230px">判据（怎么算解决）</th>
+                <th>试法</th>
+                <th style="width:76px">证据</th>
+                <th style="width:76px">状态</th>
+                <th style="width:110px">时间</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var p in Model.Items)
+            {
+                <tr>
+                    <td style="max-width:180px">
+                        <div style="overflow:hidden;text-overflow:ellipsis" title="@p.Title">@p.Title</div>
+                        @if (!string.IsNullOrEmpty(p.Tag))
+                        {
+                            <span class="tag" style="margin-top:4px">@p.Tag</span>
+                        }
+                    </td>
+                    <td style="max-width:230px">
+                        <div style="overflow:hidden;text-overflow:ellipsis" title="@p.Criteria">
+                            @IndexModel.Preview(p.Criteria)
+                        </div>
+                        @if (!p.CriteriaConfirmed)
+                        {
+                            <span class="tag paused" title="AI 起草、还没被本人确认过">判据未确认</span>
+                        }
+                    </td>
+                    <td style="max-width:360px">
+                        @if (string.IsNullOrWhiteSpace(p.Attempt) && p.Status == 0)
+                        {
+                            <span style="color:var(--muted)">观察中（还没定试法）</span>
+                        }
+                        else if (string.IsNullOrWhiteSpace(p.Attempt))
+                        {
+                            <span style="color:var(--muted)">—</span>
+                        }
+                        else
+                        {
+                            <div style="overflow:hidden;text-overflow:ellipsis" title="@Model.AttemptText(p)">
+                                @Model.AttemptText(p)
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(p.ClosingNote) && p.Status != 0)
+                        {
+                            <div class="hint" style="margin-top:4px">收尾：@p.ClosingNote</div>
+                        }
+                    </td>
+                    <td>
+                        @if (Model.EvidenceOf(p) == 0)
+                        {
+                            <span style="color:var(--muted)">0</span>
+                        }
+                        else
+                        {
+                            <a class="btn sm" href="/things?problem=@Uri.EscapeDataString(p.Id)"
+                               title="只看这张卡下面挂的证据">×@Model.EvidenceOf(p)</a>
+                        }
+                    </td>
+                    <td><span class="@Model.StatusClass(p)">@Model.StatusText(p)</span></td>
+                    <td style="white-space:nowrap;color:var(--muted)">
+                        建 @Fmt.ShortDate(p.CreatedAt)
+                        @if (p.ClosedAt > 0)
+                        {
+                            <br />
+                            <text>关 @Fmt.ShortDate(p.ClosedAt)</text>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+
+        @if (Model.Hidden > 0)
+        {
+            <div class="hint" style="margin-top:12px">
+                还有 @Model.Hidden 张更早的没有渲染（一次最多 300 张）。
+            </div>
+        }
+    }
+</div>

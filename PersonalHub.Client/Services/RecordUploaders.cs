@@ -301,4 +301,45 @@ namespace PersonalHub.Client.Services
             };
         }
     }
+
+    /// <summary>
+    /// 问题卡上传器：LocalProblem 列表 → UploadProblemsRequest → ProblemService.UploadProblems。
+    ///
+    /// 与其它上传器结构完全对称。唯一的差别是它上传的**不是事实记录，而是"我要改什么"**——
+    /// 所以服务端会再守一遍闸 1（判据不能为空），判据空着的卡会整批里单条失败，
+    /// 客户端保持 Synced=false 下次再试，而不是把卡丢掉。
+    /// </summary>
+    public sealed class ProblemUploader : IRecordUploader<LocalProblem>
+    {
+        private static readonly TimeSpan UploadTimeout = TimeSpan.FromSeconds(10);
+
+        private readonly ServerConnection _conn;
+
+        public ProblemUploader(ServerConnection conn) => _conn = conn;
+
+        public string DisplayName => "问题卡";
+
+        public async Task<UploadOutcome> UploadAsync(IReadOnlyList<LocalProblem> items, CancellationToken ct = default)
+        {
+            if (items.Count == 0) return UploadOutcome.Empty;
+
+            await _conn.EnsureAsync().ConfigureAwait(false);
+
+            var request = new UploadProblemsRequest();
+            request.Problems.AddRange(items.Select(x => x.ToProto()));
+
+            var resp = await _conn.NewProblemClient()
+                .UploadProblemsAsync(request,
+                    deadline: DateTime.UtcNow.Add(UploadTimeout),
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            return new UploadOutcome
+            {
+                Accepted = resp.AcceptedCount,
+                FailedIds = resp.FailedIds.ToArray(),
+                ErrorMsg = string.IsNullOrEmpty(resp.ErrorMsg) ? null : resp.ErrorMsg,
+            };
+        }
+    }
 }

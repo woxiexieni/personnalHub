@@ -241,6 +241,11 @@ message Thing {
     optional string reflection = 10;            // 复盘反思
     optional string action_plan = 11;           // 后续行动计划
     optional int64 created_at = 12;             // 本地创建时间（Unix 毫秒）
+
+    // R7.2：这张事件卡挂在哪张问题卡下（空 = 没挂）。
+    // 不加外键约束：问题卡可能还没同步上来、也可能先被删掉，
+    // 所以这只是一根"软引用"——管理端查不到对应问题时按"未挂"显示。
+    optional string problem_id = 13;
 }
 
 // 上传事件反思表格
@@ -575,6 +580,59 @@ message ListIdeasRequest {
 }
 
 message IdeaList { repeated Idea ideas = 1; }
+
+// =====================
+// 问题卡（R7.2）
+// =====================
+// 问题卡是控制环里"向前看的债"：判据（怎么算还完）+ 试法（现在用的招）+ 证据（事件卡反挂）。
+//
+// 为什么 v1 纯本地、v2 才上服务端：
+//   v1 只在一个设备上用，本地就够了，上服务端要处理"两端同时改一张卡"的冲突，
+//   而那时候连这张卡该长什么样都还没稳定。
+//   现在形态稳定了（判据/试法/评估三选一都在用），才把它变成可备份、可在管理端查看的数据。
+//
+// 与 things 的关系：things.problem_id 是软引用，问题卡被删不会连带删事件卡 ——
+// 事件卡是事实，事实不该因为"我不再关心这个问题了"而消失。
+service ProblemService {
+    rpc UploadProblems (UploadProblemsRequest) returns (UploadProblemsResponse);
+    // 恢复 + 管理端只读浏览共用同一个出口（和 ListIdeas / ListThings 同一个思路）。
+    rpc ListProblems (ListProblemsRequest) returns (ProblemList);
+}
+
+message Problem {
+    optional string id = 1;
+    optional string title = 2;                 // 问题的一句话（必填）
+    optional string criteria = 3;              // 判据：怎么算解决（闸 1，必填）
+    optional bool criteria_confirmed = 4 [default = false]; // 判据是否用户亲手确认过
+    optional string attempt = 5;               // 当前试法，可空 = 观察中
+    optional int64 attempt_started_at = 6;     // 当前试法开始时刻（Unix 毫秒）
+    optional int32 attempt_count = 7;          // 换招次数
+    optional int32 status = 8 [default = 0];   // 0 进行中 / 1 已解决 / 2 放弃
+    optional string source = 9;                // manual / event / pattern
+    optional string tag = 10;                  // 分类标签，与事件卡共用词表
+    optional string closing_note = 11;         // 关卡时的一句话
+    optional int64 created_at = 12;
+    optional int64 updated_at = 13;
+    optional int64 closed_at = 14;             // 0 = 还开着
+    optional bool deleted = 15 [default = false];
+}
+
+message UploadProblemsRequest { repeated Problem problems = 1; }
+
+message UploadProblemsResponse {
+    optional int32 accepted_count = 1 [default = 0];
+    repeated string failed_ids = 2;
+    optional string error_msg = 3;
+}
+
+message ListProblemsRequest {
+    optional int32 status = 1 [default = -1];   // -1 = 全部
+    optional int64 from = 2;                    // 按 created_at 过滤，含
+    optional int64 to = 3;                      // 不含
+    optional bool include_deleted = 4 [default = false];
+}
+
+message ProblemList { repeated Problem problems = 1; }
 
 // =====================
 // AI 助手（§27）
