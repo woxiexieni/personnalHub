@@ -107,7 +107,6 @@ namespace PersonalHub.Client
             services ??= IPlatformApplication.Current?.Services;
 
             object? page = services?.GetService(_pageType);
-
             if (page is null)
             {
                 // 只有真的有无参构造时才兜底。否则别让 Activator 抛 MissingMethodException ——
