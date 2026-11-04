@@ -21,6 +21,7 @@ namespace PersonalHub.Client
         private readonly RecordSyncService<LocalRecord> _expenseSync;
         private readonly RecordSyncService<ThingRecord> _thingSync;
         private readonly RecordSyncService<LocalBlock> _blockSync;
+        private readonly RecordSyncService<LocalProblem> _problemSync;
 
         /// <summary>防止 OnAppearing 连续触发时叠起两次同步（同步器内部也有锁，这里只是少绕一圈）。</summary>
         private bool _syncing;
@@ -30,19 +31,22 @@ namespace PersonalHub.Client
             LocalRecordStore<ThingRecord> things,
             LocalRecordStore<LocalBlock> blocks,
             LocalRecordStore<LocalIdea> ideas,
+            LocalRecordStore<LocalProblem> problems,
             RecordSyncService<LocalRecord> expenseSync,
             RecordSyncService<ThingRecord> thingSync,
-            RecordSyncService<LocalBlock> blockSync)
+            RecordSyncService<LocalBlock> blockSync,
+            RecordSyncService<LocalProblem> problemSync)
         {
             InitializeComponent();
 
             _expenseSync = expenseSync;
             _thingSync = thingSync;
             _blockSync = blockSync;
+            _problemSync = problemSync;
 
             // 目录只有几项、且是固定集合 → 用 BindableLayout 而不是 CollectionView。
             // （CollectionView 套在 ScrollView 里测量高度会出问题，这里根本不需要虚拟化。）
-            _types = RecordCatalog.Build(expenses, things, blocks, ideas);
+            _types = RecordCatalog.Build(expenses, things, blocks, ideas, problems);
             BindableLayout.SetItemsSource(TypeRows, _types);
         }
 
@@ -62,8 +66,10 @@ namespace PersonalHub.Client
                 var expense = await _expenseSync.SyncAsync();
                 var thing = await _thingSync.SyncAsync();
                 var block = await _blockSync.SyncAsync();
+                var problem = await _problemSync.SyncAsync();   // 兜底：老卡（上传器上线前建的）也从这里补传
 
-                int uploaded = expense.UploadedRecords + thing.UploadedRecords + block.UploadedRecords;
+                int uploaded = expense.UploadedRecords + thing.UploadedRecords + block.UploadedRecords
+                             + problem.UploadedRecords;
 
                 if (uploaded > 0)
                 {

@@ -45,6 +45,7 @@ namespace PersonalHub.Client.Services
         private readonly LocalRecordStore<LocalPattern> _patterns;
         private readonly LocalRecordStore<LocalPractice> _practices;
         private readonly LocalRecordStore<LocalIdea> _ideas;
+        private readonly LocalRecordStore<LocalProblem> _problems;
         private readonly SemaphoreSlim _gate = new(1, 1);
 
         public RestoreService(
@@ -56,7 +57,8 @@ namespace PersonalHub.Client.Services
             LocalRecordStore<LocalPlan> plans,
             LocalRecordStore<LocalPattern> patterns,
             LocalRecordStore<LocalPractice> practices,
-            LocalRecordStore<LocalIdea> ideas)
+            LocalRecordStore<LocalIdea> ideas,
+            LocalRecordStore<LocalProblem> problems)
         {
             _conn = conn;
             _records = records;
@@ -67,6 +69,7 @@ namespace PersonalHub.Client.Services
             _patterns = patterns;
             _practices = practices;
             _ideas = ideas;
+            _problems = problems;
         }
 
         /// <summary>本地这台设备一共存了多少条（八类合计）。0 = 全新的空设备。</summary>
@@ -79,7 +82,8 @@ namespace PersonalHub.Client.Services
                  + await _plans.CountAllAsync().ConfigureAwait(false)
                  + await _patterns.CountAllAsync().ConfigureAwait(false)
                  + await _practices.CountAllAsync().ConfigureAwait(false)
-                 + await _ideas.CountAllAsync().ConfigureAwait(false);
+                 + await _ideas.CountAllAsync().ConfigureAwait(false)
+                 + await _problems.CountAllAsync().ConfigureAwait(false);
         }
 
         /// <summary>
@@ -209,6 +213,23 @@ namespace PersonalHub.Client.Services
                     return r.Ideas.Select(x => x.ToLocalIdea()).ToList();
                 }, now, ct).ConfigureAwait(false));
 
+                // ---- 问题卡（R7.2）----
+                // 顺序放在事件卡之后纯属无关紧要：problem_id 是软引用，
+                // 两端谁先到都不影响显示，只是"事件卡能翻到名字"会晚一轮。
+                lines.Add(await StepAsync("问题卡", _problems, progress, async c =>
+                {
+                    var r = await _conn.NewProblemClient()
+                        .ListProblemsAsync(new ListProblemsRequest
+                        {
+                            Status = -1,
+                            From = EpochFrom, To = to,
+                            IncludeDeleted = false,
+                        }, deadline: DateTime.UtcNow.Add(CallTimeout), cancellationToken: c)
+                        .ConfigureAwait(false);
+
+                    return r.Problems.Select(x => x.ToLocalProblem()).ToList();
+                }, now, ct).ConfigureAwait(false));
+
                 int added = lines.Where(l => l.Stats is not null).Sum(l => l.Stats!.Added);
                 int updated = lines.Where(l => l.Stats is not null).Sum(l => l.Stats!.Updated);
                 int failed = lines.Count(l => !l.Ok);
@@ -282,6 +303,7 @@ namespace PersonalHub.Client.Services
             CreatedTimestamp = p.CreatedAt,
             UpdatedAt = p.CreatedAt,          // Thing 没有 updated_at，用创建时间当版本
             Deleted = false,
+            ProblemId = p.ProblemId ?? string.Empty,   // R7.2：换机后仍然知道这张卡挂在哪个问题上
         };
     }
 }

@@ -23,6 +23,25 @@ namespace PersonalHub.Client.Services
 
     public sealed record AiTextResult(bool Ok, string Message, string Text);
 
+    /// <summary>一张事件卡草稿（服务端已校验，但用户没确认前不算数）。</summary>
+    public sealed record AiEventDraft(
+        int Index, string Title, string Emotion, string Tag,
+        string Facts, string Action, string InitialThought, string Result, string Question);
+
+    /// <summary>新模式草案（只提示，不自动建）。</summary>
+    public sealed record AiPatternDraft(string Title, string Reason);
+
+    /// <summary>事件卡 → 问题/模式 的路由（id 服务端已对照请求清单校验，标题由页面按 id 反查）。</summary>
+    public sealed record AiEventRoute(
+        int EventIndex, string MatchProblemId, string MatchPatternId, AiPatternDraft? NewPattern,
+        string SuggestedAttempt = "");
+
+    /// <summary>AI 周回看的一条发现（服务端已校验：title/reason 非空）。</summary>
+    public sealed record AiReviewFinding(
+        string Title, string Reason, bool SuggestProblem, string SuggestedCriteria, string SuggestedAttempt);
+
+    public sealed record AiEventResult(bool Ok, string Message, List<AiEventDraft> Events, List<AiEventRoute> Routes);
+
     /// <summary>
     /// AI 助手的客户端入口：gRPC → 服务端 → DeepSeek，外加上「当天缓存」与「失败静默」。
     ///
@@ -224,6 +243,148 @@ namespace PersonalHub.Client.Services
             catch (Exception ex)
             {
                 return new AiTextResult(false, "调用失败：" + ex.Message, string.Empty);
+            }
+        }
+
+        // ============================================================
+        // D. 事件卡：自由文字 → 结构化事件草稿（R7）
+        // ============================================================
+        //
+        // 与上面三个方法不同：**不做当天缓存**。缓存的意义是"同一件事反复点"，
+        // 而这里的输入是用户现打的文字，每次都不一样，没有可缓存的东西。
+
+        public async Task<AiEventResult> ExtractEventsAsync(
+            string rawText,
+            IReadOnlyList<(string Id, string Title)> problems,
+            IReadOnlyList<(string Id, string Title)> patterns,
+            IReadOnlyList<string> tagOptions,
+            IReadOnlyList<string> emotionOptions,
+            CancellationToken ct = default)
+        {
+            try
+            {
+                if (!await _conn.EnsureAsync().ConfigureAwait(false))
+                {
+                    return new AiEventResult(false, "暂时连不上服务端（原文可以先存着）", new(), new());
+                }
+
+                var req = new ExtractEventsRequest { RawText = rawText };
+                foreach (var (id, title) in problems)
+                {
+                    req.KnownProblems.Add(new KnownRef { Id = id, Title = title });
+                }
+                foreach (var (id, title) in patterns)
+                {
+                    req.KnownPatterns.Add(new KnownRef { Id = id, Title = title });
+                }
+                req.TagOptions.AddRange(tagOptions);
+                req.EmotionOptions.AddRange(emotionOptions);
+
+                var resp = await _conn.NewAiClient()
+                    .ExtractEventsAsync(req,
+                        deadline: DateTime.UtcNow.Add(CallTimeout),
+                        cancellationToken: ct)
+                    .ConfigureAwait(false);
+
+                if (!resp.Ok || resp.Events.Count == 0)
+                {
+                    return new AiEventResult(false, resp.ErrorMsg ?? "这次没整理出来", new(), new());
+                }
+
+                var events = resp.Events
+                    .Where(e => !string.IsNullOrWhiteSpace(e.Facts))
+                    .Select(e => new AiEventDraft(
+                        e.EventIndex, e.Title ?? string.Empty, e.Emotion ?? string.Empty,
+                        e.Tag ?? string.Empty, e.Facts, e.Action ?? string.Empty,
+                        e.InitialThought ?? string.Empty, e.Result ?? string.Empty,
+                        e.Question ?? string.Empty))
+                    .ToList();
+
+                var routes = resp.Routes
+                    .Select(r => new AiEventRoute(
+                        r.EventIndex, r.MatchProblemId ?? string.Empty, r.MatchPatternId ?? string.Empty,
+                        r.NewPattern is null
+                            ? null
+                            : new AiPatternDraft(r.NewPattern.Title ?? string.Empty, r.NewPattern.Reason ?? string.Empty),
+                        r.SuggestedAttempt ?? string.Empty))
+                    .ToList();
+
+                if (events.Count == 0)
+                {
+                    return new AiEventResult(false, "返回里没有可用的一张卡", new(), new());
+                }
+
+                return new AiEventResult(true, string.Empty, events, routes);
+            }
+            catch (Exception ex)
+            {
+                return new AiEventResult(false, "调用失败：" + ex.Message, new(), new());
+            }
+        }
+
+        // ============================================================
+        // D2. AI 周回看：近 30 天事件卡 → 重复苗头（防盲区，手动触发）
+        // ============================================================
+
+        /// <summary>
+        /// 让 AI 扫一遍近期事件卡，主动说"我注意到这几件事在重复"。
+        /// 不做当天缓存——事件列表每次都在变，缓存反而是误导。
+        /// </summary>
+        public async Task<(bool Ok, string Message, List<AiReviewFinding> Findings)> ReviewEventsAsync(
+            IReadOnlyList<(string Day, string Title, string Facts)> events,
+            IReadOnlyList<(string Id, string Title)> problems,
+            IReadOnlyList<(string Id, string Title)> patterns,
+            CancellationToken ct = default)
+        {
+            try
+            {
+                if (!await _conn.EnsureAsync().ConfigureAwait(false))
+                {
+                    return (false, "暂时连不上服务端", new());
+                }
+
+                var req = new ReviewEventsRequest();
+                foreach (var (day, title, facts) in events)
+                {
+                    req.Events.Add(new ReviewEvent { Day = day, Title = title, Facts = facts });
+                }
+                foreach (var (id, title) in problems)
+                {
+                    req.KnownProblems.Add(new KnownRef { Id = id, Title = title });
+                }
+                foreach (var (id, title) in patterns)
+                {
+                    req.KnownPatterns.Add(new KnownRef { Id = id, Title = title });
+                }
+
+                var resp = await _conn.NewAiClient()
+                    .ReviewEventsAsync(req,
+                        deadline: DateTime.UtcNow.Add(CallTimeout),
+                        cancellationToken: ct)
+                    .ConfigureAwait(false);
+
+                if (!resp.Ok || resp.Findings.Count == 0)
+                {
+                    return (false, resp.ErrorMsg ?? "这次没看出苗头", new());
+                }
+
+                var findings = resp.Findings
+                    .Where(f => !string.IsNullOrWhiteSpace(f.Title) && !string.IsNullOrWhiteSpace(f.Reason))
+                    .Select(f => new AiReviewFinding(
+                        f.Title, f.Reason, f.SuggestProblem,
+                        f.SuggestedCriteria ?? string.Empty, f.SuggestedAttempt ?? string.Empty))
+                    .ToList();
+
+                if (findings.Count == 0)
+                {
+                    return (false, "返回里没有可用的一条发现", new());
+                }
+
+                return (true, string.Empty, findings);
+            }
+            catch (Exception ex)
+            {
+                return (false, "调用失败：" + ex.Message, new());
             }
         }
 

@@ -67,6 +67,7 @@ namespace Personalhub
             Reflection = r.Reflection ?? string.Empty,
             ActionPlan = r.ActionPlan ?? string.Empty,
             CreatedAt = r.CreatedTimestamp,
+            ProblemId = r.ProblemId ?? string.Empty,
         };
 
         // ============================================================
@@ -264,6 +265,50 @@ namespace Personalhub
             Deleted = p.Deleted,
             Done = p.Done,
             DoneAt = p.Done ? p.DoneAt : 0,
+        };
+
+        // ============================================================
+        // R7.2：问题卡
+        // ============================================================
+
+        /// <summary>本地问题卡 → proto Problem。</summary>
+        public static Problem ToProto(this LocalProblem p) => new()
+        {
+            Id = p.Id,
+            Title = p.Title ?? string.Empty,
+            Criteria = p.Criteria ?? string.Empty,
+            CriteriaConfirmed = p.CriteriaConfirmed,
+            Attempt = p.Attempt ?? string.Empty,
+            AttemptStartedAt = p.AttemptStartedAt,
+            AttemptCount = p.AttemptCount,
+            Status = p.Status,
+            Source = p.Source ?? string.Empty,
+            Tag = p.Tag ?? string.Empty,
+            ClosingNote = p.ClosingNote ?? string.Empty,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
+            ClosedAt = p.ClosedAt,
+            Deleted = p.Deleted,
+        };
+
+        /// <summary>恢复/镜像用：不设 Synced（下载 ≠ 已上传）。</summary>
+        public static LocalProblem ToLocalProblem(this Problem p) => new()
+        {
+            Id = p.Id,
+            Title = p.Title ?? string.Empty,
+            Criteria = p.Criteria ?? string.Empty,
+            CriteriaConfirmed = p.CriteriaConfirmed,
+            Attempt = p.Attempt ?? string.Empty,
+            AttemptStartedAt = p.AttemptStartedAt,
+            AttemptCount = p.AttemptCount,
+            Status = p.Status,
+            Source = p.Source ?? string.Empty,
+            Tag = p.Tag ?? string.Empty,
+            ClosingNote = p.ClosingNote ?? string.Empty,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
+            ClosedAt = p.ClosedAt,
+            Deleted = p.Deleted,
         };
     }
 }

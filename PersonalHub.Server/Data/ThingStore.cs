@@ -87,6 +87,53 @@ namespace personalHub.Server.Data
             }
         }
 
+        /// <summary>
+        /// 每张问题卡底下挂了多少条事件卡（证据数），problem_id → count。
+        ///
+        /// 用 SQL 分组而不是把 things 全读出来数：事件卡是会天天长的表，
+        /// 而问题卡页每次打开都要这个数，读全表迟早变慢。
+        /// </summary>
+        public IReadOnlyDictionary<string, int> CountByProblem()
+        {
+            lock (_db.Sync)
+            {
+                return _db.Conn
+                    .Query<ProblemCount>(
+                        "SELECT problem_id AS pid, COUNT(*) AS cnt FROM things " +
+                        "WHERE deleted = 0 AND problem_id IS NOT NULL AND problem_id <> '' " +
+                        "GROUP BY problem_id")
+                    .Where(x => !string.IsNullOrEmpty(x.pid))
+                    .ToDictionary(x => x.pid!, x => x.cnt);
+            }
+        }
+
+        /// <summary>全部未删除事件卡的标签（去重，用于管理端筛选胶囊）。</summary>
+        public IReadOnlyList<string> Tags()
+        {
+            lock (_db.Sync)
+            {
+                return _db.Conn
+                    .Query<TagRow>(
+                        "SELECT tag, COUNT(*) AS cnt FROM things " +
+                        "WHERE deleted = 0 AND tag IS NOT NULL AND tag <> '' " +
+                        "GROUP BY tag ORDER BY cnt DESC")
+                    .Select(x => x.tag!)
+                    .ToList();
+            }
+        }
+
+        private sealed class ProblemCount
+        {
+            public string? pid { get; set; }
+            public int cnt { get; set; }
+        }
+
+        private sealed class TagRow
+        {
+            public string? tag { get; set; }
+            public int cnt { get; set; }
+        }
+
         private static ThingRow ToRow(Thing t) => new()
         {
             Id = t.Id,
@@ -101,6 +148,7 @@ namespace personalHub.Server.Data
             Reflection = t.Reflection,
             ActionPlan = t.ActionPlan,
             CreatedAt = t.CreatedAt,
+            ProblemId = t.ProblemId,
         };
 
         private static Thing ToProto(ThingRow row) => new()
@@ -117,6 +165,7 @@ namespace personalHub.Server.Data
             Reflection = row.Reflection ?? string.Empty,
             ActionPlan = row.ActionPlan ?? string.Empty,
             CreatedAt = row.CreatedAt,
+            ProblemId = row.ProblemId ?? string.Empty,
         };
     }
 }

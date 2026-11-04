@@ -73,6 +73,9 @@ namespace PersonalHub.Client.Services
         // 想法（R6）
         public Personalhub.IdeaService.IdeaServiceClient NewIdeaClient() => new(Channel);
 
+        // 问题卡（R7.2）：v1 纯本地，v2 起走这条通道上传 / 恢复。
+        public Personalhub.ProblemService.ProblemServiceClient NewProblemClient() => new(Channel);
+
         // AI 助手（§27）。key 在服务端 ai.json 里，这条通道只传"要点什么"，不传 key。
         public Personalhub.AiService.AiServiceClient NewAiClient() => new(Channel);
 

@@ -21,8 +21,11 @@ namespace PersonalHub.Client.Services
         /// <summary>账单录入页路由。</summary>
         public const string ExpenseRoute = "entry/expense";
 
-        /// <summary>事件反思录入页路由（9 段，低频深写）。</summary>
+        /// <summary>事件卡录入页路由（想到什么打什么，AI 拆卡）。</summary>
         public const string ThingRoute = "entry/thing";
+
+        /// <summary>事件卡库路由（全部历史 + 筛选；录入页的"今日"只是当天切片）。</summary>
+        public const string ThingListRoute = "thing/list";
 
         /// <summary>时间块录入页路由（R2 主入口）。</summary>
         public const string BlockRoute = "entry/block";
@@ -48,11 +51,18 @@ namespace PersonalHub.Client.Services
         /// <summary>想法库路由（列表 + 转成目标）。</summary>
         public const string IdeaListRoute = "idea/list";
 
+        /// <summary>问题卡列表路由（R7.1）：随时可翻的"债"清单。</summary>
+        public const string ProblemRoute = "problem/list";
+
+        /// <summary>问题卡建卡/编辑路由（带 ?id= 为编辑）。</summary>
+        public const string ProblemEditRoute = "problem/edit";
+
         public static List<DirectoryItem> Build(
             LocalRecordStore<LocalRecord> expenses,
             LocalRecordStore<ThingRecord> things,
             LocalRecordStore<LocalBlock> blocks,
-            LocalRecordStore<LocalIdea> ideas)
+            LocalRecordStore<LocalIdea> ideas,
+            LocalRecordStore<LocalProblem> problems)
         {
             return new List<DirectoryItem>
             {
@@ -94,8 +104,8 @@ namespace PersonalHub.Client.Services
                     pendingProvider: blocks.CountUnsyncedAsync),
 
                 new(
-                    title: "事件反思",
-                    subtitle: "想深挖一件事时用（9 段，不是日常入口）",
+                    title: "事件卡",
+                    subtitle: "想到什么打什么，AI 拆成卡，逐张确认",
                     icon: "📝",
                     route: ThingRoute,
                     summaryProvider: async () =>
@@ -105,6 +115,22 @@ namespace PersonalHub.Client.Services
                         return rows.Count == 0 ? null : $"今日已记 {rows.Count} 条";
                     },
                     pendingProvider: things.CountUnsyncedAsync),
+
+                // 事件卡库不设目录项：录入页顶部已有「全部事件卡 ›」入口，
+                // 目录里再摆一份是重复入口（2026-11-04 用户指出，已删）。
+
+                new(
+                    title: "问题卡库",
+                    subtitle: "在还什么债：判据 / 试法 / 证据，随时翻",
+                    icon: "🎯",
+                    route: ProblemRoute,
+                    summaryProvider: async () =>
+                    {
+                        var all = await problems.GetAllAsync().ConfigureAwait(false);
+                        int active = all.Count(p => !p.Deleted && p.Status == 0);
+                        if (active == 0) return null;
+                        return active == 1 ? "1 张进行中" : $"{active} 张进行中";
+                    }),
 
                 new(
                     title: "行为模式",

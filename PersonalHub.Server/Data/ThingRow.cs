@@ -60,5 +60,12 @@ namespace personalHub.Server.Data
         /// <summary>软删除标记：0 = 正常，1 = 已删除。</summary>
         [Column("deleted")]
         public int Deleted { get; set; }
+
+        /// <summary>
+        /// R7.2：这张事件卡挂在哪张问题卡下（空 = 没挂）。
+        /// 软引用，不加外键：问题卡可能被删，但事件卡是事实，不该跟着消失。
+        /// </summary>
+        [Column("problem_id")]
+        public string? ProblemId { get; set; }
     }
 }

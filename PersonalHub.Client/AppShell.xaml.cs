@@ -43,6 +43,19 @@ namespace PersonalHub.Client
                 RecordCatalog.ThingRoute,
                 new ServiceRouteFactory(typeof(RecordDothingPage)));
 
+            // R7.2：事件卡库（全部历史 + 筛选）
+            Routing.RegisterRoute(
+                RecordCatalog.ThingListRoute,
+                new ServiceRouteFactory(typeof(EventListPage)));
+
+            // R7.1：问题卡（列表 + 建卡/编辑，?id= 为编辑）
+            Routing.RegisterRoute(
+                RecordCatalog.ProblemRoute,
+                new ServiceRouteFactory(typeof(ProblemListPage)));
+            Routing.RegisterRoute(
+                RecordCatalog.ProblemEditRoute,
+                new ServiceRouteFactory(typeof(ProblemEditPage)));
+
             // R6：想法（录入 + 想法库）。两级：先记，再整理。
             Routing.RegisterRoute(
                 RecordCatalog.IdeaRoute,

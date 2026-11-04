@@ -1,0 +1,175 @@
+@page
+@model PersonalHub.Server.Pages.Things.IndexModel
+@using personalHub.Server.Analysis
+@{
+    ViewData["Title"] = "事件卡";
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>事件卡</h2>
+        <span class="hint">事实层 · 当时那一刻写了什么就存什么 · 只读，不提供事后编辑</span>
+    </div>
+
+    <div class="kpis">
+        <div class="kpi">
+            <div class="label">全部事件卡</div>
+            <div class="num">@Model.Total</div>
+            <div class="sub">含未挂问题卡的</div>
+        </div>
+        <div class="kpi">
+            <div class="label">本周新增</div>
+            <div class="num">@Model.ThisWeek</div>
+            <div class="sub">周一 00:00 起（UTC+8）</div>
+        </div>
+        <div class="kpi">
+            <div class="label">挂了问题卡</div>
+            <div class="num">@Model.LinkedCount</div>
+            <div class="sub">这些是评估时用的证据</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2 style="font-size:14px">按标签</h2>
+        <span class="hint">标签是事后整理的，没打标签的只出现在「全部」里</span>
+    </div>
+
+    <div class="filters">
+        <a class="btn sm @(string.IsNullOrEmpty(Model.Tag) ? "primary" : "")" href="/things?linked=@Model.Linked">
+            全部 <span style="opacity:.7">@Model.Total</span>
+        </a>
+        @foreach (var t in Model.Tags)
+        {
+            <a class="btn sm @(Model.Tag == t ? "primary" : "")" href="/things?tag=@Uri.EscapeDataString(t)&linked=@Model.Linked">@t</a>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2 style="font-size:14px">按是否挂卡</h2>
+        <span class="hint">「未挂」= 还没归到任何问题上；这些往往是下一个问题的原材料</span>
+    </div>
+
+    <div class="filters">
+        <a class="btn sm @(Model.Linked < 0 ? "primary" : "")" href="/things?tag=@Uri.EscapeDataString(Model.Tag)">全部</a>
+        <a class="btn sm @(Model.Linked == 1 ? "primary" : "")" href="/things?tag=@Uri.EscapeDataString(Model.Tag)&linked=1">
+            已挂 <span style="opacity:.7">@Model.LinkedCount</span>
+        </a>
+        <a class="btn sm @(Model.Linked == 0 ? "primary" : "")" href="/things?tag=@Uri.EscapeDataString(Model.Tag)&linked=0">
+            未挂 <span style="opacity:.7">@(Model.Total - Model.LinkedCount)</span>
+        </a>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.FilterTitle))
+{
+    <div class="card">
+        <div class="card-head">
+            <h2 style="font-size:14px">只看这张问题卡的证据：@Model.FilterTitle</h2>
+            <a class="btn sm" href="/things">看全部事件卡</a>
+        </div>
+        <div class="hint">这些就是你评估时该看的样本 —— 不是"我是不是又犯了"，而是"这招到底有没有用"。</div>
+    </div>
+}
+
+<div class="card">
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty">
+            @if (Model.Total == 0)
+            {
+                <text>还没有事件卡。手机端「记录 → 事件卡」打一段话，AI 会拆成卡。</text>
+            }
+            else if (!string.IsNullOrEmpty(Model.Problem))
+            {
+                <text>这张问题卡下面还没有挂证据。翻车时打一张事件卡，AI 命中会自动挂上来。</text>
+            }
+            else
+            {
+                <text>这个筛选下没有事件卡。</text>
+            }
+        </div>
+    }
+    else
+    {
+        <table class="grid">
+            <thead>
+            <tr>
+                <th style="width:110px">发生时间</th>
+                <th style="width:88px">标签</th>
+                <th>标题</th>
+                <th>事实</th>
+                <th style="width:170px">问题卡</th>
+                <th style="width:70px">情绪</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var t in Model.Items)
+            {
+                <tr>
+                    <td style="white-space:nowrap;color:var(--muted)">
+                        @Fmt.ShortDate(t.OccurredAt)
+                        @DateTimeOffset.FromUnixTimeMilliseconds(t.OccurredAt).ToOffset(Period.Cst).ToString("HH:mm")
+                    </td>
+                    <td>
+                        @if (string.IsNullOrEmpty(t.Tag))
+                        {
+                            <span style="color:var(--muted)">—</span>
+                        }
+                        else
+                        {
+                            <span class="tag">@t.Tag</span>
+                        }
+                    </td>
+                    <td style="max-width:200px">
+                        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="@t.Title">
+                            @if (t.Title == "（待整理）")
+                            {
+                                <span class="tag paused" title="AI 没拆成卡，原文还留着">待整理</span>
+                            }
+                            else
+                            {
+                                @t.Title
+                            }
+                        </div>
+                    </td>
+                    <td style="max-width:420px">
+                        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                             title="@IndexModel.Preview(t.ObjectiveDescription, 400)">
+                            @IndexModel.Preview(t.ObjectiveDescription)
+                        </div>
+                    </td>
+                    <td style="max-width:170px">
+                        @{
+                            var ptext = Model.ProblemText(t);
+                        }
+                        @if (string.IsNullOrEmpty(ptext))
+                        {
+                            <span style="color:var(--muted)">—</span>
+                        }
+                        else
+                        {
+                            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="@ptext">
+                                <span class="tag active">@ptext</span>
+                            </div>
+                        }
+                    </td>
+                    <td style="color:var(--muted)">
+                        @(string.IsNullOrEmpty(t.Emotion) ? "—" : t.Emotion)
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+
+        @if (Model.Hidden > 0)
+        {
+            <div class="hint" style="margin-top:12px">
+                还有 @Model.Hidden 条更早的没有渲染（一次最多 300 条）。用上面的标签收窄，或只看「未挂」。
+            </div>
+        }
+    }
+</div>

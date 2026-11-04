@@ -759,11 +759,14 @@ namespace PersonalHub.Client
         /// <summary>
         /// 点候选 = 整条填进去（光标放到末尾），然后收起列表。
         /// 只填不保存 —— 备注跟着哪一次记录走，得等点片那一下才算数。
+        ///
+        /// 注意 sender 是「被点的那条候选 Border」，不是 TapGestureRecognizer 本身，
+        /// 所以参数只能从 e.Parameter 取。早期版本判 sender is TapGestureRecognizer，
+        /// 永远为 false，表现就是"候选出来了、点了一点反应都没有"（2026-11-04 用户报的）。
         /// </summary>
         private void OnNoteMatchTapped(object? sender, TappedEventArgs e)
         {
-            if (sender is not TapGestureRecognizer tap
-                || tap.CommandParameter is not string text) return;
+            if (e.Parameter is not string text) return;
 
             _suppressNoteFilter = true;   // 填完别再触发一次过滤，把列表重新弹出来
             NoteEntry.Text = text;
