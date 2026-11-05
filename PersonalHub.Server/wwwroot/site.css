@@ -99,6 +99,7 @@ tr.deleted td { color: #a3a09a; }
 .tag.active { background: #e6f1fb; color: #185fa5; }
 .tag.paused { background: #faf3e0; color: #8a5b00; }
 .tag.done { background: #eaf3de; color: #3b6d11; }
+.tag.bad { background: #fdeceb; color: var(--expense); }
 
 /* ---------- 表单 ---------- */
 .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }

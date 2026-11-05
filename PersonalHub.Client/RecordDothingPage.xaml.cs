@@ -51,6 +51,12 @@ namespace PersonalHub.Client
         /// </summary>
         public static (string Id, string Raw)? PendingRefill { get; set; }
 
+        /// <summary>
+        /// 时间块页 → 本页的交接：评价攒够阈值后点提示过来，带一段预填原文。
+        /// 预填的是「一段话」，不是一个表单 —— 用户可以在这段话上接着写，也可以直接交给 AI。
+        /// </summary>
+        public static string? PendingSeed { get; set; }
+
         public RecordDothingPage(
             LocalRecordStore<ThingRecord> store,
             RecordSyncService<ThingRecord> sync,
@@ -74,8 +80,15 @@ namespace PersonalHub.Client
         {
             base.OnAppearing();
 
+            // 时间块页 → 「评价攒够了」带过来的预填原文。优先消费，和下面的 refill 互斥。
+            if (PendingSeed is { Length: > 0 } seed)
+            {
+                PendingSeed = null;
+                RawInput.Text = seed;
+                StatusLabel.Text = "带着这段时间的记录过来的 —— 在上面补两句，或者直接交给 AI。";
+            }
             // 事件卡库 → 「重新交给 AI」的交接：原文填回输入框，删掉那张待整理卡
-            if (PendingRefill is { } refill)
+            else if (PendingRefill is { } refill)
             {
                 PendingRefill = null;
                 RawInput.Text = refill.Raw;
@@ -92,32 +105,8 @@ namespace PersonalHub.Client
 
             // 先展示本地数据（秒开，不等网络），再后台试一次同步
             await RefreshLocalAsync();
-            await RefreshSyncStatusAsync();
 
             _ = SyncInBackgroundAsync();
-        }
-
-        // ============ 同步按钮（沿用原有逻辑） ============
-        private async void OnSyncClicked(object sender, EventArgs e)
-        {
-            SyncBtn.IsEnabled = false;
-            StatusLabel.Text = "正在同步……";
-            try
-            {
-                var result = await _sync.SyncAsync();
-                StatusLabel.Text = result.Message;
-            }
-            catch (Exception ex)
-            {
-                StatusLabel.Text = "同步失败：" + ex.Message;
-            }
-            finally
-            {
-                SyncBtn.IsEnabled = true;
-            }
-
-            await RefreshLocalAsync();
-            await RefreshSyncStatusAsync();
         }
 
         // ============ 交给 AI 整理 ============
@@ -233,7 +222,6 @@ namespace PersonalHub.Client
                 SaveRawBtn.IsVisible = false;
 
                 await RefreshLocalAsync();
-                await RefreshSyncStatusAsync();
             }
             catch (Exception ex)
             {
@@ -403,7 +391,6 @@ namespace PersonalHub.Client
                     StatusLabel.Text = "已保存。";
 
                     await RefreshLocalAsync();
-                    await RefreshSyncStatusAsync();
                     _ = SyncInBackgroundAsync();
                 }
                 catch (Exception ex)
@@ -704,20 +691,7 @@ namespace PersonalHub.Client
             }
 
             await RefreshLocalAsync();
-            await RefreshSyncStatusAsync();
             StatusLabel.Text = "原文已填回上面的输入框。点「交给 AI 整理」再试一次。";
-        }
-
-        // ============ 刷新同步状态条 ============
-        private async Task RefreshSyncStatusAsync()
-        {
-            int pending = await _store.CountUnsyncedAsync();
-            long last = _sync.LastSyncAtMs;
-
-            SyncTitleLabel.Text = pending > 0 ? $"待同步 {pending} 条" : "全部已同步";
-            SyncInfoLabel.Text = last > 0
-                ? "最后同步 " + DateTimeOffset.FromUnixTimeMilliseconds(last).LocalDateTime.ToString("MM-dd HH:mm")
-                : "尚未同步过（回家连网后自动上传）";
         }
 
         /// <summary>后台静默同步：不打扰用户，只在成功时刷新列表与状态。</summary>
@@ -733,7 +707,6 @@ namespace PersonalHub.Client
                     {
                         await RefreshLocalAsync();
                     }
-                    await RefreshSyncStatusAsync();
                 });
             }
             catch

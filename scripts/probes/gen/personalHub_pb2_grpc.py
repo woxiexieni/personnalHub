@@ -1693,6 +1693,158 @@ class IdeaService:
             _registered_method=True)
 
 
+class ProblemServiceStub:
+    """=====================
+    问题卡（R7.2）
+    =====================
+    问题卡是控制环里"向前看的债"：判据（怎么算还完）+ 试法（现在用的招）+ 证据（事件卡反挂）。
+
+    为什么 v1 纯本地、v2 才上服务端：
+    v1 只在一个设备上用，本地就够了，上服务端要处理"两端同时改一张卡"的冲突，
+    而那时候连这张卡该长什么样都还没稳定。
+    现在形态稳定了（判据/试法/评估三选一都在用），才把它变成可备份、可在管理端查看的数据。
+
+    与 things 的关系：things.problem_id 是软引用，问题卡被删不会连带删事件卡 ——
+    事件卡是事实，事实不该因为"我不再关心这个问题了"而消失。
+    """
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.UploadProblems = channel.unary_unary(
+                '/personalhub.ProblemService/UploadProblems',
+                request_serializer=personalHub__pb2.UploadProblemsRequest.SerializeToString,
+                response_deserializer=personalHub__pb2.UploadProblemsResponse.FromString,
+                _registered_method=True)
+        self.ListProblems = channel.unary_unary(
+                '/personalhub.ProblemService/ListProblems',
+                request_serializer=personalHub__pb2.ListProblemsRequest.SerializeToString,
+                response_deserializer=personalHub__pb2.ProblemList.FromString,
+                _registered_method=True)
+
+
+class ProblemServiceServicer:
+    """=====================
+    问题卡（R7.2）
+    =====================
+    问题卡是控制环里"向前看的债"：判据（怎么算还完）+ 试法（现在用的招）+ 证据（事件卡反挂）。
+
+    为什么 v1 纯本地、v2 才上服务端：
+    v1 只在一个设备上用，本地就够了，上服务端要处理"两端同时改一张卡"的冲突，
+    而那时候连这张卡该长什么样都还没稳定。
+    现在形态稳定了（判据/试法/评估三选一都在用），才把它变成可备份、可在管理端查看的数据。
+
+    与 things 的关系：things.problem_id 是软引用，问题卡被删不会连带删事件卡 ——
+    事件卡是事实，事实不该因为"我不再关心这个问题了"而消失。
+    """
+
+    def UploadProblems(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListProblems(self, request, context):
+        """恢复 + 管理端只读浏览共用同一个出口（和 ListIdeas / ListThings 同一个思路）。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_ProblemServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'UploadProblems': grpc.unary_unary_rpc_method_handler(
+                    servicer.UploadProblems,
+                    request_deserializer=personalHub__pb2.UploadProblemsRequest.FromString,
+                    response_serializer=personalHub__pb2.UploadProblemsResponse.SerializeToString,
+            ),
+            'ListProblems': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListProblems,
+                    request_deserializer=personalHub__pb2.ListProblemsRequest.FromString,
+                    response_serializer=personalHub__pb2.ProblemList.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'personalhub.ProblemService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('personalhub.ProblemService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class ProblemService:
+    """=====================
+    问题卡（R7.2）
+    =====================
+    问题卡是控制环里"向前看的债"：判据（怎么算还完）+ 试法（现在用的招）+ 证据（事件卡反挂）。
+
+    为什么 v1 纯本地、v2 才上服务端：
+    v1 只在一个设备上用，本地就够了，上服务端要处理"两端同时改一张卡"的冲突，
+    而那时候连这张卡该长什么样都还没稳定。
+    现在形态稳定了（判据/试法/评估三选一都在用），才把它变成可备份、可在管理端查看的数据。
+
+    与 things 的关系：things.problem_id 是软引用，问题卡被删不会连带删事件卡 ——
+    事件卡是事实，事实不该因为"我不再关心这个问题了"而消失。
+    """
+
+    @staticmethod
+    def UploadProblems(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/personalhub.ProblemService/UploadProblems',
+            personalHub__pb2.UploadProblemsRequest.SerializeToString,
+            personalHub__pb2.UploadProblemsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListProblems(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/personalhub.ProblemService/ListProblems',
+            personalHub__pb2.ListProblemsRequest.SerializeToString,
+            personalHub__pb2.ProblemList.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
 class AiServiceStub:
     """=====================
     AI 助手（§27）
@@ -1735,6 +1887,21 @@ class AiServiceStub:
                 '/personalhub.AiService/CommentWeek',
                 request_serializer=personalHub__pb2.WeekFacts.SerializeToString,
                 response_deserializer=personalHub__pb2.WeekComment.FromString,
+                _registered_method=True)
+        self.ExtractEvents = channel.unary_unary(
+                '/personalhub.AiService/ExtractEvents',
+                request_serializer=personalHub__pb2.ExtractEventsRequest.SerializeToString,
+                response_deserializer=personalHub__pb2.ExtractEventsReply.FromString,
+                _registered_method=True)
+        self.ReviewEvents = channel.unary_unary(
+                '/personalhub.AiService/ReviewEvents',
+                request_serializer=personalHub__pb2.ReviewEventsRequest.SerializeToString,
+                response_deserializer=personalHub__pb2.ReviewEventsReply.FromString,
+                _registered_method=True)
+        self.CommentGoal = channel.unary_unary(
+                '/personalhub.AiService/CommentGoal',
+                request_serializer=personalHub__pb2.GoalFacts.SerializeToString,
+                response_deserializer=personalHub__pb2.GoalComment.FromString,
                 _registered_method=True)
 
 
@@ -1779,6 +1946,29 @@ class AiServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ExtractEvents(self, request, context):
+        """R7 事件卡：把用户随手打的自由文字整理成结构化事件卡草稿。
+        服务端无状态：问题卡/模式清单由客户端随请求带来，服务端不存。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReviewEvents(self, request, context):
+        """AI 周回看：近 30 天事件卡 → 重复苗头/建议立卡（防盲区，手动触发，一次调用）。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CommentGoal(self, request, context):
+        """目标 30 天归纳：客户端算好事实，服务端只做归纳，**不建议**。
+        这是 OPDCA 里的 A（处理）：用用户自己的记录，把他说不出口的那个共同点说出来。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AiServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1801,6 +1991,21 @@ def add_AiServiceServicer_to_server(servicer, server):
                     servicer.CommentWeek,
                     request_deserializer=personalHub__pb2.WeekFacts.FromString,
                     response_serializer=personalHub__pb2.WeekComment.SerializeToString,
+            ),
+            'ExtractEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.ExtractEvents,
+                    request_deserializer=personalHub__pb2.ExtractEventsRequest.FromString,
+                    response_serializer=personalHub__pb2.ExtractEventsReply.SerializeToString,
+            ),
+            'ReviewEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReviewEvents,
+                    request_deserializer=personalHub__pb2.ReviewEventsRequest.FromString,
+                    response_serializer=personalHub__pb2.ReviewEventsReply.SerializeToString,
+            ),
+            'CommentGoal': grpc.unary_unary_rpc_method_handler(
+                    servicer.CommentGoal,
+                    request_deserializer=personalHub__pb2.GoalFacts.FromString,
+                    response_serializer=personalHub__pb2.GoalComment.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1925,6 +2130,87 @@ class AiService:
             '/personalhub.AiService/CommentWeek',
             personalHub__pb2.WeekFacts.SerializeToString,
             personalHub__pb2.WeekComment.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ExtractEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/personalhub.AiService/ExtractEvents',
+            personalHub__pb2.ExtractEventsRequest.SerializeToString,
+            personalHub__pb2.ExtractEventsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReviewEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/personalhub.AiService/ReviewEvents',
+            personalHub__pb2.ReviewEventsRequest.SerializeToString,
+            personalHub__pb2.ReviewEventsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CommentGoal(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/personalhub.AiService/CommentGoal',
+            personalHub__pb2.GoalFacts.SerializeToString,
+            personalHub__pb2.GoalComment.FromString,
             options,
             channel_credentials,
             insecure,

@@ -17,33 +17,12 @@
                 Style="{StaticResource Headline}"
                 SemanticProperties.HeadingLevel="Level1"/>
 
-            <!-- ============ 同步状态条【沿用原有逻辑】 ============ -->
-            <Border
-                Stroke="{StaticResource Gray300}"
-                StrokeThickness="1"
-                Padding="12,8">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
-                        <Label
-                            x:Name="SyncTitleLabel"
-                            Text="本地保存"
-                            FontSize="14"/>
-                        <Label
-                            x:Name="SyncInfoLabel"
-                            Text="尚未同步过"
-                            FontSize="12"
-                            TextColor="{StaticResource Gray500}"/>
-                    </VerticalStackLayout>
-                    <Button
-                        Grid.Column="1"
-                        x:Name="SyncBtn"
-                        Text="同步"
-                        Clicked="OnSyncClicked"
-                        Padding="14,0"
-                        HeightRequest="36"
-                        VerticalOptions="Center"/>
-                </Grid>
-            </Border>
+            <!--
+                这里原来有一条「同步状态条」（全部已同步 / 最后同步 xx / 同步按钮）。
+                2026-11-04 按用户要求删掉了：上传本来就是后台静默做的，
+                把"已同步"摆在最显眼的位置，等于让用户每天确认一件不该他操心的事。
+                没同步成功的记录会在列表里自己带「待同步」小字，够用了。
+            -->
 
             <!-- ============ 1. 输入区：像跟人说话一样打字 ============ -->
             <Label

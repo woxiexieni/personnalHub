@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>&#x65F6;&#x95F4;&#x5757; · PersonalHub</title>
+    <link rel="stylesheet" href="/site.css" />
+</head>
+<body>
+<div class="wrap">
+    <header class="topbar">
+        <a class="brand" href="/">PersonalHub<span>管理端</span></a>
+        <nav class="nav">
+            <a href="/">概览</a>
+            <a href="/records">账单</a>
+            <a href="/blocks">时间块</a>
+            <a href="/goals">目标</a>
+            <a href="/ideas">想法</a>
+            <a href="/things">事件卡</a>
+            <a href="/problems">问题卡</a>
+            <a href="/records/edit">补录账单</a>
+            <a href="/categories">分类</a>
+            <a href="/backup">备份</a>
+        </nav>
+        <span class="ver">v1.0.7</span>
+    </header>
+
+    <div class="warn">
+        本页面没有登录校验，仅供家庭局域网使用。请不要在公共 Wi-Fi / 公司网络下开启服务端。
+    </div>
+
+    <main>
+        
+
+<div class="card">
+    <form method="get" action="/blocks">
+        <div class="filters">
+            <div class="field">
+                <label>从</label>
+                <input type="date" name="from" value="2026-10-01" />
+            </div>
+            <div class="field">
+                <label>到</label>
+                <input type="date" name="to" value="2026-11-06" />
+            </div>
+            <div class="field">
+                <label>事情片</label>
+                <select name="pieceCode">
+                    <option value="">全部</option>
+                        <optgroup label="&#x4EA7;&#x51FA;">
+                                <option value="code">&#x5199;&#x4EE3;&#x7801;</option>
+                                <option value="work">&#x5E72;&#x6D3B;</option>
+                                <option value="review">&#x5199;&#x590D;&#x76D8;</option>
+                        </optgroup>
+                        <optgroup label="&#x8EAB;&#x4F53;">
+                                <option value="sleep">&#x7761;&#x89C9;</option>
+                                <option value="meal">&#x5403;&#x996D;</option>
+                                <option value="sport">&#x8FD0;&#x52A8;</option>
+                        </optgroup>
+                        <optgroup label="&#x751F;&#x6D3B;">
+                                <option value="commute">&#x901A;&#x52E4;</option>
+                                <option value="chore">&#x5BB6;&#x52A1;&#x6742;&#x4E8B;</option>
+                        </optgroup>
+                        <optgroup label="&#x5B66;&#x4E60;">
+                                <option value="learn">&#x5B66;&#x4E60;</option>
+                        </optgroup>
+                        <optgroup label="&#x4EBA;&#x9645;">
+                                <option value="people">&#x966A;&#x4EBA;</option>
+                        </optgroup>
+                        <optgroup label="&#x6D88;&#x8017;">
+                                <option value="entertain">&#x5A31;&#x4E50;</option>
+                        </optgroup>
+                        <optgroup label="&#x96F6;&#x6563;">
+                                <option value="idle">&#x53D1;&#x5446;</option>
+                        </optgroup>
+                </select>
+            </div>
+            <div class="field">
+                <label>目标</label>
+                <select name="goalId">
+                    <option value="">全部</option>
+                        <option value="b9d66181f10f41f18444fa62f7571441">personalHub&#x4EE3;&#x7801;&#x63A8;&#x8FDB;</option>
+                        <option value="90431f73b9dd43aea36139c943dee060">&#x627E;&#x53BB;&#x627E;&#x4E2A;&#x517C;&#x804C;&#x4E86;</option>
+                        <option value="fb9c766f75e34f1b8bbb7edd53485fb6">&#x6BCF;&#x5929;&#x5FC5;&#x505A;&#x7684;&#x4E09;&#x4EF6;&#x4E8B;&#xFF1A;</option>
+                        <option value="fe396c8143274592ad173bcda7cf3bef">&#x73B0;&#x5728;&#x628A;&#x522B;&#x4EBA;&#x7684;&#x8BDD;&#x8F6C;&#x5316;&#x4E3A;&#x9700;&#x6C42;&#x7684;&#x80FD;&#x529B;&#x5F88;&#x4F4E;&#x3002;</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>&nbsp;</label>
+                <label class="hint" style="display:flex;align-items:center;gap:6px;min-height:36px">
+                    <input type="checkbox" name="deleted" value="true" />
+                    显示已删除
+                </label>
+            </div>
+            <button class="btn primary" type="submit">筛选</button>
+            <a class="btn" href="/blocks">重置</a>
+            <a class="btn" href="/blocks/edit">补录</a>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2>10-01 ~ 11-06</h2>
+        <span class="hint">未记录 = 已经过去的时间 − 已记录，未来的时间不算漏记（含睡眠与没记的部分）</span>
+    </div>
+    <div class="kpis">
+        <div class="kpi">
+            <div class="label">已记录</div>
+            <div class="num balance">71 &#x5C0F;&#x65F6; 35 &#x5206;</div>
+            <div class="sub">39 条 · 日均 2 &#x5C0F;&#x65F6; 2 &#x5206;</div>
+        </div>
+        <div class="kpi">
+            <div class="label">未记录</div>
+            <div class="num expense">759 &#x5C0F;&#x65F6; 33 &#x5206;</div>
+            <div class="sub">已过去 831 &#x5C0F;&#x65F6; 8 &#x5206;</div>
+        </div>
+        <div class="kpi">
+            <div class="label">覆盖率</div>
+            <div class="num income">9%</div>
+            <div class="sub">已记录 ÷ 已过去</div>
+        </div>
+    </div>
+</div>
+
+
+<div class="card">
+    <div class="card-head">
+        <h2>时间去哪了</h2>
+        <span class="hint">按事情片，占比分母是本区间已记录时间</span>
+    </div>
+
+        <div class="rows">
+                <div class="row">
+                    <div class="name" title="&#x5199;&#x4EE3;&#x7801;">&#x5199;&#x4EE3;&#x7801;</div>
+                    <div class="bar">
+                        <i style="width:38%"></i>
+                    </div>
+                    <div class="amt">27 &#x5C0F;&#x65F6;</div>
+                    <div class="ratio">38%</div>
+                </div>
+                <div class="row">
+                    <div class="name" title="&#x7761;&#x89C9;">&#x7761;&#x89C9;</div>
+                    <div class="bar">
+                        <i style="width:15%"></i>
+                    </div>
+                    <div class="amt">11 &#x5C0F;&#x65F6;</div>
+                    <div class="ratio">15%</div>
+                </div>
+                <div class="row">
+                    <div class="name" title="&#x7761;&#x89C9;">&#x7761;&#x89C9;</div>
+                    <div class="bar">
+                        <i style="width:11%"></i>
+                    </div>
+                    <div class="amt">7 &#x5C0F;&#x65F6; 45 &#x5206;</div>
+                    <div class="ratio">11%</div>
+                </div>
+                <div class="row">
+                    <div class="name" title="&#x5E72;&#x6D3B;">&#x5E72;&#x6D3B;</div>
+                    <div class="bar">
+                        <i style="width:10%"></i>
+                    </div>
+                    <div class="amt">7 &#x5C0F;&#x65F6; 15 &#x5206;</div>
+                    <div class="ratio">10%</div>
+                </div>
+                <div class="row">
+                    <div class="name" title="&#x5E72;&#x6D3B;">&#x5E72;&#x6D3B;</div>
+                    <div class="bar">
+                        <i style="width:9%"></i>
+                    </div>
+                    <div class="amt">6 &#x5C0F;&#x65F6; 15 &#x5206;</div>
+                    <div class="ratio">9%</div>
+                </div>
+                <div class="row">
+                    <div class="name" title="&#x901A;&#x52E4;">&#x901A;&#x52E4;</div>
+                    <div class="bar">
+                        <i style="width:6%"></i>
+                    </div>
+                    <div class="amt">4 &#x5C0F;&#x65F6; 30 &#x5206;</div>
+                    <div class="ratio">6%</div>
+                </div>
+                <div class="row">
+                    <div class="name" title="&#x5B66;&#x4E60;">&#x5B66;&#x4E60;</div>
+                    <div class="bar">
+                        <i style="width:4%"></i>
+                    </div>
+                    <div class="amt">3 &#x5C0F;&#x65F6;</div>
+                    <div class="ratio">4%</div>
+                </div>
+                <div class="row">
+                    <div class="name" title="&#x8FD0;&#x52A8;">&#x8FD0;&#x52A8;</div>
+                    <div class="bar">
+                        <i style="width:3%"></i>
+                    </div>
+                    <div class="amt">1 &#x5C0F;&#x65F6; 50 &#x5206;</div>
+                    <div class="ratio">3%</div>
+                </div>
+                <div class="row">
+                    <div class="name" title="&#x5BB6;&#x52A1;&#x6742;&#x4E8B;">&#x5BB6;&#x52A1;&#x6742;&#x4E8B;</div>
+                    <div class="bar">
+                        <i style="width:2%"></i>
+                    </div>
+                    <div class="amt">1 &#x5C0F;&#x65F6; 30 &#x5206;</div>
+                    <div class="ratio">2%</div>
+                </div>
+                <div class="row">
+                    <div class="name" title="&#x5A31;&#x4E50;">&#x5A31;&#x4E50;</div>
+                    <div class="bar">
+                        <i style="width:1%"></i>
+                    </div>
+                    <div class="amt">1 &#x5C0F;&#x65F6;</div>
+                    <div class="ratio">1%</div>
+                </div>
+                <div class="row">
+                    <div class="name" title="&#x5403;&#x996D;">&#x5403;&#x996D;</div>
+                    <div class="bar">
+                        <i style="width:1%"></i>
+                    </div>
+                    <div class="amt">30 &#x5206;</div>
+                    <div class="ratio">1%</div>
+                </div>
+        </div>
+</div>
+
+    <div class="card">
+        <div class="card-head">
+            <h2>目标投入</h2>
+            <span class="hint">只算本区间 · 累计投入请看目标列表（那是全量的）</span>
+        </div>
+        <div class="rows">
+                <div class="row">
+                    <div class="name" title="&#x672A;&#x5F52;&#x76EE;&#x6807;">&#x672A;&#x5F52;&#x76EE;&#x6807;</div>
+                    <div class="bar pay">
+                        <i style="width:84%"></i>
+                    </div>
+                    <div class="amt">60 &#x5C0F;&#x65F6; 20 &#x5206;</div>
+                    <div class="ratio">29 条</div>
+                </div>
+                <div class="row">
+                    <div class="name" title="personalHub&#x4EE3;&#x7801;&#x63A8;&#x8FDB;">personalHub&#x4EE3;&#x7801;&#x63A8;&#x8FDB;</div>
+                    <div class="bar pay">
+                        <i style="width:16%"></i>
+                    </div>
+                    <div class="amt">11 &#x5C0F;&#x65F6; 15 &#x5206;</div>
+                    <div class="ratio">10 条</div>
+                </div>
+        </div>
+    </div>
+
+<div class="card">
+    <div class="card-head">
+        <h2>共 39 条 · 第 1 / 1 页</h2>
+        <span class="hint">「编辑」可改时间 / 片 / 时长 / 目标；「删除」是软删，可回看</span>
+    </div>
+
+        <table class="grid">
+            <thead>
+            <tr>
+                <th>时间</th>
+                <th>事情片</th>
+                <th class="num">时长</th>
+                <th>目标</th>
+                <th>备注</th>
+                <th>评价</th>
+                <th>状态</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+                <tr class="">
+                    <td>2026-11-04 21:44</td>
+                    <td>
+                        <span class="hint">&#x25B2;</span>
+                        &#x8FD0;&#x52A8;
+                    </td>
+                    <td class="num">30 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>hit&#x71C3;&#x8102;&#x51CF;&#x809A;&#x5B50;</td>
+                    <td>
+                            <span class="tag done">值得</span>
+                            <div class="hint" title="&#x505A;&#x4E86;&#x56DB;&#x79CD;&#x52A8;&#x4F5C;&#xFF0C;&#x7136;&#x540E;&#x6BCF;&#x7EC4;&#x6BCF;&#x79CD;&#x52A8;&#x4F5C;100&#x4E2A;&#x4EC0;&#x4E48;&#x8E72;&#x8D77;&#xFF0C;&#x9AD8;&#x62AC;&#x817F;&#xFF0C;&#x4FA7;&#x62AC;&#x817F;&#xFF0C;&#x7136;&#x540E;&#x8FD8;&#x6709;&#x5C31;&#x662F;&#xFF0C;&#x7136;&#x540E;&#x5C31;&#x662F;&#x80EF;&#x4E0B;&#x51FB;&#x638C;&#xFF0C;&#x505A;&#x5B8C;&#x611F;&#x89C9;&#x817F;&#x5F88;&#x75DB;&#x554A;&#xFF0C;&#x809A;&#x5B50;&#x90A3;&#x91CC;&#x6CA1;&#x611F;&#x89C9;&#x3002;" style="margin-top:2px; max-width:220px">↳ &#x505A;&#x4E86;&#x56DB;&#x79CD;&#x52A8;&#x4F5C;&#xFF0C;&#x7136;&#x540E;&#x6BCF;&#x7EC4;&#x6BCF;&#x79CD;&#x52A8;&#x4F5C;100&#x4E2A;&#x4EC0;&#x4E48;&#x8E72;&#x8D77;&#xFF0C;&#x9AD8;&#x62AC;&#x817F;&#xFF0C;&#x4FA7;&#x62AC;&#x817F;&#xFF0C;&#x7136;&#x540E;&#x8FD8;&#x6709;&#x5C31;&#x662F;&#xFF0C;&#x7136;&#x540E;&#x5C31;&#x662F;&#x80EF;&#x4E0B;&#x51FB;&#x638C;&#xFF0C;&#x505A;&#x5B8C;&#x611F;&#x89C9;&#x817F;&#x5F88;&#x75DB;&#x554A;&#xFF0C;&#x809A;&#x5B50;&#x90A3;&#x91CC;&#x6CA1;&#x611F;&#x89C9;&#x3002;</div>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=3a9b510fdc054d97858967ba9a2b0338">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="3a9b510fdc054d97858967ba9a2b0338" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-11-04 20:52</td>
+                    <td>
+                        <span class="hint">&#x25B2;</span>
+                        &#x8FD0;&#x52A8;
+                    </td>
+                    <td class="num">15 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x5065;&#x8EAB;</td>
+                    <td>
+                            <span class="tag done">值得</span>
+                            <div class="hint" title="&#x5C31;&#x662F;&#x62C9;&#x90A3;&#x4E2A;&#x5355;&#x6760;&#x554A;&#x611F;&#x89C9;&#x4E00;&#x822C;" style="margin-top:2px; max-width:220px">↳ &#x5C31;&#x662F;&#x62C9;&#x90A3;&#x4E2A;&#x5355;&#x6760;&#x554A;&#x611F;&#x89C9;&#x4E00;&#x822C;</div>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=beff15e2d7e34cddb48ffdc5ecc7ef25">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="beff15e2d7e34cddb48ffdc5ecc7ef25" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-11-04 15:42</td>
+                    <td>
+                        <span class="hint">&#x2328;</span>
+                        &#x5199;&#x4EE3;&#x7801;
+                    </td>
+                    <td class="num">2 &#x5C0F;&#x65F6;</td>
+                    <td>personalHub&#x4EE3;&#x7801;&#x63A8;&#x8FDB;</td>
+                    <td>&#x4F18;&#x5316;personhub</td>
+                    <td>
+                            <span class="tag done">值得</span>
+                            <div class="hint" title="&#x53EF;&#x4EE5;&#x7684;&#xFF0C;&#x6211;&#x89C9;&#x5F97;&#x8FD9;&#x4E2A;&#x662F;&#x628A;&#x6211;&#x662F;&#x8F6F;&#x4EF6;&#x81F3;&#x5C11;&#x628A;&#x6211;&#x7684;&#x4E8B;&#x60C5;&#xFF0C;&#x63A5;&#x5165;&#x4E86;pdca&#x6A21;&#x578B;" style="margin-top:2px; max-width:220px">↳ &#x53EF;&#x4EE5;&#x7684;&#xFF0C;&#x6211;&#x89C9;&#x5F97;&#x8FD9;&#x4E2A;&#x662F;&#x628A;&#x6211;&#x662F;&#x8F6F;&#x4EF6;&#x81F3;&#x5C11;&#x628A;&#x6211;&#x7684;&#x4E8B;&#x60C5;&#xFF0C;&#x63A5;&#x5165;&#x4E86;pdca&#x6A21;&#x578B;</div>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=7d271f2620de4db0a4355f54685b2d16">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="7d271f2620de4db0a4355f54685b2d16" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-11-04 11:33</td>
+                    <td>
+                        <span class="hint">&#x2328;</span>
+                        &#x5199;&#x4EE3;&#x7801;
+                    </td>
+                    <td class="num">1 &#x5C0F;&#x65F6; 30 &#x5206;</td>
+                    <td>personalHub&#x4EE3;&#x7801;&#x63A8;&#x8FDB;</td>
+                    <td>&#x4F18;&#x5316;personhub</td>
+                    <td>
+                            <span class="tag done">值得</span>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=9264b5c872784a58ab12f3c432869592">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="9264b5c872784a58ab12f3c432869592" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-29 21:43</td>
+                    <td>
+                        <span class="hint">&#x25B2;</span>
+                        &#x8FD0;&#x52A8;
+                    </td>
+                    <td class="num">15 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x8DD1;&#x6B65;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=f10c1239f4394cf1b14e319c712cb341">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="f10c1239f4394cf1b14e319c712cb341" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-29 21:22</td>
+                    <td>
+                        <span class="hint">&#x25B2;</span>
+                        &#x8FD0;&#x52A8;
+                    </td>
+                    <td class="num">30 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x6563;&#x6B65;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=9bb4475870994962a28b860cc7b0edac">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="9bb4475870994962a28b860cc7b0edac" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-29 17:51</td>
+                    <td>
+                        <span class="hint">&#x2328;</span>
+                        &#x5199;&#x4EE3;&#x7801;
+                    </td>
+                    <td class="num">2 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x4F18;&#x5316;personhub</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=7f1a6e6fdeb1405e90b90f8699f35310">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="7f1a6e6fdeb1405e90b90f8699f35310" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-29 14:44</td>
+                    <td>
+                        <span class="hint">&#x263E;</span>
+                        &#x7761;&#x89C9;
+                    </td>
+                    <td class="num">45 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x5348;&#x7761;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=ec06ab9df74b453695af49b2f541b410">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="ec06ab9df74b453695af49b2f541b410" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-29 14:44</td>
+                    <td>
+                        <span class="hint">&#x25CB;</span>
+                        &#x5403;&#x996D;
+                    </td>
+                    <td class="num">30 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x5348;&#x996D;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=9af230373dd64f59a9fd1b585d1ab201">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="9af230373dd64f59a9fd1b585d1ab201" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-29 14:44</td>
+                    <td>
+                        <span class="hint">&#x270E;</span>
+                        &#x5E72;&#x6D3B;
+                    </td>
+                    <td class="num">3 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x89E3;&#x51B3;bug</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=d94ca0382cf842b48dba75f6a4e77d0e">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="d94ca0382cf842b48dba75f6a4e77d0e" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-23 12:30</td>
+                    <td>
+                        <span class="hint">&#x270E;</span>
+                        &#x5E72;&#x6D3B;
+                    </td>
+                    <td class="num">2 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x6D4B;&#x8BD5;mac</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=eb727d00331343329105364d04e41c26">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="eb727d00331343329105364d04e41c26" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-23 12:25</td>
+                    <td>
+                        <span class="hint">&#x263E;</span>
+                        &#x7761;&#x89C9;
+                    </td>
+                    <td class="num">7 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td></td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=0cbb8f9843764a24b28c582cc0822f96">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="0cbb8f9843764a24b28c582cc0822f96" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-23 12:23</td>
+                    <td>
+                        <span class="hint">&#x2192;</span>
+                        &#x901A;&#x52E4;
+                    </td>
+                    <td class="num">45 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td></td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=d40102067cd842b187aa479c561b7867">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="d40102067cd842b187aa479c561b7867" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-23 11:43</td>
+                    <td>
+                        <span class="hint">&#x270E;</span>
+                        &#x5E72;&#x6D3B;
+                    </td>
+                    <td class="num">45 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x89E3;&#x51B3;rdm&#x6253;&#x5F00;&#x526A;&#x5207;&#x677F;&#x5F02;&#x5E38;&#x95EE;&#x9898;&#x3002;</td>
+                    <td>
+                            <span class="tag bad">别做了</span>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=1e577b5b27f54c6bb5709b267a2c3314">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="1e577b5b27f54c6bb5709b267a2c3314" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-23 09:57</td>
+                    <td>
+                        <span class="hint">&#x270E;</span>
+                        &#x5E72;&#x6D3B;
+                    </td>
+                    <td class="num">30 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x5BF9;&#x63A5;&#x5DE5;&#x4F5C;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=8f139c175f9944d9b69c8a6aa1a86013">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="8f139c175f9944d9b69c8a6aa1a86013" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-23 01:10</td>
+                    <td>
+                        <span class="hint">&#x2328;</span>
+                        &#x5199;&#x4EE3;&#x7801;
+                    </td>
+                    <td class="num">30 &#x5206;</td>
+                    <td>personalHub&#x4EE3;&#x7801;&#x63A8;&#x8FDB;</td>
+                    <td>&#x4F18;&#x5316;personhub&#x4F7F;&#x7528;&#x4F53;&#x9A8C;</td>
+                    <td>
+                            <span class="tag done">值得</span>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=ee80d5e1608d46f69088dcedc1fe38ed">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="ee80d5e1608d46f69088dcedc1fe38ed" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-22 23:20</td>
+                    <td>
+                        <span class="hint">&#x263E;</span>
+                        &#x7761;&#x89C9;
+                    </td>
+                    <td class="num">2 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x7761;&#x89C9;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=b15b6f6705374379882be5f9a6e9f483">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="b15b6f6705374379882be5f9a6e9f483" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-22 18:37</td>
+                    <td>
+                        <span class="hint">&#x270E;</span>
+                        &#x5E72;&#x6D3B;
+                    </td>
+                    <td class="num">4 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x6D4B;&#x8BD5;mac&#xFF0C;&#x5B66;&#x4E86;&#x4E00;&#x4E0B;MySQL&#x6570;&#x636E;&#x5E93;&#x3002;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=2b59621f32d14dc98e65083a3d200220">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="2b59621f32d14dc98e65083a3d200220" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-22 18:35</td>
+                    <td>
+                        <span class="hint">&#x270E;</span>
+                        &#x5E72;&#x6D3B;
+                    </td>
+                    <td class="num">3 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>bts&#x53D1;&#x7248;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=da4a107051e4491d9a33db510ea9c7b7">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="da4a107051e4491d9a33db510ea9c7b7" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-21 23:17</td>
+                    <td>
+                        <span class="hint">&#x25B2;</span>
+                        &#x8FD0;&#x52A8;
+                    </td>
+                    <td class="num">20 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x6CE2;&#x6BD4;&#x8DF3;</td>
+                    <td>
+                            <span class="tag done">值得</span>
+                            <div class="hint" title="&#x8FD0;&#x52A8;&#x5B8C;&#x5F88;&#x723D;" style="margin-top:2px; max-width:220px">↳ &#x8FD0;&#x52A8;&#x5B8C;&#x5F88;&#x723D;</div>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=9cf0ec20b0414bcfbf70990cc19944f3">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="9cf0ec20b0414bcfbf70990cc19944f3" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-21 22:57</td>
+                    <td>
+                        <span class="hint">&#x2328;</span>
+                        &#x5199;&#x4EE3;&#x7801;
+                    </td>
+                    <td class="num">30 &#x5206;</td>
+                    <td>personalHub&#x4EE3;&#x7801;&#x63A8;&#x8FDB;</td>
+                    <td></td>
+                    <td>
+                            <span class="tag done">值得</span>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=4412d5a6cc76403abbf633b5eb656995">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="4412d5a6cc76403abbf633b5eb656995" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-21 20:56</td>
+                    <td>
+                        <span class="hint">&#x2328;</span>
+                        &#x5199;&#x4EE3;&#x7801;
+                    </td>
+                    <td class="num">1 &#x5C0F;&#x65F6; 30 &#x5206;</td>
+                    <td>personalHub&#x4EE3;&#x7801;&#x63A8;&#x8FDB;</td>
+                    <td></td>
+                    <td>
+                            <span class="tag done">值得</span>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=9bd6de7162374e558daf32609c13de6e">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="9bd6de7162374e558daf32609c13de6e" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-21 20:46</td>
+                    <td>
+                        <span class="hint">&#x2192;</span>
+                        &#x901A;&#x52E4;
+                    </td>
+                    <td class="num">1 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td></td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=cc86c352de4d48b2877b472181d41ca5">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="cc86c352de4d48b2877b472181d41ca5" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-21 20:46</td>
+                    <td>
+                        <span class="hint">&#x2328;</span>
+                        &#x5199;&#x4EE3;&#x7801;
+                    </td>
+                    <td class="num">8 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x5DE5;&#x4F5C;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=b66af82eb9604feb86aaab0a9dd83b24">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="b66af82eb9604feb86aaab0a9dd83b24" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-21 20:45</td>
+                    <td>
+                        <span class="hint">&#x263E;</span>
+                        &#x7761;&#x89C9;
+                    </td>
+                    <td class="num">8 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x7761;&#x89C9;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=04f7106a918744a69690c7d2ba604c54">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="04f7106a918744a69690c7d2ba604c54" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-20 21:59</td>
+                    <td>
+                        <span class="hint">&#x2192;</span>
+                        &#x901A;&#x52E4;
+                    </td>
+                    <td class="num">2 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td></td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=5e4191d20bd64eb3bf43ba11c4f7e6e4">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="5e4191d20bd64eb3bf43ba11c4f7e6e4" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-20 21:20</td>
+                    <td>
+                        <span class="hint">&#x2328;</span>
+                        &#x5199;&#x4EE3;&#x7801;
+                    </td>
+                    <td class="num">1 &#x5C0F;&#x65F6;</td>
+                    <td>personalHub&#x4EE3;&#x7801;&#x63A8;&#x8FDB;</td>
+                    <td>&#x4F18;&#x5316;personhub&#x7684;&#x4EE3;&#x7801;&#xFF0C;</td>
+                    <td>
+                            <span class="tag done">值得</span>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=0be0b38fcb0e4438af71048f462760c0">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="0be0b38fcb0e4438af71048f462760c0" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-20 19:13</td>
+                    <td>
+                        <span class="hint">&#x263E;</span>
+                        &#x7761;&#x89C9;
+                    </td>
+                    <td class="num">30 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td></td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=06b02728fbbf4a02bdf698d066fae8e9">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="06b02728fbbf4a02bdf698d066fae8e9" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-20 11:56</td>
+                    <td>
+                        <span class="hint">&#x25C8;</span>
+                        &#x5B66;&#x4E60;
+                    </td>
+                    <td class="num">3 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x770B;&#x5BA2;&#x6237;&#x7AEF;&#x53D1;&#x9001;&#x547D;&#x4EE4;&#x5230;&#x670D;&#x52A1;&#x5668;&#xFF0C;&#x8FD8;&#x6709;c#&#x7684;&#x4E8B;&#x4EF6;&#x8BA2;&#x9605;&#xFF0C;&#x591A;&#x64AD;&#x673A;&#x5236;&#xFF1A;&#x5C31;&#x662F;&#x57FA;&#x7C7B;&#x91CC;&#x9762;&#x5199;&#x4E00;&#x4E2A;&#x4E8B;&#x4EF6;&#xFF0C;&#x4ED6;&#x7684;&#x5B50;&#x7C7B;&#x5229;&#x7528;&#x8FD9;&#x4E2A;&#x65F6;&#x95F4;&#x8BA2;&#x9605;&#x4E0D;&#x540C;&#x7684;&#x65F6;&#x95F4;&#x3002;</td>
+                    <td>
+                            <span class="tag done">值得</span>
+                            <div class="hint" title="&#x4E0B;&#x6B21;&#x611F;&#x89C9;&#x8981;&#x5B9A;&#x4E2A;&#x76EE;&#x6807;&#x53BB;&#x770B;&#x4EE3;&#x7801;" style="margin-top:2px; max-width:220px">↳ &#x4E0B;&#x6B21;&#x611F;&#x89C9;&#x8981;&#x5B9A;&#x4E2A;&#x76EE;&#x6807;&#x53BB;&#x770B;&#x4EE3;&#x7801;</div>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=9ec3bbaac1ef4de59834cb8aa39e79de">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="9ec3bbaac1ef4de59834cb8aa39e79de" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-19 19:24</td>
+                    <td>
+                        <span class="hint">&#x2328;</span>
+                        &#x5199;&#x4EE3;&#x7801;
+                    </td>
+                    <td class="num">3 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x4ECA;&#x665A;&#x4E0A;&#x8FD8;&#x52A0;&#x4E86;&#x73ED;&#xFF0C;&#x628A;&#x90A3;&#x4E2A;&#x52A0;&#x6025;&#x4EFB;&#x52A1;&#x641E;&#x597D;&#x4E86;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=6be03786bfec47a6b82471e0e89c038a">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="6be03786bfec47a6b82471e0e89c038a" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-19 13:25</td>
+                    <td>
+                        <span class="hint">&#x263E;</span>
+                        &#x7761;&#x89C9;
+                    </td>
+                    <td class="num">30 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td></td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=52df65ac64b94073bda82a789170ca4e">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="52df65ac64b94073bda82a789170ca4e" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-19 12:15</td>
+                    <td>
+                        <span class="hint">&#x2328;</span>
+                        &#x5199;&#x4EE3;&#x7801;
+                    </td>
+                    <td class="num">3 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x4E0A;&#x73ED;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=3cf364f2aa2c458e8fa11f9a71646c4b">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="3cf364f2aa2c458e8fa11f9a71646c4b" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-19 09:14</td>
+                    <td>
+                        <span class="hint">&#x270E;</span>
+                        &#x5E72;&#x6D3B;
+                    </td>
+                    <td class="num">15 &#x5206;</td>
+                    <td>personalHub&#x4EE3;&#x7801;&#x63A8;&#x8FDB;</td>
+                    <td>&#x6D4B;&#x8BD5;personalhub&#xFF0C;&#x63CF;&#x8FF0;&#x9700;&#x6C42;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=c0435590cb78468dbabbee70b401ea70">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="c0435590cb78468dbabbee70b401ea70" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-19 08:45</td>
+                    <td>
+                        <span class="hint">&#x2192;</span>
+                        &#x901A;&#x52E4;
+                    </td>
+                    <td class="num">45 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td></td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=dc34326eaa0648fd9825563312117767">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="dc34326eaa0648fd9825563312117767" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-19 00:44</td>
+                    <td>
+                        <span class="hint">&#x2328;</span>
+                        &#x5199;&#x4EE3;&#x7801;
+                    </td>
+                    <td class="num">30 &#x5206;</td>
+                    <td>personalHub&#x4EE3;&#x7801;&#x63A8;&#x8FDB;</td>
+                    <td></td>
+                    <td>
+                            <span class="tag done">值得</span>
+                            <div class="hint" title="&#x628A;&#x9700;&#x6C42;&#x786E;&#x5B9A;&#x597D;&#x4E86;" style="margin-top:2px; max-width:220px">↳ &#x628A;&#x9700;&#x6C42;&#x786E;&#x5B9A;&#x597D;&#x4E86;</div>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=221fc191330148938e6cd32ad947eba1">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="221fc191330148938e6cd32ad947eba1" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-18 23:00</td>
+                    <td>
+                        <span class="hint">&#x2328;</span>
+                        &#x5199;&#x4EE3;&#x7801;
+                    </td>
+                    <td class="num">30 &#x5206;</td>
+                    <td>personalHub&#x4EE3;&#x7801;&#x63A8;&#x8FDB;</td>
+                    <td>&#x4FEE;&#x6539;&#x76EE;&#x6807;&#x754C;&#x9762;&#x903B;&#x8F91;&#xFF0C;&#x6DFB;&#x52A0;&#x5907;&#x6CE8;&#xFF0C;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=3573a7fd4c884b69be3bf879c46793fc">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="3573a7fd4c884b69be3bf879c46793fc" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-18 22:47</td>
+                    <td>
+                        <span class="hint">&#x25B7;</span>
+                        &#x5A31;&#x4E50;
+                    </td>
+                    <td class="num">1 &#x5C0F;&#x65F6;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x5237;&#x89C6;&#x9891;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=985f5143ac0b4c9cbbf9fbc111607dbf">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="985f5143ac0b4c9cbbf9fbc111607dbf" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-18 22:06</td>
+                    <td>
+                        <span class="hint">&#x25A0;</span>
+                        &#x5BB6;&#x52A1;&#x6742;&#x4E8B;
+                    </td>
+                    <td class="num">1 &#x5C0F;&#x65F6; 30 &#x5206;</td>
+                    <td>&#x672A;&#x5F52;&#x76EE;&#x6807;</td>
+                    <td>&#x7406;&#x53D1;</td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=6ad1f930cac74e079fd22c423427ae58">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="6ad1f930cac74e079fd22c423427ae58" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+                <tr class="">
+                    <td>2026-10-18 19:47</td>
+                    <td>
+                        <span class="hint">&#x2328;</span>
+                        &#x5199;&#x4EE3;&#x7801;
+                    </td>
+                    <td class="num">3 &#x5C0F;&#x65F6;</td>
+                    <td>personalHub&#x4EE3;&#x7801;&#x63A8;&#x8FDB;</td>
+                    <td></td>
+                    <td>
+                    </td>
+                    <td>
+                            <span class="tag">正常</span>
+                    </td>
+                    <td style="white-space:nowrap">
+                            <a class="btn sm" href="/blocks/edit?id=1d4a08d78ca643bc811cb540eb11cb7d">编辑</a>
+                            <form method="post" style="display:inline" onsubmit="return confirm('删除这条时间块？软删，可在「显示已删除」里找回');" action="/Blocks?handler=Delete">
+                                <input type="hidden" name="id" value="1d4a08d78ca643bc811cb540eb11cb7d" />
+                                <input type="hidden" name="returnUrl" value="/blocks?from=2026-10-01&amp;to=2026-11-05" />
+                                <button class="btn sm danger" type="submit">删除</button>
+                            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8MIy61ZXTAxGi_2vc5Zttv3YKht8CvBl-u4vf-y53IXuGypZislSLyFfffSypARqm2hJAvgWdD---Zjs3VdgL6kK5W0-XJD6Kb59mCUwzZK-46F8qniZ-9sibyplAUVCURbVoEy1svr-AR2zQDj7NPE" /></form>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="pager">
+            <span>第 1 / 1 页 · 每页 50 条</span>
+        </div>
+</div>
+
+    </main>
+
+    <footer class="foot">
+        PersonalHub · 服务端是唯一数据源，手机端只缓存最近 30 天
+    </footer>
+</div>
+</body>
+</html>

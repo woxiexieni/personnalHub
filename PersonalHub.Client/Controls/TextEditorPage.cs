@@ -41,18 +41,27 @@ namespace PersonalHub.Client.Controls
             if (_open) return null;
             _open = true;
 
-            var page = new TextEditorPage(title, initial, placeholder, compact, maxLength);
+            // _open 必须在任何退出路径上释放。原来只在 PushModalAsync 失败和 OnDisappearing
+            // 里清 —— 万一某次弹窗走了一条不触发 OnDisappearing 的路，这个静态标记就永久卡住，
+            // 之后所有编辑框都会"点了没反应"（调用方拿到 null，当成用户取消）。
             try
             {
-                await Shell.Current.Navigation.PushModalAsync(page, true);
+                var page = new TextEditorPage(title, initial, placeholder, compact, maxLength);
+                try
+                {
+                    await Shell.Current.Navigation.PushModalAsync(page, true);
+                }
+                catch
+                {
+                    return null;
+                }
+
+                return await page._result.Task;
             }
-            catch
+            finally
             {
                 _open = false;
-                return null;
             }
-
-            return await page._result.Task;
         }
 
         private TextEditorPage(string title, string? initial, string? placeholder, bool compact, int maxLength)

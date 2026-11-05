@@ -183,6 +183,7 @@
                 <th class="num">时长</th>
                 <th>目标</th>
                 <th>备注</th>
+                <th>评价</th>
                 <th>状态</th>
                 <th></th>
             </tr>
@@ -199,6 +200,26 @@
                     <td class="num">@(b.DurationMin > 0 ? Pieces.Minutes(b.DurationMin) : "未填")</td>
                     <td>@Model.GoalTitle(b.GoalId)</td>
                     <td>@b.Note</td>
+                    <td>
+                        @* 复盘评价：手机上点「值得 / 一般 / 别做了」写的那一句，电脑端一直看不到。
+                           0 = 没评，留空而不是画一个"未评"占位，否则每行都在喊"你还没评"。 *@
+                        @if (b.Worth == 1)
+                        {
+                            <span class="tag done">值得</span>
+                        }
+                        else if (b.Worth == 2)
+                        {
+                            <span class="tag">一般</span>
+                        }
+                        else if (b.Worth == 3)
+                        {
+                            <span class="tag bad">别做了</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(b.Lesson))
+                        {
+                            <div class="hint" title="@b.Lesson" style="margin-top:2px; max-width:220px">↳ @b.Lesson</div>
+                        }
+                    </td>
                     <td>
                         @if (b.Deleted)
                         {

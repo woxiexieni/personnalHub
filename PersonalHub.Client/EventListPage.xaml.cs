@@ -76,8 +76,13 @@ namespace PersonalHub.Client
             {
                 if (child is not Button b) continue;
                 bool on = i < values.Count && values[i] == _filter;
-                b.BackgroundColor = on ? Color.FromArgb("#4A6FA5") : Color.FromArgb("#3A3A40");
-                b.TextColor = on ? Colors.White : (dark ? Colors.White : Colors.Black);
+                // 同 ProblemListPage：原来的深灰底 + 黑字在浅色主题下看不见。
+                b.BackgroundColor = on
+                    ? Color.FromArgb("#4A6FA5")
+                    : (dark ? Color.FromArgb("#33333A") : Color.FromArgb("#F1EFE8"));
+                b.TextColor = on
+                    ? Colors.White
+                    : (dark ? Color.FromArgb("#E8E8E8") : Color.FromArgb("#2C2C2A"));
                 i++;
             }
         }

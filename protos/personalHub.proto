@@ -658,6 +658,9 @@ service AiService {
     rpc ExtractEvents (ExtractEventsRequest) returns (ExtractEventsReply);
     // AI 周回看：近 30 天事件卡 → 重复苗头/建议立卡（防盲区，手动触发，一次调用）。
     rpc ReviewEvents (ReviewEventsRequest) returns (ReviewEventsReply);
+    // 目标 30 天归纳：客户端算好事实，服务端只做归纳，**不建议**。
+    // 这是 OPDCA 里的 A（处理）：用用户自己的记录，把他说不出口的那个共同点说出来。
+    rpc CommentGoal (GoalFacts) returns (GoalComment);
 }
 
 message AiStatusResponse {
@@ -722,6 +725,35 @@ message WeekFacts {
 message WeekComment {
     optional bool ok = 1 [default = false];
     optional string text = 2;         // 一句话，≤40 字
+    optional string error_msg = 3;
+}
+
+// ============ 目标 30 天：归纳，不建议 ============
+//
+// 事实由客户端算好（本地 SQLite 就有），服务端只负责"把它们之间的共同点说出来"。
+// 服务端无状态：不查库、不存结果。
+//
+// 硬性边界（写进提示词，也在这里留档）：
+//   只做归纳，不给建议。产出"你标了 3 次别做了，共同点是都在绕开同一个接口问题"可以；
+//   产出"所以你应该先重构接口"不行 —— 它不知道用户的真实约束，猜错了用户还得反驳它，
+//   反驳成本比打字成本高得多。
+
+message GoalFacts {
+    optional string goal_title = 1;
+    optional int32 days = 2;          // 统计窗口天数（一般 30）
+    optional int32 blocks = 3;        // 块数
+    optional int32 minutes = 4;       // 总投入
+    optional int32 worth_good = 5;    // 标「值得」的条数
+    optional int32 worth_mid = 6;     // 标「一般」的条数
+    optional int32 worth_bad = 7;     // 标「别做了」的条数
+    repeated string lessons = 8;      // 「值得」时写的那句话，原文（不准改写）
+    repeated string bad_notes = 9;    // 「别做了」那几段的备注，原文（不准改写）
+    optional string top_piece = 10;   // 投入最多的片名，可空
+}
+
+message GoalComment {
+    optional bool ok = 1 [default = false];
+    repeated string lines = 2;        // 2~4 行，每行 ≤40 字，只归纳
     optional string error_msg = 3;
 }
 

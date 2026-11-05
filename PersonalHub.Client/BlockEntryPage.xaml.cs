@@ -66,6 +66,29 @@ namespace PersonalHub.Client
         /// <summary>长按抑制窗口：长按后 800ms 内的 Clicked 一律忽略（见 OnPiecePressed）。</summary>
         private DateTime _suppressClickUntil = DateTime.MinValue;
 
+        // ============================================================
+        // 评价 → 事件卡 的升级阈值
+        // ============================================================
+        //
+        // 片回答「哪一类」，事件卡回答「这一件到底怎么了」。
+        // 同一类事被你否掉两次，就说明它不是"这一次运气不好"，值得说清楚一次。
+        //
+        // 触发条件是「本次评价刚好让计数 == 阈值」而不是「>= 阈值」：
+        //   >= 会让每次点都弹 → 变成每天要清的收件箱；
+        //   == 只在跨过那一秒弹一次，且不需要存"已提示"标记（零状态）。
+
+        /// <summary>同片 30 天内「别做了」累计到 2 条时推一次。</summary>
+        private const int UpgradeBadAt = 2;
+
+        /// <summary>同片 30 天内「值得 + 那句经验」累计到 3 条时推一次。</summary>
+        private const int UpgradeGoodAt = 3;
+
+        /// <summary>当前提示对应的片（已过 Canonical，统计口径与合并片一致）。</summary>
+        private string _upgradePieceCode = string.Empty;
+
+        /// <summary>点提示时带给事件卡页的预填原文。</summary>
+        private string _upgradeSeed = string.Empty;
+
         public BlockEntryPage(
             LocalRecordStore<LocalBlock> blocks,
             LocalRecordStore<LocalGoal> goals,
@@ -907,14 +930,23 @@ namespace PersonalHub.Client
                 NoteText = r.Note ?? string.Empty,
                 SyncText = r.Synced ? "已同步" : "待同步",
                 SyncColor = r.Synced ? SyncedColor : PendingColor,
+
+                WorthText = r.Worth switch { 1 => "值得", 2 => "一般", 3 => "别做了", _ => string.Empty },
+                WorthColor = r.Worth switch { 1 => WorthOkBg, 2 => WorthMidBg, 3 => WorthBadBg, _ => Colors.Transparent },
+                HasWorth = r.Worth is 1 or 2 or 3,
+                LessonText = string.IsNullOrWhiteSpace(r.Lesson) ? string.Empty : "↳ " + r.Lesson.Trim(),
+                HasLesson = !string.IsNullOrWhiteSpace(r.Lesson),
             }).ToList();
 
             TodayList.ItemsSource = vm;
 
             // 列表高度跟着内容走：固定 320 会在只记了 3 条时留一大片空白（截图里那个空框），
             // 而记满一天时又要滚动两次——两头都不对。
+            // 评价行也算进去，否则加了「↳ 一句话」之后行会被截掉。
             TodayList.HeightRequest = Math.Clamp(
-                rows.Sum(r => string.IsNullOrEmpty(r.Note) ? 56 : 72) + 12, 76, 460);
+                rows.Sum(r => 56
+                    + (string.IsNullOrEmpty(r.Note) ? 0 : 16)
+                    + (r.Worth is 1 or 2 or 3 ? 18 : 0)) + 12, 76, 460);
 
             // 计划：从本地读今天这一组（按创建顺序），实际时长由今天的块现算
             var plans = await _plans.GetByRangeAsync(from, to);
@@ -1528,7 +1560,123 @@ namespace PersonalHub.Client
             StatusLabel.Text = worth == 1 ? "已标值得" : worth == 2 ? "已标一般" : "已标「别做了」";
 
             await RefreshTodayAsync();     // 复盘区跟着重画（按钮选中态 + 那一句经验）
+
+            // 放在重画之后：RefreshTodayAsync 会重置 StatusLabel 一带，提示卡得最后立
+            await SuggestEventCardAsync(row, worth).ConfigureAwait(true);
+
             _ = SyncAndRefreshAsync();
+        }
+
+        // ============================================================
+        // 评价攒够了 → 推一张事件卡
+        // ============================================================
+        //
+        // 这是「时间片 → 事件卡」唯一的一条自动路径。另一条永远是用户自己建。
+        //
+        // 为什么按"片"统计而不按"目标"：片是必填的，目标多数块是空的。
+        // 按目标统计会让这个功能在真实数据上几乎不触发。
+        //
+        // 为什么用 Canonical：合并片之后「午睡」和「睡觉」是同一件事，
+        // 不归并的话，历史评价会散在旧代号上，永远攒不够阈值。
+
+        private async Task SuggestEventCardAsync(LocalBlock justRated, int worth)
+        {
+            HideUpgradeCard();
+
+            // 只有「别做了」「值得」两种评价值得往上升；「一般」不给任何反馈
+            if (worth != 1 && worth != 3) return;
+
+            string code = Pieces.Canonical(justRated.PieceCode);
+            var (from, to) = Period.LastDays(30);
+
+            var same = (await _blocks.GetByRangeAsync(from, to).ConfigureAwait(true))
+                .Where(b => !b.Deleted
+                            && string.Equals(Pieces.Canonical(b.PieceCode), code, StringComparison.Ordinal))
+                .OrderByDescending(b => b.OccurredAt)
+                .ToList();
+
+            int badCount = same.Count(b => b.Worth == 3);
+            int goodCount = same.Count(b => b.Worth == 1 && !string.IsNullOrWhiteSpace(b.Lesson));
+
+            bool hitBad = worth == 3 && badCount == UpgradeBadAt;
+            bool hitGood = worth == 1 && goodCount == UpgradeGoodAt;
+            if (!hitBad && !hitGood) return;
+
+            string name = _settings.DisplayName(justRated.PieceCode);
+
+            UpgradeTitle.Text = hitBad
+                ? $"「{name}」30 天内标了 {UpgradeBadAt} 次「别做了」"
+                : $"「{name}」30 天内攒了 {UpgradeGoodAt} 句「值得」的经验";
+
+            _upgradePieceCode = code;
+            _upgradeSeed = BuildUpgradeSeed(name, same, hitBad);
+            UpgradeCard.IsVisible = true;
+        }
+
+        /// <summary>
+        /// 预填给事件卡页的原文 —— 是「一段话」而不是一个表单。
+        /// 用户看到的是自己那几个片段，可以直接在上面接着写；
+        /// 不写也能点「交给 AI 整理」，AI 会照这段原文拆卡。
+        /// </summary>
+        private string BuildUpgradeSeed(string pieceName, List<LocalBlock> same, bool bad)
+        {
+            int total = same.Sum(b => Math.Max(0, b.DurationMin));
+            var sb = new System.Text.StringBuilder();
+
+            sb.Append('【').Append(pieceName).Append(" · 30 天 ").Append(same.Count).Append(" 段")
+              .Append(total > 0 ? " · " + FormatMinutes(total) : string.Empty).Append('】');
+
+            if (bad)
+            {
+                sb.AppendLine();
+                sb.AppendLine("其中这几段我标了「别做了」：");
+                foreach (var b in same.Where(x => x.Worth == 3).Take(5))
+                {
+                    string when = Period.ToLocalTime(b.OccurredAt).ToString("MM-dd");
+                    string note = string.IsNullOrWhiteSpace(b.Note) ? "（没写备注）" : b.Note.Trim();
+                    sb.Append("· ").Append(when).Append(' ').AppendLine(note);
+                }
+            }
+            else
+            {
+                sb.AppendLine();
+                sb.AppendLine("这几段我标了「值得」，记下的经验是：");
+                foreach (var b in same.Where(x => x.Worth == 1 && !string.IsNullOrWhiteSpace(x.Lesson)).Take(5))
+                {
+                    sb.Append("· ").AppendLine(b.Lesson.Trim());
+                }
+            }
+
+            sb.AppendLine();
+            sb.Append("（在上面补两句：这次到底怎么回事，下次打算怎么处理。");
+            sb.Append("不补也能直接整理。）");
+
+            return sb.ToString();
+        }
+
+        private void HideUpgradeCard()
+        {
+            UpgradeCard.IsVisible = false;
+            _upgradePieceCode = string.Empty;
+            _upgradeSeed = string.Empty;
+        }
+
+        private async void OnUpgradeTapped(object? sender, TappedEventArgs e)
+        {
+            if (_upgradeSeed.Length == 0) return;
+
+            // 走静态交接（和问题卡页 → 建卡页同一套）：不依赖导航参数长度上限
+            RecordDothingPage.PendingSeed = _upgradeSeed;
+            HideUpgradeCard();
+
+            try
+            {
+                await Shell.Current.GoToAsync(RecordCatalog.ThingRoute);
+            }
+            catch
+            {
+                StatusLabel.Text = "没找到事件卡页，请从底部「记录」进去。";
+            }
         }
 
         // ============================================================
@@ -1742,5 +1890,14 @@ namespace PersonalHub.Client
         public string NoteText { get; set; } = string.Empty;
         public string SyncText { get; set; } = string.Empty;
         public Color SyncColor { get; set; } = Colors.Transparent;
+
+        /// <summary>复盘评价（值得 / 一般 / 别做）。Worth=0 时整行隐藏。</summary>
+        public string WorthText { get; set; } = string.Empty;
+        public Color WorthColor { get; set; } = Colors.Transparent;
+        public bool HasWorth { get; set; }
+
+        /// <summary>只评「值得」时写的那一句话。没写就只显示评价本身。</summary>
+        public string LessonText { get; set; } = string.Empty;
+        public bool HasLesson { get; set; }
     }
 }

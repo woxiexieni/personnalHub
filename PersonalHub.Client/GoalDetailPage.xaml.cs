@@ -106,6 +106,11 @@ namespace PersonalHub.Client
             AiPanel.IsVisible = false;
             SuggestHintLabel.Text = "做完就换，只留一条。想不出来就点「帮我想」。";
 
+            // 归纳结果同理：上一个目标的结论挂在这个目标下面会变成假话
+            DigestLines.Children.Clear();
+            DigestLines.IsVisible = false;
+            DigestHint.Text = string.Empty;
+
             ApplyPlanTodayState();
 
             // 本地先渲染（0ms），再尝试用服务端的全量数字覆盖
@@ -155,6 +160,151 @@ namespace PersonalHub.Client
             RenderWeekBars(mine);
             RenderTimeline(mine);
             RenderEvaluation(mine);
+            RenderDigestFacts(mine);
+        }
+
+        // ============================================================
+        // 这 30 天：事实常驻，AI 归纳按需
+        // ============================================================
+        //
+        // 事实行永远显示 —— 本地算，零等待、零输入，不点按钮也在。
+        // AI 归纳要点一下才跑：它只在"你想知道为什么会这样"的时候才有价值，
+        // 常驻反而是噪音（而且每次打开页面都调一次 API，很贵）。
+        //
+        // AI 失败时**不弹错**，只把事实行留着并说一句没接上 ——
+        // 上面那几个数本身就是全部能确定的东西，降级路径并非"什么都不剩"。
+
+        private void RenderDigestFacts(List<LocalBlock> mine)
+        {
+            if (mine.Count == 0)
+            {
+                DigestFacts.Text = "最近 30 天还没有时间块。记一笔归到这个目标的块，这里才会长出东西。";
+                DigestBtn.IsEnabled = false;
+                DigestBtn.TextColor = Color.FromArgb("#B9B7AE");
+                return;
+            }
+
+            DigestBtn.IsEnabled = true;
+            DigestBtn.TextColor = Color.FromArgb("#185FA5");
+
+            int total = mine.Sum(b => Math.Max(0, b.DurationMin));
+            int good = mine.Count(b => b.Worth == 1);
+            int mid = mine.Count(b => b.Worth == 2);
+            int bad = mine.Count(b => b.Worth == 3);
+
+            string dur = total > 0 ? " · " + BlockEntryPage.FormatMinutes(total) : string.Empty;
+            string dist = good + mid + bad == 0
+                ? " · 还没评过"
+                : $" · 值得 {good} / 一般 {mid} / 别做了 {bad}";
+
+            DigestFacts.Text = $"{mine.Count} 段{dur}{dist}";
+        }
+
+        private async void OnDigestClicked(object? sender, EventArgs e)
+        {
+            if (_goal is null || !DigestBtn.IsEnabled) return;
+
+            var (from, to) = Period.LastDays(BlockMirrorService.WindowDays);
+            var mine = (await _blocks.GetByRangeAsync(from, to))
+                .Where(b => b.GoalId == _goal.Id)
+                .ToList();
+
+            DigestLines.Children.Clear();
+            DigestLines.IsVisible = false;
+            DigestHint.Text = string.Empty;
+
+            if (mine.Count < 3)
+            {
+                DigestHint.Text = "记录还不够 3 段，凑不出「重复」。再记几笔。";
+                return;
+            }
+
+            DigestBtn.IsEnabled = false;
+            DigestBtn.Text = "找着…";
+
+            try
+            {
+                var (ok, message, lines) = await _ai.CommentGoalAsync(BuildDigest(mine));
+
+                if (ok)
+                {
+                    RenderDigestLines(lines);
+                    DigestHint.Text = "只归纳你记录里重复出现的东西，不给建议。";
+                }
+                else
+                {
+                    DigestHint.Text = $"AI 这次没接上（{message}）。上面那几个数就是全部能确定的东西。";
+                }
+            }
+            catch (Exception ex)
+            {
+                DigestHint.Text = "找的时候出错了：" + ex.Message;
+            }
+            finally
+            {
+                DigestBtn.IsEnabled = true;
+                DigestBtn.Text = "帮我找重复";
+            }
+        }
+
+        private AiGoalDigest BuildDigest(List<LocalBlock> mine)
+        {
+            var lessons = mine
+                .Where(b => b.Worth == 1 && !string.IsNullOrWhiteSpace(b.Lesson))
+                .OrderByDescending(b => b.OccurredAt)
+                .Select(b => b.Lesson.Trim())
+                .ToList();
+
+            // 「别做了」那几段的备注就是它们唯一的说明 —— 不写就带空，不替用户补
+            var badNotes = mine
+                .Where(b => b.Worth == 3 && !string.IsNullOrWhiteSpace(b.Note))
+                .OrderByDescending(b => b.OccurredAt)
+                .Select(b => b.Note.Trim())
+                .ToList();
+
+            var top = mine
+                .GroupBy(b => Pieces.Canonical(b.PieceCode))
+                .OrderByDescending(g => g.Sum(x => Math.Max(0, x.DurationMin)))
+                .FirstOrDefault();
+
+            return new AiGoalDigest(
+                GoalTitle: _goal?.Title ?? string.Empty,
+                Days: BlockMirrorService.WindowDays,
+                Blocks: mine.Count,
+                Minutes: mine.Sum(b => Math.Max(0, b.DurationMin)),
+                WorthGood: mine.Count(b => b.Worth == 1),
+                WorthMid: mine.Count(b => b.Worth == 2),
+                WorthBad: mine.Count(b => b.Worth == 3),
+                Lessons: lessons,
+                BadNotes: badNotes,
+                TopPiece: top is null ? string.Empty : _settings.DisplayName(top.Key));
+        }
+
+        private void RenderDigestLines(List<string> lines)
+        {
+            DigestLines.Children.Clear();
+
+            foreach (string line in lines)
+            {
+                var row = new HorizontalStackLayout { Spacing = 6 };
+                row.Children.Add(new Label
+                {
+                    Text = "·",
+                    FontSize = 13,
+                    TextColor = Color.FromArgb("#185FA5"),
+                    VerticalOptions = LayoutOptions.Start,
+                });
+                row.Children.Add(new Label
+                {
+                    Text = line,
+                    FontSize = 13,
+                    LineBreakMode = LineBreakMode.WordWrap,
+                    VerticalOptions = LayoutOptions.Start,
+                });
+                DigestLines.Children.Add(row);
+            }
+
+            DigestLines.IsVisible = DigestLines.Children.Count > 0;
         }
 
         /// <summary>

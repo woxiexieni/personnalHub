@@ -126,6 +126,24 @@
                     HorizontalOptions="Start"
                     Clicked="OnUnhideAllClicked"/>
 
+            <!-- 评价攒够阈值 → 推一张事件卡。
+                 只在"刚跨过阈值"那一刻出现一次，不存已提示标记，所以不会变成每天要清的收件箱。 -->
+            <Border x:Name="UpgradeCard" IsVisible="False"
+                    Stroke="#E6C68A" StrokeThickness="1" Padding="14,10" Margin="0,4,0,0">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnUpgradeTapped"/>
+                </Border.GestureRecognizers>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label x:Name="UpgradeTitle" Text="" FontSize="13" LineBreakMode="WordWrap"/>
+                        <Label Text="点这里写张事件卡说清楚 ›" FontSize="11"
+                               TextColor="{StaticResource Gray500}"/>
+                    </VerticalStackLayout>
+                    <Label Grid.Column="1" Text="›" FontSize="18"
+                           TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+
             <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
 
             <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,4"/>
@@ -156,6 +174,20 @@
                                 </HorizontalStackLayout>
                                 <Label Text="{Binding NoteText}" FontSize="11" TextColor="{StaticResource Gray500}"
                                        LineBreakMode="TailTruncation"/>
+
+                                <!-- 评价：原来只在页面最下面的复盘区显示，列表里一点痕迹都没有，
+                                     评完往上翻看会以为没保存上。 -->
+                                <HorizontalStackLayout Spacing="6" IsVisible="{Binding HasWorth}">
+                                    <Label Text="{Binding WorthText}" FontSize="11"
+                                           FontAttributes="Bold"
+                                           TextColor="{Binding WorthColor}"
+                                           VerticalOptions="Center"/>
+                                    <Label Text="{Binding LessonText}" FontSize="11"
+                                           TextColor="#3B6D11"
+                                           LineBreakMode="TailTruncation"
+                                           IsVisible="{Binding HasLesson}"
+                                           VerticalOptions="Center"/>
+                                </HorizontalStackLayout>
                             </VerticalStackLayout>
 
                             <Label Grid.Column="1" Text="{Binding Minutes}" FontSize="14" VerticalOptions="Center"/>

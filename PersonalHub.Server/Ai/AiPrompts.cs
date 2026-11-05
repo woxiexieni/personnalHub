@@ -272,6 +272,78 @@ namespace personalHub.Server.Ai
         }
 
         // ============================================================
+        // C2. 目标 30 天：归纳，不建议
+        // ============================================================
+        //
+        // 这一块是整个系统里最容易做歪的地方。模型天生爱给建议，一给建议，
+        // 用户拿到的就是一张"你应该去做什么"的清单 —— 那正是反 Goodhart 要避免的东西。
+        //
+        // 所以提示词的禁令写得比要求还长：只许指出重复，不许给方向。
+        // 事实由客户端算好（条数/时长/分布/原话），模型只负责"这些之间有什么共同点"。
+
+        public static (string System, string User) GoalComment(GoalFacts f)
+        {
+            const string system = """
+                你是一个记录员，只做一件事：把这个目标最近一段时间的记录里**重复出现的东西**指出来。
+
+                硬性要求（违反任何一条都算失败）：
+                1. 只归纳，不建议。禁止出现"你应该/建议/不如/可以试试/下次要/值得/需要"这类字眼。
+                2. 输出 2 到 4 行，每行不超过 40 个字。
+                3. 只使用材料里出现过的事实和原话，不要推算材料里没有的东西，不要编造动机。
+                4. material 里给出的原话可以引用，但一个字都不许改写、不许润色。
+                5. 看不出重复就返回空数组 —— 什么都不说，比凑一句强。
+                6. 不评价好坏、不打分、不说"进步了/退步了/效率高/效率低"。
+
+                可以写的样子（举例，不是模板）：
+                "13 段里 7 段标了一般，都在同一件事上返工"
+                "两句经验说的是同一个动作：先写下来再动手"
+
+                只输出 JSON：{"lines":["...","..."]}
+                """;
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"目标：{f.GoalTitle}");
+            sb.AppendLine($"区间：最近 {f.Days} 天，共 {f.Blocks} 段，{f.Minutes} 分钟");
+            sb.AppendLine($"评价分布：值得 {f.WorthGood} 段 / 一般 {f.WorthMid} 段 / 别做了 {f.WorthBad} 段");
+
+            if (!string.IsNullOrWhiteSpace(f.TopPiece)) sb.AppendLine("投入最多的片：" + f.TopPiece);
+
+            if (f.Lessons.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("标「值得」时记下的原话（引用时不许改写）：");
+                foreach (string s in f.Lessons.Take(10)) sb.AppendLine("- " + OneLine(s, 100));
+            }
+
+            if (f.BadNotes.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("标「别做了」那几段的备注（引用时不许改写）：");
+                foreach (string s in f.BadNotes.Take(10)) sb.AppendLine("- " + OneLine(s, 100));
+            }
+
+            return (system, sb.ToString());
+        }
+
+        public static List<string> ParseGoalComment(string raw)
+        {
+            var list = new List<string>();
+            if (!TryRoot(raw, out var root)) return list;
+            if (!root.TryGetProperty("lines", out var arr) || arr.ValueKind != JsonValueKind.Array)
+                return list;
+
+            foreach (var el in arr.EnumerateArray())
+            {
+                if (el.ValueKind != JsonValueKind.String) continue;
+                string line = OneLine(el.GetString(), 60);
+                if (line.Length > 0) list.Add(line);
+                if (list.Count >= 4) break;
+            }
+
+            return list;
+        }
+
+        // ============================================================
         // D. 事件卡：自由文字 → 结构化事件草稿（R7）
         // ============================================================
 

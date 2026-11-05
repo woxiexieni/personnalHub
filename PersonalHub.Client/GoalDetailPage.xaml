@@ -93,6 +93,27 @@
 
             <BoxView HeightRequest="1" Color="{StaticResource Gray300}"/>
 
+            <!-- ============ 主体三半：这 30 天 ============
+                 事实那一行永远显示（本地算，零等待、零输入）；
+                 AI 归纳要点一下才跑 —— 它只在"你想知道为什么"的时候才有价值。 -->
+            <Border x:Name="DigestCard" Stroke="#C9D8EA" StrokeThickness="1" Padding="14,10">
+                <VerticalStackLayout Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" Text="这 30 天" FontSize="13" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" x:Name="DigestBtn" Text="帮我找重复"
+                                FontSize="12" HeightRequest="30" Padding="12,0"
+                                BackgroundColor="Transparent" TextColor="#185FA5"
+                                Clicked="OnDigestClicked"/>
+                    </Grid>
+                    <Label x:Name="DigestFacts" Text="" FontSize="12" LineBreakMode="WordWrap"/>
+                    <VerticalStackLayout x:Name="DigestLines" Spacing="5" IsVisible="False"/>
+                    <Label x:Name="DigestHint" Text="" FontSize="11"
+                           TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <BoxView HeightRequest="1" Color="{StaticResource Gray300}"/>
+
             <!-- ============ 主体四：演进（一长串时间片，不是百分比） ============ -->
             <Grid ColumnDefinitions="*,Auto">
                 <Label Grid.Column="0" Text="演进" Style="{StaticResource SubHeadline}"

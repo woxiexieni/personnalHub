@@ -13,6 +13,15 @@ namespace PersonalHub.Client.Services
 
     public sealed record AiStepOption(string Action, string PieceCode, int Minutes);
 
+    /// <summary>
+    /// 「这 30 天」的归纳输入：全部由客户端本地算好（数据本来就在 SQLite 里）。
+    /// 不直接用 proto 的 GoalFacts —— 同下面的理由，界面层不碰生成类型。
+    /// </summary>
+    public sealed record AiGoalDigest(
+        string GoalTitle, int Days, int Blocks, int Minutes,
+        int WorthGood, int WorthMid, int WorthBad,
+        List<string> Lessons, List<string> BadNotes, string TopPiece);
+
     public sealed record AiPattern(
         string Title, string Trigger, string OldResponse, string NewResponse,
         List<string> Evidence, int Count);
@@ -243,6 +252,56 @@ namespace PersonalHub.Client.Services
             catch (Exception ex)
             {
                 return new AiTextResult(false, "调用失败：" + ex.Message, string.Empty);
+            }
+        }
+
+        // ============================================================
+        // C2. 目标 30 天：归纳，不建议
+        // ============================================================
+        //
+        // **不做缓存**：输入是"截至现在的 30 天"，每记一块就变一次。
+        // 缓存在这里会在最需要新数据的时候把旧结论端上来。按钮低频，不缓存更诚实。
+
+        public async Task<(bool Ok, string Message, List<string> Lines)> CommentGoalAsync(
+            AiGoalDigest digest, CancellationToken ct = default)
+        {
+            try
+            {
+                if (!await _conn.EnsureAsync().ConfigureAwait(false))
+                {
+                    return (false, "暂时连不上服务端", new List<string>());
+                }
+
+                var facts = new GoalFacts
+                {
+                    GoalTitle = digest.GoalTitle,
+                    Days = digest.Days,
+                    Blocks = digest.Blocks,
+                    Minutes = digest.Minutes,
+                    WorthGood = digest.WorthGood,
+                    WorthMid = digest.WorthMid,
+                    WorthBad = digest.WorthBad,
+                    TopPiece = digest.TopPiece,
+                };
+                facts.Lessons.AddRange(digest.Lessons);
+                facts.BadNotes.AddRange(digest.BadNotes);
+
+                var resp = await _conn.NewAiClient()
+                    .CommentGoalAsync(facts,
+                        deadline: DateTime.UtcNow.Add(CallTimeout),
+                        cancellationToken: ct)
+                    .ConfigureAwait(false);
+
+                if (!resp.Ok || resp.Lines.Count == 0)
+                {
+                    return (false, resp.ErrorMsg ?? "这次没说", new List<string>());
+                }
+
+                return (true, string.Empty, resp.Lines.ToList());
+            }
+            catch (Exception ex)
+            {
+                return (false, "调用失败：" + ex.Message, new List<string>());
             }
         }
 

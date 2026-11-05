@@ -85,8 +85,14 @@ namespace PersonalHub.Client
                 bool on = i == 0
                     ? _filterTag.Length == 0
                     : i - 1 < RecordTags.All.Length && RecordTags.All[i - 1] == _filterTag;
-                b.BackgroundColor = on ? Color.FromArgb("#4A6FA5") : Color.FromArgb("#3A3A40");
-                b.TextColor = on ? Colors.White : (dark ? Colors.White : Colors.Black);
+                // 未选中原来是 #3A3A40（深灰）配 Black 文字 —— 浅色主题下是黑字压黑底，根本看不清。
+                // 跟时间块 / 想法库的胶囊统一：浅色主题浅底深字，深色主题深底浅字。
+                b.BackgroundColor = on
+                    ? Color.FromArgb("#4A6FA5")
+                    : (dark ? Color.FromArgb("#33333A") : Color.FromArgb("#F1EFE8"));
+                b.TextColor = on
+                    ? Colors.White
+                    : (dark ? Color.FromArgb("#E8E8E8") : Color.FromArgb("#2C2C2A"));
                 i++;
             }
         }

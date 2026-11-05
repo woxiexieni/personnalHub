@@ -251,6 +251,57 @@ namespace personalHub.Server.Services
         }
 
         // ============================================================
+        // C2. 目标 30 天：归纳，不建议
+        // ============================================================
+        //
+        // 和服务端其他 AI 方法一样：**无状态**。事实是客户端算好带来的，
+        // 这里不查库、不存结果、不知道该用户的任何历史。
+
+        public override async Task<GoalComment> CommentGoal(GoalFacts request, ServerCallContext context)
+        {
+            var resp = new GoalComment();
+
+            var cfg = _config.Current;
+            if (!cfg.Configured)
+            {
+                resp.ErrorMsg = cfg.Hint;
+                return resp;
+            }
+
+            // 数据太少就不说。三两段记录凑不出"重复"，只会凑出空话 ——
+            // 而这一块一旦开始说空话，用户就再也不点它了。
+            if (request.Blocks < 3)
+            {
+                resp.ErrorMsg = "这个目标最近只有 " + request.Blocks + " 段记录，还看不出重复。攒到 3 段以上再看。";
+                return resp;
+            }
+
+            var (system, user) = AiPrompts.GoalComment(request);
+            var reply = await _llm.ChatJsonAsync(cfg, system, user, context.CancellationToken)
+                .ConfigureAwait(false);
+
+            if (!reply.Ok)
+            {
+                resp.ErrorMsg = reply.Error;
+                Log("目标归纳", request.GoalTitle ?? "-", reply);
+                return resp;
+            }
+
+            var lines = AiPrompts.ParseGoalComment(reply.Content);
+            Log("目标归纳", request.GoalTitle ?? "-", reply, $"→ {lines.Count} 行");
+
+            if (lines.Count == 0)
+            {
+                resp.ErrorMsg = "模型没看出重复，所以没说。";
+                return resp;
+            }
+
+            resp.Ok = true;
+            resp.Lines.AddRange(lines);
+            return resp;
+        }
+
+        // ============================================================
         // D. 事件卡：自由文字 → 结构化事件草稿（R7）
         // ============================================================
         //
