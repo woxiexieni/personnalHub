@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.BeliefGamePage"
+             Title="拼信念">
+
+    <!--
+        拼词小游戏。整页只干一件事，所以没有任何表单字段。
+
+        上面是空槽（点一下已拼的块可以拿下来），下面是词块池（混着另一条信念的块）。
+        拼满自动判定：对了记一次练习次数，错了就抖一下让你重排。
+
+        刻意不做：计时、积分、连击、排行榜。它是个玩具，不是考核。
+    -->
+    <Grid RowDefinitions="Auto,*,Auto" Padding="24,18" RowSpacing="14">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="4">
+            <Label x:Name="HintLabel"
+                   Text="把这句话拼回来"
+                   FontSize="15"
+                   FontAttributes="Bold"/>
+            <Label x:Name="SubHintLabel"
+                   Text=""
+                   FontSize="11"
+                   TextColor="{StaticResource Gray500}"
+                   LineBreakMode="WordWrap"/>
+        </VerticalStackLayout>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="18" Margin="0,4">
+
+                <FlexLayout x:Name="SlotArea"
+                            Wrap="Wrap" Direction="Row"
+                            JustifyContent="Start" AlignItems="Start"/>
+
+                <BoxView HeightRequest="1" Color="#E3E0D8" Margin="0,2"/>
+
+                <FlexLayout x:Name="PoolArea"
+                            Wrap="Wrap" Direction="Row"
+                            JustifyContent="Start" AlignItems="Start"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <VerticalStackLayout Grid.Row="2" Spacing="8">
+            <Label x:Name="FeedbackLabel"
+                   Text="点下面的块，按顺序拼到上面。拼错了点上面的块可以拿下来。"
+                   FontSize="12"
+                   TextColor="{StaticResource Gray500}"
+                   LineBreakMode="WordWrap"/>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Grid.Column="0"
+                        x:Name="RetryBtn"
+                        Text="重来"
+                        FontSize="13"
+                        HeightRequest="42"
+                        Clicked="OnRetryClicked"/>
+                <Button Grid.Column="1"
+                        Text="回去"
+                        FontSize="13"
+                        HeightRequest="42"
+                        BackgroundColor="#F1EFE8"
+                        TextColor="#2C2C2A"
+                        Clicked="OnBackClicked"/>
+            </Grid>
+        </VerticalStackLayout>
+
+    </Grid>
+
+</ContentPage>

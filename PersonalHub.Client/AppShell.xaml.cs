@@ -64,6 +64,11 @@ namespace PersonalHub.Client
                 RecordCatalog.IdeaListRoute,
                 new ServiceRouteFactory(typeof(IdeaListPage)));
 
+            // R8：信念拼词（从想法行上进，带 ?id=）
+            Routing.RegisterRoute(
+                RecordCatalog.BeliefGameRoute,
+                new ServiceRouteFactory(typeof(BeliefGamePage)));
+
             // R2：时间块 + 目标
             Routing.RegisterRoute(
                 RecordCatalog.BlockRoute,

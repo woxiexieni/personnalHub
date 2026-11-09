@@ -55,6 +55,9 @@ namespace PersonalHub.Client
         /// <summary>已落实用的绿。与「计划行动」同色：落实本来就是"计划那类想法"的终点。</summary>
         private static readonly Color DoneColor = Color.FromArgb("#3B6D11");
 
+        /// <summary>信念用的琥珀色：跟"已落实"区分开，也别跟类型筛选抢眼。</summary>
+        private static readonly Color BeliefColor = Color.FromArgb("#BA7517");
+
         private readonly LocalRecordStore<LocalIdea> _ideas;
         private readonly LocalRecordStore<LocalGoal> _goals;
         private readonly RecordSyncService<LocalIdea> _ideaSync;
@@ -71,6 +74,9 @@ namespace PersonalHub.Client
         /// 关掉的时候不会告诉你"还有几条没落实" —— 想法库不给人积压感。
         /// </summary>
         private bool _doneOnly;
+
+        /// <summary>只看信念（R8）。跟「已落实」一样是视角开关，不是流程状态。</summary>
+        private bool _beliefOnly;
 
         /// <summary>当前范围。默认按数量取最近 100 条：想"再看一点"比想"某一天"常见得多。</summary>
         private IdeaRange _range = Ranges[0];
@@ -142,6 +148,46 @@ namespace PersonalHub.Client
             }
 
             AddDoneChip();
+            AddBeliefChip();
+        }
+
+        /// <summary>
+        /// 「信念」开关（R8）。和「已落实」同理：它是独立一维，不是第五种类型。
+        /// 用处只有一个 —— 玩拼词时能从一堆想法里直接把信念捞出来。
+        /// </summary>
+        private void AddBeliefChip()
+        {
+            var chip = new Button
+            {
+                Text = "◆ 信念",
+                FontSize = 12,
+                HeightRequest = 32,
+                Padding = new Thickness(13, 0),
+                CornerRadius = 16,
+                Margin = new Thickness(0, 0, 8, 8),
+            };
+
+            StyleBeliefChip(chip);
+            chip.Clicked += OnBeliefFilterClicked;
+            FilterChips.Children.Add(chip);
+        }
+
+        private void StyleBeliefChip(Button chip)
+        {
+            chip.BackgroundColor = _beliefOnly ? BeliefColor : ChipBg;
+            chip.TextColor = _beliefOnly ? Colors.White : ChipText;
+            chip.BorderWidth = 0;
+        }
+
+        private async void OnBeliefFilterClicked(object? sender, EventArgs e)
+        {
+            if (sender is not Button chip) return;
+
+            _beliefOnly = !_beliefOnly;
+            StyleBeliefChip(chip);
+
+            _renderLimit = PageSize;
+            await LoadAsync();
         }
 
         /// <summary>
@@ -295,6 +341,8 @@ namespace PersonalHub.Client
                 ? "库里还是空的。回上一页写一句就有一条 —— 不需要组织语言。"
                 : snap.Scope.Count == 0
                     ? $"{_range.Label}里没有想法。换个范围就能看到更早的。"
+                    : _beliefOnly
+                        ? "这个范围里还没有信念。在想法行上点「↑ 信念」，把值得反复刻的那句挑出来。"
                     : _doneOnly
                         ? "这个范围里还没有标成「已落实」的想法。它不是待办，标不标都行。"
                         : "这个筛选下还没有想法。";
@@ -322,6 +370,7 @@ namespace PersonalHub.Client
                 : scope.Where(x => x.Kind == _filter).ToList();
 
             if (_doneOnly) filtered = filtered.Where(x => x.Done).ToList();
+            if (_beliefOnly) filtered = filtered.Where(x => x.IsBelief).ToList();
 
             return new Snapshot(all, scope, filtered);
         }
@@ -401,6 +450,7 @@ namespace PersonalHub.Client
             int unclassified = snap.Scope.Count(x => x.Kind == IdeaKinds.Unclassified);
             int converted = snap.Scope.Count(x => !string.IsNullOrEmpty(x.GoalId));
             int done = snap.Scope.Count(x => x.Done);
+            int beliefs = snap.Scope.Count(x => x.IsBelief);
 
             // 头一段永远先说"这一页是什么口径"：范围一换，条数变化才有解释，
             // 否则用户看到 12 条 → 3 条，会以为数据丢了。
@@ -412,6 +462,7 @@ namespace PersonalHub.Client
             if (unclassified > 0) head += $" · 未分类 {unclassified} 条";
             if (converted > 0) head += $" · 已转成目标 {converted} 条";
             if (done > 0) head += $" · 已落实 {done} 条";
+            if (beliefs > 0) head += $" · 信念 {beliefs} 条";
             if (render.Count < snap.Filtered.Count) head += $" · 显示 {render.Count} 条";
 
             return head;
@@ -447,6 +498,20 @@ namespace PersonalHub.Client
                 });
             }
 
+            // 信念单独占一行：它和「已落实」一样，是回头翻时才想确认的状态
+            if (idea.IsBelief)
+            {
+                info.Children.Add(new Label
+                {
+                    Text = idea.PracticeCount > 0
+                        ? $"◆ 信念 · 拼对 {idea.PracticeCount} 次" + (idea.LastPracticedAt > 0 ? " · 上次 " + FormatDay(idea.LastPracticedAt) : string.Empty)
+                        : "◆ 信念 · 还没拼过",
+                    FontSize = 11,
+                    TextColor = BeliefColor,
+                    FontAttributes = FontAttributes.Bold,
+                });
+            }
+
             info.Children.Add(new Label
             {
                 Text = meta,
@@ -455,6 +520,41 @@ namespace PersonalHub.Client
             });
 
             var actions = new VerticalStackLayout { Spacing = 6, VerticalOptions = LayoutOptions.Start };
+
+            // 信念：还没升的给「↑ 信念」，升了的给「拼词 N 次」直接进场 ——
+            // 场次写在按钮上，不用点进去才知道练过几次。
+            if (idea.IsBelief)
+            {
+                var play = new Button
+                {
+                    Text = idea.PracticeCount > 0 ? $"拼词 {idea.PracticeCount} 次" : "拼一遍",
+                    FontSize = 11,
+                    HeightRequest = 30,
+                    Padding = new Thickness(10, 0),
+                    CornerRadius = 8,
+                    BackgroundColor = Color.FromArgb("#FAEEDA"),
+                    TextColor = Color.FromArgb("#854F0B"),
+                    CommandParameter = idea.Id,
+                };
+                play.Clicked += OnPlayBeliefClicked;
+                actions.Children.Add(play);
+            }
+            else
+            {
+                var belief = new Button
+                {
+                    Text = "↑ 信念",
+                    FontSize = 11,
+                    HeightRequest = 30,
+                    Padding = new Thickness(10, 0),
+                    CornerRadius = 8,
+                    BackgroundColor = Color.FromArgb("#F1EFE8"),
+                    TextColor = Color.FromArgb("#5F5E5A"),
+                    CommandParameter = idea.Id,
+                };
+                belief.Clicked += OnMakeBeliefClicked;
+                actions.Children.Add(belief);
+            }
 
             if (string.IsNullOrEmpty(idea.GoalId))
             {
@@ -521,6 +621,39 @@ namespace PersonalHub.Client
         {
             if (ms <= 0) return "时间未知";
             return DateTimeOffset.FromUnixTimeMilliseconds(ms).ToOffset(Period.Cst).ToString("HH:mm");
+        }
+
+        // ============================================================
+        // 信念（R8，纯本地，不上服务端）
+        // ============================================================
+
+        /// <summary>
+        /// 「↑ 信念」：先标成信念再进场。
+        ///
+        /// 先标后玩 —— 万一玩到一半退出去，这句也已经进了信念清单，下次从按钮上
+        /// 「拼一遍」还能接着来。次数只在拼对时才加，所以不会虚高。
+        /// </summary>
+        private async void OnMakeBeliefClicked(object? sender, EventArgs e)
+        {
+            if (sender is not Button b || b.CommandParameter is not string id) return;
+
+            var idea = await _ideas.FindAsync(id);
+            if (idea is null) return;
+
+            if (!idea.IsBelief)
+            {
+                idea.IsBelief = true;
+                await _ideas.UpdateAsync(idea);
+            }
+
+            await Shell.Current.GoToAsync($"{RecordCatalog.BeliefGameRoute}?id={Uri.EscapeDataString(id)}");
+        }
+
+        private async void OnPlayBeliefClicked(object? sender, EventArgs e)
+        {
+            if (sender is not Button b || b.CommandParameter is not string id) return;
+
+            await Shell.Current.GoToAsync($"{RecordCatalog.BeliefGameRoute}?id={Uri.EscapeDataString(id)}");
         }
 
         // ============================================================

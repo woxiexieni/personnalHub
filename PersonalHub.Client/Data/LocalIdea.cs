@@ -46,6 +46,22 @@ namespace PersonalHub.Client.Data
         /// <summary>标记落实的时刻（Unix 毫秒）；0 = 没标过。取消落实时清 0。</summary>
         public long DoneAt { get; set; }
 
+        /// <summary>
+        /// 「升」成了信念：这句要一遍一遍往脑子里刻。
+        ///
+        /// 刻意**不另建表** —— 信念就是想法本身，只是多标了一个"值得反复练"。
+        /// 也刻意**不上服务端**：这是个玩具，多一个表就要多一份 proto / 同步 / 服务端迁移，
+        /// 而它的价值全在"当场玩两分钟"，换个设备看不到也不心疼。
+        /// 所以 RecordExtentions.ToProto 里不映射这几个字段，同步照旧只传正文。
+        /// </summary>
+        public bool IsBelief { get; set; }
+
+        /// <summary>拼词拼对了几次。只增不减，「再来一遍」也加。</summary>
+        public int PracticeCount { get; set; }
+
+        /// <summary>最后一次拼对的时间（Unix 毫秒）。0 = 没练过。</summary>
+        public long LastPracticedAt { get; set; }
+
         public long CreatedAt { get; set; }
 
         public long UpdatedAt { get; set; }

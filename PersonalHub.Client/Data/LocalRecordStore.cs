@@ -44,6 +44,11 @@ namespace PersonalHub.Client.Data
 
             // R7.2：问题卡加分类标签（与事件卡共用词表）。老行补空串。
             ("problems",      "Tag",       "TEXT NOT NULL DEFAULT ''"),
+
+            // R8：想法「升成信念」+ 拼词练习计数。老行补 0（bool / int / long 都读得动）。
+            ("ideas",         "IsBelief",       "INTEGER NOT NULL DEFAULT 0"),
+            ("ideas",         "PracticeCount",  "INTEGER NOT NULL DEFAULT 0"),
+            ("ideas",         "LastPracticedAt","INTEGER NOT NULL DEFAULT 0"),
         };
 
         /// <summary>
