@@ -1,3 +1,4 @@
+using System.Text;
 using PersonalHub.Client.Controls;
 using PersonalHub.Client.Data;
 using PersonalHub.Client.Services;
@@ -86,6 +87,26 @@ namespace PersonalHub.Client
 
         /// <summary>上一张卡片属于哪一天（自然日起点，毫秒）。null = 还没有，或时间未知那组。</summary>
         private long? _lastDayKey;
+
+        // ============================================================
+        // 搜索（R8.1）
+        // ============================================================
+
+        /// <summary>搜索框原文，用来回显条件。</summary>
+        private string _search = string.Empty;
+
+        /// <summary>解析后的词：必须包含的 / 必须排除的。</summary>
+        private List<string> _searchTerms = new();
+        private List<string> _searchExcludes = new();
+
+        /// <summary>输入防抖：每敲一个字就重建 100 张卡会明显卡手。</summary>
+        private CancellationTokenSource? _searchDebounce;
+
+        /// <summary>本轮渲染出来的卡片，供 ↑↓ 跳转与高亮。</summary>
+        private readonly List<View> _renderedCards = new();
+
+        /// <summary>当前停在第几个命中（0 基）。</summary>
+        private int _hitIndex;
 
         public IdeaListPage(
             LocalRecordStore<LocalIdea> ideas,
@@ -330,49 +351,83 @@ namespace PersonalHub.Client
             var render = snap.Filtered.Take(_renderLimit).ToList();
 
             _lastDayKey = null;          // 整页重建，日期分节从头算
+            _renderedCards.Clear();
             IdeaRows.Children.Clear();
             RenderWithDayHeaders(render);
 
             // 还有没显示的才给按钮。全部显示完就不留一个永远点不动的"更早"
             MoreBtn.IsVisible = snap.Filtered.Count > render.Count;
 
+            bool searching = _searchTerms.Count > 0 || _searchExcludes.Count > 0;
+
+            // 搜索时范围让位给「全库搜」，按钮上直说 —— 否则"明明有却搜不到"会被当成 bug
+            RangeBtn.Text = searching ? "搜索中 · 全库" : $"范围：{_range.Label}";
+
+            bool canJump = searching && render.Count > 0;
+
+            // 词改窄了之后原来的下标可能越界，回到第一条
+            if (_hitIndex >= render.Count) _hitIndex = 0;
+
+            PrevHitBtn.IsVisible = canJump;
+            NextHitBtn.IsVisible = canJump;
+            HitLabel.Text = searching
+                ? (render.Count == 0 ? "0/0" : $"{_hitIndex + 1}/{render.Count}")
+                : string.Empty;
+
             EmptyLabel.IsVisible = render.Count == 0;
             EmptyLabel.Text = snap.All.Count == 0
                 ? "库里还是空的。回上一页写一句就有一条 —— 不需要组织语言。"
-                : snap.Scope.Count == 0
-                    ? $"{_range.Label}里没有想法。换个范围就能看到更早的。"
-                    : _beliefOnly
-                        ? "这个范围里还没有信念。在想法行上点「↑ 信念」，把值得反复刻的那句挑出来。"
-                    : _doneOnly
-                        ? "这个范围里还没有标成「已落实」的想法。它不是待办，标不标都行。"
-                        : "这个筛选下还没有想法。";
+                : searching && snap.HitsBeforeChips == 0
+                    ? "没搜到。试试少一个词，或者去掉 - 开头的排除词。"
+                    : searching && snap.HitsBeforeChips > 0
+                        ? $"搜到 {snap.HitsBeforeChips} 条，但被上面的类型/信念筛选排掉了。点一下「全部」就能看到。"
+                        : snap.Scope.Count == 0
+                            ? $"{_range.Label}里没有想法。换个范围就能看到更早的。"
+                            : _beliefOnly
+                                ? "这个范围里还没有信念。在想法行上点「↑ 信念」，把值得反复刻的那句挑出来。"
+                                : _doneOnly
+                                    ? "这个范围里还没有标成「已落实」的想法。它不是待办，标不标都行。"
+                                    : "这个筛选下还没有想法。";
 
             CountLabel.Text = snap.All.Count == 0
                 ? string.Empty
                 : BuildCountText(snap, render);
 
+            ApplyHitHighlight();
+
             await RefreshStatusAsync();
         }
 
-        private sealed record Snapshot(List<LocalIdea> All, List<LocalIdea> Scope, List<LocalIdea> Filtered);
+        private sealed record Snapshot(List<LocalIdea> All, List<LocalIdea> Scope, List<LocalIdea> Filtered, int HitsBeforeChips);
 
         /// <summary>
         /// 读库 + 套范围 + 套筛选。范围先切、筛选后套（原因见 LoadAsync 里的注释）。
         /// 抽出来是因为「更早」也要重算一遍，两边必须用同一个口径。
+        ///
+        /// 搜索是唯一一个**越过范围**的口径：范围是"翻着看"用的，搜东西时它只会让你
+        /// 搜不到半年前那条明明存在的想法。所以有搜索词时直接拿全库。
         /// </summary>
         private async Task<Snapshot> QueryAsync()
         {
             var all = await _ideas.GetByRangeAsync(0, long.MaxValue);
-            var scope = ApplyRange(all);
+
+            bool searching = _searchTerms.Count > 0 || _searchExcludes.Count > 0;
+
+            var scope = searching
+                ? all.OrderByDescending(x => x.CreatedAt).ToList()
+                : ApplyRange(all);
+
+            var hits = searching ? scope.Where(Matches).ToList() : scope;
+            int hitsBeforeChips = hits.Count;
 
             var filtered = _filter < 0
-                ? scope
-                : scope.Where(x => x.Kind == _filter).ToList();
+                ? hits
+                : hits.Where(x => x.Kind == _filter).ToList();
 
             if (_doneOnly) filtered = filtered.Where(x => x.Done).ToList();
             if (_beliefOnly) filtered = filtered.Where(x => x.IsBelief).ToList();
 
-            return new Snapshot(all, scope, filtered);
+            return new Snapshot(all, scope, filtered, hitsBeforeChips);
         }
 
         /// <summary>
@@ -391,6 +446,11 @@ namespace PersonalHub.Client
 
             MoreBtn.IsVisible = snap.Filtered.Count > already + extra.Count;
             CountLabel.Text = BuildCountText(snap, snap.Filtered.Take(already + extra.Count).ToList());
+
+            // 追加之后命中总数变了，↑↓ 的 "N" 跟着变
+            ApplyHitHighlight();
+            if (_searchTerms.Count > 0 || _searchExcludes.Count > 0)
+                HitLabel.Text = $"{_hitIndex + 1}/{_renderedCards.Count}";
         }
 
         /// <summary>
@@ -411,7 +471,9 @@ namespace PersonalHub.Client
                     _lastDayKey = day;
                 }
 
-                IdeaRows.Children.Add(BuildCard(idea));
+                var card = BuildCard(idea);
+                _renderedCards.Add(card);
+                IdeaRows.Children.Add(card);
             }
         }
 
@@ -447,6 +509,17 @@ namespace PersonalHub.Client
 
         private string BuildCountText(Snapshot snap, List<LocalIdea> render)
         {
+            // 搜索时先说"我在哪儿搜、命中了多少"，否则下面那几个数会被当成莫名其妙
+            bool searching = _searchTerms.Count > 0 || _searchExcludes.Count > 0;
+
+            if (searching)
+            {
+                string s = $"全库 {snap.All.Count} 条 · 搜索「{_search.Trim()}」· 命中 {snap.HitsBeforeChips} 条";
+                if (snap.Filtered.Count != snap.HitsBeforeChips) s += $" · 叠加筛选后 {snap.Filtered.Count} 条";
+                if (render.Count < snap.Filtered.Count) s += $" · 显示 {render.Count} 条";
+                return s;
+            }
+
             int unclassified = snap.Scope.Count(x => x.Kind == IdeaKinds.Unclassified);
             int converted = snap.Scope.Count(x => !string.IsNullOrEmpty(x.GoalId));
             int done = snap.Scope.Count(x => x.Done);
@@ -468,18 +541,12 @@ namespace PersonalHub.Client
             return head;
         }
 
-        private View BuildCard(LocalIdea idea)
+        private Border BuildCard(LocalIdea idea)
         {
             var info = new VerticalStackLayout { Spacing = 4 };
 
             // 点一下就地展开（短）或弹阅读卡（长）。想法没有详情页，所以这里是唯一读全文的地方。
-            info.Children.Add(TextPeek.Attach(new Label
-            {
-                Text = idea.Text,
-                FontSize = 14,
-                LineBreakMode = LineBreakMode.TailTruncation,
-                MaxLines = 4,
-            }));
+            info.Children.Add(BuildBody(idea));
 
             // 卡片上只写几点几分：日期由上面的分节标题给，不重复
             string meta = $"{IdeaKinds.LabelOf(idea.Kind)} · {FormatClock(idea.CreatedAt)}";
@@ -609,6 +676,155 @@ namespace PersonalHub.Client
             };
         }
 
+        /// <summary>
+        /// 正文：有搜索词时把命中的片段高亮。
+        ///
+        /// 注意 TextPeek 的默认取文是 <c>() => label.Text</c>，而用了 FormattedText 之后
+        /// label.Text 是空的 —— 必须显式把原文传进去，否则"点一下看全文"会点了没反应。
+        /// </summary>
+        private Label BuildBody(LocalIdea idea)
+        {
+            var label = new Label
+            {
+                FontSize = 14,
+                LineBreakMode = LineBreakMode.TailTruncation,
+                MaxLines = 4,
+            };
+
+            string text = idea.Text ?? string.Empty;
+            var ranges = MatchRanges(text);
+
+            if (ranges.Count == 0)
+            {
+                label.Text = text;
+            }
+            else
+            {
+                var formatted = new FormattedString();
+                int pos = 0;
+
+                foreach (var (start, length) in ranges)
+                {
+                    if (start > pos)
+                        formatted.Spans.Add(new Span { Text = text.Substring(pos, start - pos) });
+
+                    // 高亮 Span 必须显式给颜色：深色主题下不写 TextColor 会变成浅字压浅底
+                    formatted.Spans.Add(new Span
+                    {
+                        Text = text.Substring(start, length),
+                        TextColor = Color.FromArgb("#412402"),
+                        BackgroundColor = Color.FromArgb("#FAC775"),
+                    });
+
+                    pos = start + length;
+                }
+
+                if (pos < text.Length)
+                    formatted.Spans.Add(new Span { Text = text.Substring(pos) });
+
+                label.FormattedText = formatted;
+            }
+
+            return TextPeek.Attach(label, () => idea.Text);
+        }
+
+        /// <summary>一条想法是否满足全部包含词、且不含任何排除词。</summary>
+        private bool Matches(LocalIdea idea)
+        {
+            string text = idea.Text ?? string.Empty;
+
+            foreach (var t in _searchExcludes)
+                if (text.Contains(t, StringComparison.OrdinalIgnoreCase)) return false;
+
+            foreach (var t in _searchTerms)
+                if (!text.Contains(t, StringComparison.OrdinalIgnoreCase)) return false;
+
+            return true;
+        }
+
+        /// <summary>找出所有命中片段（只算"必须包含"的词），合并重叠，按位置排序。</summary>
+        private List<(int Start, int Length)> MatchRanges(string text)
+        {
+            var found = new List<(int Start, int Length)>();
+
+            if (_searchTerms.Count == 0 || text.Length == 0) return found;
+
+            foreach (var term in _searchTerms)
+            {
+                if (term.Length == 0) continue;
+
+                int from = 0;
+
+                while (from <= text.Length - term.Length)
+                {
+                    int at = text.IndexOf(term, from, StringComparison.OrdinalIgnoreCase);
+                    if (at < 0) break;
+
+                    found.Add((at, term.Length));
+                    from = at + term.Length;
+                }
+            }
+
+            if (found.Count == 0) return found;
+
+            found.Sort((a, b) => a.Start.CompareTo(b.Start));
+
+            var merged = new List<(int Start, int Length)>();
+
+            foreach (var r in found)
+            {
+                if (merged.Count == 0)
+                {
+                    merged.Add(r);
+                    continue;
+                }
+
+                var last = merged[^1];
+                int lastEnd = last.Start + last.Length;
+
+                if (r.Start <= lastEnd)
+                {
+                    int end = Math.Max(lastEnd, r.Start + r.Length);
+                    merged[^1] = (last.Start, end - last.Start);
+                }
+                else
+                {
+                    merged.Add(r);
+                }
+            }
+
+            return merged;
+        }
+
+        /// <summary>把当前停的那张卡描粗一点。搜索时才有意义。</summary>
+        private void ApplyHitHighlight()
+        {
+            bool searching = _searchTerms.Count > 0 || _searchExcludes.Count > 0;
+
+            for (int i = 0; i < _renderedCards.Count; i++)
+            {
+                if (_renderedCards[i] is not Border card) continue;
+
+                bool current = searching && i == _hitIndex;
+
+                card.Stroke = Color.FromArgb(current ? "#185FA5" : "#E3E0D8");
+                card.StrokeThickness = current ? 2 : 1;
+            }
+        }
+
+        private async Task MoveHitAsync(int delta)
+        {
+            if (_renderedCards.Count == 0) return;
+
+            int count = _renderedCards.Count;
+            _hitIndex = (_hitIndex + delta + count) % count;
+
+            ApplyHitHighlight();
+            HitLabel.Text = $"{_hitIndex + 1}/{count}";
+
+            await PageScroll.ScrollToAsync(_renderedCards[_hitIndex], ScrollToPosition.Center, true);
+        }
+
         /// <summary>「10月21日」这种短日期，给"落实时间"用 —— 它只需要到天。</summary>
         private static string FormatDay(long ms)
         {
@@ -654,6 +870,114 @@ namespace PersonalHub.Client
             if (sender is not Button b || b.CommandParameter is not string id) return;
 
             await Shell.Current.GoToAsync($"{RecordCatalog.BeliefGameRoute}?id={Uri.EscapeDataString(id)}");
+        }
+
+        // ============================================================
+        // 搜索（R8.1）
+        // ============================================================
+
+        /// <summary>
+        /// 输入即筛，150ms 防抖 —— 每敲一个字就重建 100 张卡会明显卡手。
+        /// 防抖用 CTS 取消上一次：后一次输入把前一次的等待干掉，只有最后一次真正落库。
+        /// </summary>
+        private async void OnSearchTextChanged(object? sender, TextChangedEventArgs e)
+        {
+            _searchDebounce?.Cancel();
+            _searchDebounce?.Dispose();
+
+            var cts = new CancellationTokenSource();
+            _searchDebounce = cts;
+
+            try
+            {
+                await Task.Delay(150, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            if (cts.IsCancellationRequested) return;
+
+            _search = e.NewTextValue ?? string.Empty;
+            (_searchTerms, _searchExcludes) = ParseSearch(_search);
+
+            _renderLimit = PageSize;
+            _hitIndex = 0;
+
+            await LoadAsync();
+        }
+
+        /// <summary>回车 = 看下一个命中，跟 VS 的 F3 一个意思。</summary>
+        private async void OnSearchCompleted(object? sender, EventArgs e)
+        {
+            await MoveHitAsync(1);
+        }
+
+        private async void OnPrevHitClicked(object? sender, EventArgs e)
+        {
+            await MoveHitAsync(-1);
+        }
+
+        private async void OnNextHitClicked(object? sender, EventArgs e)
+        {
+            await MoveHitAsync(1);
+        }
+
+        /// <summary>
+        /// 解析搜索语法（v1，只有三条）：
+        ///   `沟通 开会`   → 必须同时包含两个词
+        ///   `沟通 -杠精`  → 含"沟通"，且不含"杠精"
+        ///   `"先做重要"`  → 整串短语（中间带空格也不会被切开）
+        /// 中文不分词，直接子串匹配就够 —— 想法都是一两句话，词就是字。
+        /// </summary>
+        private static (List<string> Terms, List<string> Excludes) ParseSearch(string raw)
+        {
+            var terms = new List<string>();
+            var excludes = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(raw)) return (terms, excludes);
+
+            var buffer = new StringBuilder();
+            bool quoted = false;
+
+            void Flush()
+            {
+                if (buffer.Length == 0) return;
+
+                string token = buffer.ToString().Trim();
+                buffer.Clear();
+
+                // 光一个减号没有意义，别让它变成一个永远搜不到的词
+                if (token.Length == 0 || token == "-") return;
+
+                if (token.Length > 1 && token[0] == '-') excludes.Add(token[1..].Trim());
+                else terms.Add(token);
+            }
+
+            foreach (char ch in raw)
+            {
+                if (ch == '"' || ch == '“' || ch == '”')
+                {
+                    quoted = !quoted;
+                    continue;
+                }
+
+                if (!quoted && char.IsWhiteSpace(ch))
+                {
+                    Flush();
+                    continue;
+                }
+
+                buffer.Append(ch);
+            }
+
+            Flush();
+
+            terms.RemoveAll(t => t.Length == 0);
+            excludes.RemoveAll(t => t.Length == 0);
+
+            return (terms, excludes);
         }
 
         // ============================================================

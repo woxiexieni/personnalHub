@@ -4,11 +4,67 @@
              x:Class="PersonalHub.Client.IdeaListPage"
              Title="想法库">
 
-    <ScrollView>
+    <ScrollView x:Name="PageScroll">
         <VerticalStackLayout Padding="20,12" Spacing="12">
 
             <Label Text="这里是原材料仓库。没有「未处理」计数，也没有清空进度 —— 攒着不发霉才叫库。"
                    FontSize="12" TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
+
+            <!--
+                搜索常驻（不折叠）：这页的用法就是"随手翻找"，多一次点击不值。
+                ↑ ↓ 在命中条之间跳，命中的词在卡片正文里高亮。
+                语法只有三条：空格 = 同时包含；-词 = 排除；"短语" = 整串。
+            -->
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
+                <Border Grid.Column="0"
+                        Stroke="#E3E0D8" StrokeThickness="1" Padding="10,0">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="10"/>
+                    </Border.StrokeShape>
+                    <Entry x:Name="SearchEntry"
+                           Placeholder="搜想法…  空格=同时包含，-词=排除"
+                           FontSize="13"
+                           HeightRequest="40"
+                           ReturnType="Next"
+                           TextChanged="OnSearchTextChanged"
+                           Completed="OnSearchCompleted"/>
+                </Border>
+
+                <Button Grid.Column="1"
+                        x:Name="PrevHitBtn"
+                        Text="↑"
+                        IsVisible="False"
+                        FontSize="14"
+                        WidthRequest="36"
+                        HeightRequest="40"
+                        Padding="0"
+                        CornerRadius="10"
+                        BackgroundColor="#F1EFE8"
+                        TextColor="#2C2C2A"
+                        Clicked="OnPrevHitClicked"/>
+
+                <Button Grid.Column="2"
+                        x:Name="NextHitBtn"
+                        Text="↓"
+                        IsVisible="False"
+                        FontSize="14"
+                        WidthRequest="36"
+                        HeightRequest="40"
+                        Padding="0"
+                        CornerRadius="10"
+                        BackgroundColor="#F1EFE8"
+                        TextColor="#2C2C2A"
+                        Clicked="OnNextHitClicked"/>
+
+                <Label Grid.Column="3"
+                       x:Name="HitLabel"
+                       Text=""
+                       FontSize="11"
+                       TextColor="{StaticResource Gray500}"
+                       MinimumWidthRequest="42"
+                       HorizontalTextAlignment="Center"
+                       VerticalTextAlignment="Center"/>
+            </Grid>
 
             <FlexLayout x:Name="FilterChips"
                         Wrap="Wrap" Direction="Row"
