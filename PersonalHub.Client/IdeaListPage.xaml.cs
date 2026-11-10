@@ -432,7 +432,7 @@ namespace PersonalHub.Client
                             : _voidedOnly
                                 ? "这个范围里还没有作废的想法。在想法行的「⋯」菜单里可以作废。"
                                 : _beliefOnly
-                                ? "这个范围里还没有信念。在想法行上点「↑ 信念」，把值得反复刻的那句挑出来。"
+                                ? "这个范围里还没有信念。在想法行的「⋯」菜单里「升为信念」，把值得反复刻的那句挑出来。"
                                 : _doneOnly
                                     ? "这个范围里还没有标成「已落实」的想法。它不是待办，标不标都行。"
                                     : "这个筛选下还没有想法。";
@@ -670,40 +670,24 @@ namespace PersonalHub.Client
             }
             else
             {
-                // 信念：还没升的给「↑ 信念」，升了的给「拼词 N 次」直接进场 ——
-                // 场次写在按钮上，不用点进去才知道练过几次。
+                // 信念行只留「拼一遍」进场；「升为信念」收进了「⋯」菜单，
+                // 卡片上少一个低频按钮，扫起来更干净。
                 if (idea.IsBelief)
-            {
-                var play = new Button
                 {
-                    Text = idea.PracticeCount > 0 ? $"拼词 {idea.PracticeCount} 次" : "拼一遍",
-                    FontSize = 11,
-                    HeightRequest = 30,
-                    Padding = new Thickness(10, 0),
-                    CornerRadius = 8,
-                    BackgroundColor = Color.FromArgb("#FAEEDA"),
-                    TextColor = Color.FromArgb("#854F0B"),
-                    CommandParameter = idea.Id,
-                };
-                play.Clicked += OnPlayBeliefClicked;
-                actions.Children.Add(play);
-            }
-            else
-            {
-                var belief = new Button
-                {
-                    Text = "↑ 信念",
-                    FontSize = 11,
-                    HeightRequest = 30,
-                    Padding = new Thickness(10, 0),
-                    CornerRadius = 8,
-                    BackgroundColor = Color.FromArgb("#F1EFE8"),
-                    TextColor = Color.FromArgb("#5F5E5A"),
-                    CommandParameter = idea.Id,
-                };
-                belief.Clicked += OnMakeBeliefClicked;
-                actions.Children.Add(belief);
-            }
+                    var play = new Button
+                    {
+                        Text = idea.PracticeCount > 0 ? $"拼词 {idea.PracticeCount} 次" : "拼一遍",
+                        FontSize = 11,
+                        HeightRequest = 30,
+                        Padding = new Thickness(10, 0),
+                        CornerRadius = 8,
+                        BackgroundColor = Color.FromArgb("#FAEEDA"),
+                        TextColor = Color.FromArgb("#854F0B"),
+                        CommandParameter = idea.Id,
+                    };
+                    play.Clicked += OnPlayBeliefClicked;
+                    actions.Children.Add(play);
+                }
 
             if (string.IsNullOrEmpty(idea.GoalId))
             {
@@ -934,33 +918,28 @@ namespace PersonalHub.Client
         }
 
         // ============================================================
-        // 信念（R8，纯本地，不上服务端）
+        // 信念（R8 起；标记上服务端，见 RecordExtentions ↔ Idea 映射）
         // ============================================================
 
         /// <summary>
-        /// 「↑ 信念」：先标成信念再进场。
+        /// 「⋯」菜单 →「升为信念」：只标记，不进场。
         ///
-        /// 先标后玩 —— 万一玩到一半退出去，这句也已经进了信念清单，下次从按钮上
-        /// 「拼一遍」还能接着来。次数只在拼对时才加，所以不会虚高。
+        /// 菜单动作的语义是"把这句挑出来"，跟「标记已落实」一样是轻动作；
+        /// 想玩拼词时点卡片上的「拼一遍」即可，不在菜单里偷偷带一个人跳页。
+        /// 次数只在拼对时才加，所以标记本身不会虚高。
         /// </summary>
-        private async void OnMakeBeliefClicked(object? sender, EventArgs e)
+        private async Task MakeBeliefAsync(LocalIdea idea)
         {
-            if (sender is not Button b || b.CommandParameter is not string id) return;
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-            var idea = await _ideas.FindAsync(id);
-            if (idea is null) return;
+            idea.IsBelief = true;
+            idea.UpdatedAt = now;
+            idea.Synced = false;
+            await _ideas.UpdateAsync(idea);
+            await LoadAsync();
 
-            if (!idea.IsBelief)
-            {
-                long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                idea.IsBelief = true;
-                idea.UpdatedAt = now;
-                idea.Synced = false;
-                await _ideas.UpdateAsync(idea);
-                _ = _ideaSync.SyncAsync();          // is_belief 上服务端，换机不丢
-            }
-
-            await Shell.Current.GoToAsync($"{RecordCatalog.BeliefGameRoute}?id={Uri.EscapeDataString(id)}");
+            StatusLabel.Text = "已标成信念。卡片上的「拼一遍」随时进场。";
+            _ = _ideaSync.SyncAsync();          // is_belief 上服务端，换机不丢
         }
 
         private async void OnPlayBeliefClicked(object? sender, EventArgs e)
@@ -1158,8 +1137,14 @@ namespace PersonalHub.Client
             string doneAction = idea.Done ? "取消已落实" : "标记已落实";
             string voidAction = idea.IsVoided ? "取消作废" : "作废";
 
+            // 「升为信念」只在没升、也没作废时出现 —— 废案不该再产生新动作。
+            var options = new List<string> { doneAction, voidAction };
+            if (!idea.IsBelief && !idea.IsVoided) options.Add("↑ 信念");
+            options.Add("改类型");
+            options.Add("删除");
+
             string pick = await DisplayActionSheet(
-                Shorten(idea.Text, 24), "取消", null, doneAction, voidAction, "改类型", "删除");
+                Shorten(idea.Text, 24), "取消", null, options.ToArray());
 
             switch (pick)
             {
@@ -1171,6 +1156,10 @@ namespace PersonalHub.Client
                 case "作废":
                 case "取消作废":
                     await ToggleVoidAsync(idea);
+                    break;
+
+                case "↑ 信念":
+                    await MakeBeliefAsync(idea);
                     break;
 
                 case "改类型":
