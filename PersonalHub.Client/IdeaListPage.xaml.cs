@@ -270,7 +270,7 @@ namespace PersonalHub.Client
                 HeightRequest = 32,
                 Padding = new Thickness(13, 0),
                 CornerRadius = 16,
-                Margin = new Thickness(0, 0, 8, 8),
+                Margin = new Thickness(0, 0, 4, 4),
             };
 
             StyleDoneChip(chip);
@@ -305,7 +305,7 @@ namespace PersonalHub.Client
                 HeightRequest = 32,
                 Padding = new Thickness(13, 0),
                 CornerRadius = 16,
-                Margin = new Thickness(0, 0, 8, 8),
+                Margin = new Thickness(0, 0, 4, 4),
                 CommandParameter = kind,
             };
 
