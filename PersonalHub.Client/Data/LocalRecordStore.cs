@@ -49,6 +49,10 @@ namespace PersonalHub.Client.Data
             ("ideas",         "IsBelief",       "INTEGER NOT NULL DEFAULT 0"),
             ("ideas",         "PracticeCount",  "INTEGER NOT NULL DEFAULT 0"),
             ("ideas",         "LastPracticedAt","INTEGER NOT NULL DEFAULT 0"),
+
+            // R8.2：想法「作废」。老行补 0。
+            ("ideas",         "IsVoided",  "INTEGER NOT NULL DEFAULT 0"),
+            ("ideas",         "VoidedAt",  "INTEGER NOT NULL DEFAULT 0"),
         };
 
         /// <summary>

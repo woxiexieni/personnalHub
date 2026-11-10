@@ -17,11 +17,17 @@ namespace PersonalHub.Client
     ///
     /// 唯一落库的东西：IsBelief / PracticeCount / LastPracticedAt（纯本地，见 LocalIdea）。
     /// </summary>
+    /// 
+
+
+
     [QueryProperty(nameof(IdeaId), "id")]
     public partial class BeliefGamePage : ContentPage
     {
         /// <summary>切块时认作"断句点"的字符。中英文标点都算，空格也算。</summary>
         private const string BreakChars = "，。；！？、：,.!?;:…—\n\r\t（）()《》【】<>\"'“”‘’ ";
+
+        const int maxLen = 1;
 
         /// <summary>
         /// 长段再切时，优先在这些虚词后面断（读起来不会劈开一个词）。
@@ -294,7 +300,8 @@ namespace PersonalHub.Client
         /// </summary>
         private static List<string> Chunk(string text)
         {
-            const int maxLen = 5;
+            
+     
 
             var chunks = new List<string>();
 

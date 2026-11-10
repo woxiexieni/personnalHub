@@ -59,6 +59,9 @@ namespace PersonalHub.Client
         /// <summary>信念用的琥珀色：跟"已落实"区分开，也别跟类型筛选抢眼。</summary>
         private static readonly Color BeliefColor = Color.FromArgb("#BA7517");
 
+        /// <summary>作废用的红：对应缺陷单里「作废」那行的观感 —— 不是错误红，是"这行不用看了"的红。</summary>
+        private static readonly Color VoidedColor = Color.FromArgb("#C4372C");
+
         private readonly LocalRecordStore<LocalIdea> _ideas;
         private readonly LocalRecordStore<LocalGoal> _goals;
         private readonly RecordSyncService<LocalIdea> _ideaSync;
@@ -78,6 +81,9 @@ namespace PersonalHub.Client
 
         /// <summary>只看信念（R8）。跟「已落实」一样是视角开关，不是流程状态。</summary>
         private bool _beliefOnly;
+
+        /// <summary>只看作废的（R8.2）。平时作废的混在列表里（灰字删除线），这个开关专门翻它们。</summary>
+        private bool _voidedOnly;
 
         /// <summary>当前范围。默认按数量取最近 100 条：想"再看一点"比想"某一天"常见得多。</summary>
         private IdeaRange _range = Ranges[0];
@@ -170,6 +176,46 @@ namespace PersonalHub.Client
 
             AddDoneChip();
             AddBeliefChip();
+            AddVoidedChip();
+        }
+
+        /// <summary>
+        /// 「作废」开关（R8.2）。跟「已落实」「信念」同款：独立一维视角，不是类型。
+        /// 平时作废的行就混在列表里（灰字删除线），这个 chip 是"专门翻废案"时用的。
+        /// </summary>
+        private void AddVoidedChip()
+        {
+            var chip = new Button
+            {
+                Text = "✕ 作废",
+                FontSize = 12,
+                HeightRequest = 32,
+                Padding = new Thickness(13, 0),
+                CornerRadius = 16,
+                Margin = new Thickness(0, 0, 8, 8),
+            };
+
+            StyleVoidedChip(chip);
+            chip.Clicked += OnVoidedFilterClicked;
+            FilterChips.Children.Add(chip);
+        }
+
+        private void StyleVoidedChip(Button chip)
+        {
+            chip.BackgroundColor = _voidedOnly ? VoidedColor : ChipBg;
+            chip.TextColor = _voidedOnly ? Colors.White : ChipText;
+            chip.BorderWidth = 0;
+        }
+
+        private async void OnVoidedFilterClicked(object? sender, EventArgs e)
+        {
+            if (sender is not Button chip) return;
+
+            _voidedOnly = !_voidedOnly;
+            StyleVoidedChip(chip);
+
+            _renderLimit = PageSize;
+            await LoadAsync();
         }
 
         /// <summary>
@@ -383,7 +429,9 @@ namespace PersonalHub.Client
                         ? $"搜到 {snap.HitsBeforeChips} 条，但被上面的类型/信念筛选排掉了。点一下「全部」就能看到。"
                         : snap.Scope.Count == 0
                             ? $"{_range.Label}里没有想法。换个范围就能看到更早的。"
-                            : _beliefOnly
+                            : _voidedOnly
+                                ? "这个范围里还没有作废的想法。在想法行的「⋯」菜单里可以作废。"
+                                : _beliefOnly
                                 ? "这个范围里还没有信念。在想法行上点「↑ 信念」，把值得反复刻的那句挑出来。"
                                 : _doneOnly
                                     ? "这个范围里还没有标成「已落实」的想法。它不是待办，标不标都行。"
@@ -426,6 +474,7 @@ namespace PersonalHub.Client
 
             if (_doneOnly) filtered = filtered.Where(x => x.Done).ToList();
             if (_beliefOnly) filtered = filtered.Where(x => x.IsBelief).ToList();
+            if (_voidedOnly) filtered = filtered.Where(x => x.IsVoided).ToList();
 
             return new Snapshot(all, scope, filtered, hitsBeforeChips);
         }
@@ -524,6 +573,7 @@ namespace PersonalHub.Client
             int converted = snap.Scope.Count(x => !string.IsNullOrEmpty(x.GoalId));
             int done = snap.Scope.Count(x => x.Done);
             int beliefs = snap.Scope.Count(x => x.IsBelief);
+            int voided = snap.Scope.Count(x => x.IsVoided);
 
             // 头一段永远先说"这一页是什么口径"：范围一换，条数变化才有解释，
             // 否则用户看到 12 条 → 3 条，会以为数据丢了。
@@ -536,6 +586,7 @@ namespace PersonalHub.Client
             if (converted > 0) head += $" · 已转成目标 {converted} 条";
             if (done > 0) head += $" · 已落实 {done} 条";
             if (beliefs > 0) head += $" · 信念 {beliefs} 条";
+            if (voided > 0) head += $" · 已作废 {voided} 条";
             if (render.Count < snap.Filtered.Count) head += $" · 显示 {render.Count} 条";
 
             return head;
@@ -579,6 +630,18 @@ namespace PersonalHub.Client
                 });
             }
 
+            // 作废单独占一行：红色，学缺陷单那行「作废」——扫过去先看到它，正文就不用读了
+            if (idea.IsVoided)
+            {
+                info.Children.Add(new Label
+                {
+                    Text = "✕ 已作废" + (idea.VoidedAt > 0 ? " · " + FormatDay(idea.VoidedAt) : string.Empty),
+                    FontSize = 11,
+                    TextColor = VoidedColor,
+                    FontAttributes = FontAttributes.Bold,
+                });
+            }
+
             info.Children.Add(new Label
             {
                 Text = meta,
@@ -588,9 +651,28 @@ namespace PersonalHub.Client
 
             var actions = new VerticalStackLayout { Spacing = 6, VerticalOptions = LayoutOptions.Start };
 
-            // 信念：还没升的给「↑ 信念」，升了的给「拼词 N 次」直接进场 ——
-            // 场次写在按钮上，不用点进去才知道练过几次。
-            if (idea.IsBelief)
+            if (idea.IsVoided)
+            {
+                // 作废的行：信念/转目标都收掉 —— 废案不该再产生新动作，只留"恢复"和"⋯"
+                var restore = new Button
+                {
+                    Text = "恢复",
+                    FontSize = 11,
+                    HeightRequest = 30,
+                    Padding = new Thickness(10, 0),
+                    CornerRadius = 8,
+                    BackgroundColor = Color.FromArgb("#F1EFE8"),
+                    TextColor = Color.FromArgb("#5F5E5A"),
+                    CommandParameter = idea.Id,
+                };
+                restore.Clicked += OnRestoreClicked;
+                actions.Children.Add(restore);
+            }
+            else
+            {
+                // 信念：还没升的给「↑ 信念」，升了的给「拼词 N 次」直接进场 ——
+                // 场次写在按钮上，不用点进去才知道练过几次。
+                if (idea.IsBelief)
             {
                 var play = new Button
                 {
@@ -639,6 +721,7 @@ namespace PersonalHub.Client
                 convert.Clicked += OnConvertClicked;
                 actions.Children.Add(convert);
             }
+            }   // else（非作废）分支结束
 
             var more = new Button
             {
@@ -692,6 +775,17 @@ namespace PersonalHub.Client
             };
 
             string text = idea.Text ?? string.Empty;
+
+            // 作废的行：灰字 + 删除线，不再做命中高亮 ——
+            // 废案不值得扫读，高亮的琥珀底反而会把它衬得太显眼。
+            if (idea.IsVoided)
+            {
+                label.Text = text;
+                label.TextColor = Color.FromArgb("#9A9A96");
+                label.TextDecorations = TextDecorations.Strikethrough;//中位线
+                return TextPeek.Attach(label, () => idea.Text);
+            }
+
             var ranges = MatchRanges(text);
 
             if (ranges.Count == 0)
@@ -1058,15 +1152,21 @@ namespace PersonalHub.Client
             // 菜单项跟着当前状态变：已经落实的给"取消已落实"，没落实的给"标记已落实"。
             // 用两个不同的词而不是一个开关项，是因为开关项要人先读一遍才知道现在是哪一边。
             string doneAction = idea.Done ? "取消已落实" : "标记已落实";
+            string voidAction = idea.IsVoided ? "取消作废" : "作废";
 
             string pick = await DisplayActionSheet(
-                Shorten(idea.Text, 24), "取消", null, doneAction, "改类型", "删除");
+                Shorten(idea.Text, 24), "取消", null, doneAction, voidAction, "改类型", "删除");
 
             switch (pick)
             {
                 case "标记已落实":
                 case "取消已落实":
                     await ToggleDoneAsync(idea);
+                    break;
+
+                case "作废":
+                case "取消作废":
+                    await ToggleVoidAsync(idea);
                     break;
 
                 case "改类型":
@@ -1109,6 +1209,45 @@ namespace PersonalHub.Client
                 : "已取消落实标记。";
 
             _ = _ideaSync.SyncAsync();
+        }
+
+        // ============================================================
+        // 作废（R8.2，纯本地，不上服务端）
+        // ============================================================
+
+        /// <summary>
+        /// 作废 / 恢复。只改这一个标记，不动正文、不动 Done、不动 GoalId ——
+        /// 作废是"这条想法我不打算认了"，不是"这条想法不存在"。
+        ///
+        /// 与 IsBelief 同一待遇：纯本地，不碰 Synced / UpdatedAt，不触发同步
+        /// （proto 里没有这两个字段，上传也不会带上，白白标脏）。
+        /// </summary>
+        private async Task ToggleVoidAsync(LocalIdea idea)
+        {
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            idea.IsVoided = !idea.IsVoided;
+            idea.VoidedAt = idea.IsVoided ? now : 0;
+
+            await _ideas.UpdateAsync(idea);
+            await LoadAsync();
+
+            StatusLabel.Text = idea.IsVoided
+                ? "已作废。它还在库里（灰字删除线），随时能从「✕ 作废」里翻出来恢复。"
+                : "已恢复成正常想法。";
+
+            // 不触发同步：字段不上服务端，见方法注释
+        }
+
+        /// <summary>作废行上的「恢复」按钮。</summary>
+        private async void OnRestoreClicked(object? sender, EventArgs e)
+        {
+            if (sender is not Button b || b.CommandParameter is not string id) return;
+
+            var idea = await _ideas.FindAsync(id);
+            if (idea is null || !idea.IsVoided) return;
+
+            await ToggleVoidAsync(idea);
         }
 
         private async Task ChangeKindAsync(LocalIdea idea)

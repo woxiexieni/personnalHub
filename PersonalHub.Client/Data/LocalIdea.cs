@@ -62,6 +62,20 @@ namespace PersonalHub.Client.Data
         /// <summary>最后一次拼对的时间（Unix 毫秒）。0 = 没练过。</summary>
         public long LastPracticedAt { get; set; }
 
+        /// <summary>
+        /// 作废：这条想法当时想岔了 / 不想要了，但**不删**。
+        ///
+        /// 为什么不直接删：很多"废"是当时觉得废，过几个月回头看反而是线索；
+        /// 删了就什么都没有了。作废 = 留在库里，但一眼能看出它已经不是活的想法。
+        ///
+        /// 与 IsBelief 同一待遇：纯本地标记，不进 proto、不上服务端 ——
+        /// 换机恢复后这个标记会丢，可以接受（丢的只是"我不想要它"这个判断）。
+        /// </summary>
+        public bool IsVoided { get; set; }
+
+        /// <summary>作废的时刻（Unix 毫秒）。0 = 没作废过。恢复时清 0。</summary>
+        public long VoidedAt { get; set; }
+
         public long CreatedAt { get; set; }
 
         public long UpdatedAt { get; set; }
