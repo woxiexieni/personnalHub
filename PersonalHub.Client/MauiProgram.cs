@@ -118,7 +118,7 @@ namespace PersonalHub.Client
             builder.Services.AddTransient<PatternDetailPage>(); // 模式列表 → 详情（带 ?id=）
             builder.Services.AddTransient<IdeaEntryPage>();     // 目录 → 想法（记一条）
             builder.Services.AddTransient<IdeaListPage>();      // 目录 → 想法库（列表 + 转成目标）
-            builder.Services.AddTransient<BeliefGamePage>();    // 想法行 → 信念拼词（R8，纯本地）
+            builder.Services.AddTransient<BeliefGamePage>();    // 想法行 → 信念拼词（R8；拼对计数 R8.2 起同步）
             builder.Services.AddTransient<ProblemListPage>();   // 目录 → 问题卡（R7.1）
             builder.Services.AddTransient<ProblemEditPage>();   // 问题卡列表/AI 建议立卡 → 建卡/编辑
 

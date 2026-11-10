@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.Maui.Controls.Shapes;
 using PersonalHub.Client.Data;
+using PersonalHub.Client.Services;
 
 namespace PersonalHub.Client
 {
@@ -36,6 +37,7 @@ namespace PersonalHub.Client
         private const string SoftCharBreaks = "的了是在就都也和把被对";
 
         private readonly LocalRecordStore<LocalIdea> _ideas;
+        private readonly RecordSyncService<LocalIdea> _ideaSync;
 
         private LocalIdea? _idea;
         private List<string> _target = new();
@@ -48,10 +50,11 @@ namespace PersonalHub.Client
         /// <summary>由 Shell 的 ?id= 注入。</summary>
         public string IdeaId { get; set; } = string.Empty;
 
-        public BeliefGamePage(LocalRecordStore<LocalIdea> ideas)
+        public BeliefGamePage(LocalRecordStore<LocalIdea> ideas, RecordSyncService<LocalIdea> ideaSync)
         {
             InitializeComponent();
             _ideas = ideas;
+            _ideaSync = ideaSync;
         }
 
         protected override async void OnAppearing()
@@ -247,7 +250,12 @@ namespace PersonalHub.Client
                     _idea.IsBelief = true;
                     _idea.PracticeCount += 1;
                     _idea.LastPracticedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    _idea.UpdatedAt = _idea.LastPracticedAt;
+                    _idea.Synced = false;
                     await _ideas.UpdateAsync(_idea);
+
+                    // 拼对次数上服务端（R8.2 起），换机不丢「刻了多少遍」
+                    _ = _ideaSync.SyncAsync();
                 }
 
                 FeedbackLabel.Text = $"拼上了 · 这是第 {_idea?.PracticeCount ?? 1} 次";

@@ -108,6 +108,24 @@ namespace personalHub.Server.Data
                 p.DoneAt = 0;
             }
 
+            // 作废时间同一口径：恢复（is_voided=false）必须清掉 voided_at，
+            // 否则会留下"看着作废过、其实已经恢复"的记录。
+            if (p.IsVoided)
+            {
+                if (p.VoidedAt == 0) p.VoidedAt = now;
+            }
+            else
+            {
+                p.VoidedAt = 0;
+            }
+
+            // 非信念的行不该留练习痕迹（防上游漏清）；信念的行原样保留计数。
+            if (!p.IsBelief)
+            {
+                p.PracticeCount = 0;
+                p.LastPracticedAt = 0;
+            }
+
             var row = ToRow(p);
             if (old is not null) row.Deleted = old.Deleted;   // 更新不能顺手复活墓碑
 
@@ -241,6 +259,11 @@ namespace personalHub.Server.Data
             Deleted = p.Deleted ? 1 : 0,
             Done = p.Done ? 1 : 0,
             DoneAt = p.Done ? p.DoneAt : 0,
+            IsBelief = p.IsBelief ? 1 : 0,
+            PracticeCount = p.PracticeCount,
+            LastPracticedAt = p.IsBelief ? p.LastPracticedAt : 0,
+            IsVoided = p.IsVoided ? 1 : 0,
+            VoidedAt = p.IsVoided ? p.VoidedAt : 0,
         };
 
         private static Idea ToProto(IdeaRow r) => new()
@@ -254,6 +277,11 @@ namespace personalHub.Server.Data
             Deleted = r.Deleted != 0,
             Done = r.Done != 0,
             DoneAt = r.Done != 0 ? r.DoneAt : 0,
+            IsBelief = r.IsBelief != 0,
+            PracticeCount = r.IsBelief != 0 ? r.PracticeCount : 0,
+            LastPracticedAt = r.IsBelief != 0 ? r.LastPracticedAt : 0,
+            IsVoided = r.IsVoided != 0,
+            VoidedAt = r.IsVoided != 0 ? r.VoidedAt : 0,
         };
 
         /// <summary>GROUP BY 的返回行。</summary>

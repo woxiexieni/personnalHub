@@ -952,8 +952,12 @@ namespace PersonalHub.Client
 
             if (!idea.IsBelief)
             {
+                long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 idea.IsBelief = true;
+                idea.UpdatedAt = now;
+                idea.Synced = false;
                 await _ideas.UpdateAsync(idea);
+                _ = _ideaSync.SyncAsync();          // is_belief 上服务端，换机不丢
             }
 
             await Shell.Current.GoToAsync($"{RecordCatalog.BeliefGameRoute}?id={Uri.EscapeDataString(id)}");
@@ -1212,15 +1216,15 @@ namespace PersonalHub.Client
         }
 
         // ============================================================
-        // 作废（R8.2，纯本地，不上服务端）
+        // 作废（R8.2）
         // ============================================================
 
         /// <summary>
         /// 作废 / 恢复。只改这一个标记，不动正文、不动 Done、不动 GoalId ——
         /// 作废是"这条想法我不打算认了"，不是"这条想法不存在"。
         ///
-        /// 与 IsBelief 同一待遇：纯本地，不碰 Synced / UpdatedAt，不触发同步
-        /// （proto 里没有这两个字段，上传也不会带上，白白标脏）。
+        /// 状态上服务端（R8.2 起）：置 Synced=false 让下次同步把 is_voided 带上去，
+        /// 换机恢复不再丢这个标记。
         /// </summary>
         private async Task ToggleVoidAsync(LocalIdea idea)
         {
@@ -1228,6 +1232,8 @@ namespace PersonalHub.Client
 
             idea.IsVoided = !idea.IsVoided;
             idea.VoidedAt = idea.IsVoided ? now : 0;
+            idea.UpdatedAt = now;
+            idea.Synced = false;
 
             await _ideas.UpdateAsync(idea);
             await LoadAsync();
@@ -1236,7 +1242,7 @@ namespace PersonalHub.Client
                 ? "已作废。它还在库里（灰字删除线），随时能从「✕ 作废」里翻出来恢复。"
                 : "已恢复成正常想法。";
 
-            // 不触发同步：字段不上服务端，见方法注释
+            _ = _ideaSync.SyncAsync();
         }
 
         /// <summary>作废行上的「恢复」按钮。</summary>

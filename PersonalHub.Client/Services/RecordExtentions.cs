@@ -251,6 +251,11 @@ namespace Personalhub
             Deleted = p.Deleted,
             Done = p.Done,
             DoneAt = p.Done ? p.DoneAt : 0,
+            IsBelief = p.IsBelief,
+            PracticeCount = p.IsBelief ? p.PracticeCount : 0,
+            LastPracticedAt = p.IsBelief ? p.LastPracticedAt : 0,
+            IsVoided = p.IsVoided,
+            VoidedAt = p.IsVoided ? p.VoidedAt : 0,
         };
 
         /// <summary>镜像下载用：不设 Synced（下载 ≠ 已上传）。</summary>
@@ -265,6 +270,11 @@ namespace Personalhub
             Deleted = p.Deleted,
             Done = p.Done,
             DoneAt = p.Done ? p.DoneAt : 0,
+            IsBelief = p.IsBelief,
+            PracticeCount = p.IsBelief ? p.PracticeCount : 0,
+            LastPracticedAt = p.IsBelief ? p.LastPracticedAt : 0,
+            IsVoided = p.IsVoided,
+            VoidedAt = p.IsVoided ? p.VoidedAt : 0,
         };
 
         // ============================================================

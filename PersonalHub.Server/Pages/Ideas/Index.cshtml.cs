@@ -38,6 +38,10 @@ namespace PersonalHub.Server.Pages.Ideas
         [BindProperty(SupportsGet = true)]
         public int Done { get; set; } = -1;
 
+        /// <summary>-1 = 全部，1 = 只看信念，2 = 只看作废（R8.2）。</summary>
+        [BindProperty(SupportsGet = true)]
+        public int Flag { get; set; } = -1;
+
         public IReadOnlyList<Idea> Items { get; private set; } = Array.Empty<Idea>();
 
         public IReadOnlyDictionary<int, int> Counts { get; private set; }
@@ -54,6 +58,12 @@ namespace PersonalHub.Server.Pages.Ideas
         /// <summary>已经落实的条数。</summary>
         public int DoneCount { get; private set; }
 
+        /// <summary>信念条数（R8）。</summary>
+        public int BeliefCount { get; private set; }
+
+        /// <summary>作废条数（R8.2）。</summary>
+        public int VoidedCount { get; private set; }
+
         /// <summary>当前筛选下还有多少条没渲染出来。</summary>
         public int Hidden { get; private set; }
 
@@ -64,11 +74,18 @@ namespace PersonalHub.Server.Pages.Ideas
             Linked = _ideas.CountLinked();
             DoneCount = _ideas.CountDone();
 
+            // 信念 / 作废计数：一条全量查询顺带算完，不单独打 SQL
+            var all = _ideas.List(-1, 0, 0, false);
+            BeliefCount = all.Count(x => x.IsBelief);
+            VoidedCount = all.Count(x => x.IsVoided);
+
             // 本周新增用时间窗查，不读全表：想法库会越来越长。
             ThisWeek = _ideas.List(-1, WeekStartMs(), 0, false).Count;
 
             // List 已按 created_at 倒序，这里只截前 PageSize 条。
             var page = _ideas.List(Kind, 0, 0, false, Done);
+            if (Flag == 1) page = page.Where(x => x.IsBelief).ToList();
+            else if (Flag == 2) page = page.Where(x => x.IsVoided).ToList();
             Items = page.Take(PageSize).ToList();
             Hidden = Math.Max(0, page.Count - Items.Count);
         }

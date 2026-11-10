@@ -113,6 +113,13 @@ namespace personalHub.Server.Data
             EnsureColumn("ideas",   "done",       "INTEGER NOT NULL DEFAULT 0", "0");
             EnsureColumn("ideas",   "done_at",    "INTEGER NOT NULL DEFAULT 0", "0");
 
+            // R8：想法「信念」与拼词计数；R8.2：「作废」。老行补 0。
+            EnsureColumn("ideas",   "is_belief",        "INTEGER NOT NULL DEFAULT 0", "0");
+            EnsureColumn("ideas",   "practice_count",   "INTEGER NOT NULL DEFAULT 0", "0");
+            EnsureColumn("ideas",   "last_practiced_at","INTEGER NOT NULL DEFAULT 0", "0");
+            EnsureColumn("ideas",   "is_voided",        "INTEGER NOT NULL DEFAULT 0", "0");
+            EnsureColumn("ideas",   "voided_at",        "INTEGER NOT NULL DEFAULT 0", "0");
+
             // R7.2：事件卡挂问题卡。老行补空串（NULL 穿进 string 字段会变成空引用）。
             EnsureColumn("things",  "problem_id", "TEXT NOT NULL DEFAULT ''", "''");
 

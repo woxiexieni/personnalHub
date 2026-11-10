@@ -54,5 +54,25 @@ namespace personalHub.Server.Data
         /// </summary>
         [Column("done_at")]
         public long DoneAt { get; set; }
+
+        /// <summary>0 普通 / 1 信念（R8）。信念 = 这句要一遍一遍往脑子里刻。</summary>
+        [Column("is_belief")]
+        public int IsBelief { get; set; }
+
+        /// <summary>拼词拼对次数（R8）。只增不减。</summary>
+        [Column("practice_count")]
+        public int PracticeCount { get; set; }
+
+        /// <summary>最后一次拼对的时刻（Unix 毫秒）；0 = 没练过。</summary>
+        [Column("last_practiced_at")]
+        public long LastPracticedAt { get; set; }
+
+        /// <summary>0 普通 / 1 作废（R8.2）。作废 = 不认这条了，但不删。</summary>
+        [Column("is_voided")]
+        public int IsVoided { get; set; }
+
+        /// <summary>作废时刻（Unix 毫秒）；0 = 没作废过（恢复时清零）。</summary>
+        [Column("voided_at")]
+        public long VoidedAt { get; set; }
     }
 }

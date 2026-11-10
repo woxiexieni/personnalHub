@@ -561,6 +561,18 @@ message Idea {
     // 它不是流程状态，所以列表里不会出现「还有 N 条没处理」这种积压计数。
     optional bool done = 8 [default = false];
     optional int64 done_at = 9;            // 标记落实的时刻；0 = 没标过（取消落实时清零）
+
+    // ---- R8：信念（拼词练习）----
+    // 信念是想法本身多标了一个"值得反复刻"，不另建表。
+    // practice_count 只在拼对时 +1，跟着想法整条上传/恢复，换机不丢。
+    optional bool is_belief = 10 [default = false];
+    optional int32 practice_count = 11 [default = 0];  // 拼对了多少次
+    optional int64 last_practiced_at = 12;             // 最后一次拼对的时刻；0 = 没练过
+
+    // ---- R8.2：作废 ----
+    // 想岔了/不想要了，但不删 —— 留在库里，灰字删除线。
+    optional bool is_voided = 13 [default = false];
+    optional int64 voided_at = 14;                     // 作废时刻；0 = 没作废过（恢复时清零）
 }
 
 message UploadIdeasRequest { repeated Idea ideas = 1; }
