@@ -105,8 +105,16 @@ namespace PersonalHub.Client
         private List<string> _searchTerms = new();
         private List<string> _searchExcludes = new();
 
-        /// <summary>输入防抖：每敲一个字就重建 100 张卡会明显卡手。</summary>
-        private CancellationTokenSource? _searchDebounce;
+        /// <summary>
+        /// 输入防抖：每敲一个字就重建 100 张卡会明显卡手。
+        /// 用「代数」而不是 CancellationTokenSource：CTS 在上一次 Task.Delay 还挂着时被
+        /// Cancel+Dispose，await 那里会抛 ObjectDisposedException（不是 OperationCanceledException），
+        /// async void 接不住 —— 连续输入必崩。代数只做整数比较，没有可释放的东西，没有竞态。
+        /// </summary>
+        private int _searchGen;
+
+        /// <summary>加载代数：防止两次 LoadAsync 交错渲染出两份卡片。</summary>
+        private int _loadSeq;
 
         /// <summary>本轮渲染出来的卡片，供 ↑↓ 跳转与高亮。</summary>
         private readonly List<View> _renderedCards = new();
@@ -392,7 +400,12 @@ namespace PersonalHub.Client
 
         private async Task LoadAsync()
         {
+            int seq = ++_loadSeq;
             var snap = await QueryAsync();
+
+            // 查库期间又有新的搜索/加载进来了：这次是旧口径，放弃渲染。
+            // 否则两次加载交错，会把两批卡片叠在同一列里。
+            if (seq != _loadSeq) return;
 
             var render = snap.Filtered.Take(_renderLimit).ToList();
 
@@ -959,22 +972,15 @@ namespace PersonalHub.Client
         /// </summary>
         private async void OnSearchTextChanged(object? sender, TextChangedEventArgs e)
         {
-            _searchDebounce?.Cancel();
-            _searchDebounce?.Dispose();
+            int gen = ++_searchGen;
 
-            var cts = new CancellationTokenSource();
-            _searchDebounce = cts;
+            await Task.Delay(150);
 
-            try
-            {
-                await Task.Delay(150, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
+            // 150ms 内又敲了一个字：这次输入作废，让最新那次去干活
+            if (gen != _searchGen) return;
 
-            if (cts.IsCancellationRequested) return;
+            // 打完字马上离开页面：控件树已经拆了，别再碰
+            if (Window is null) return;
 
             _search = e.NewTextValue ?? string.Empty;
             (_searchTerms, _searchExcludes) = ParseSearch(_search);
