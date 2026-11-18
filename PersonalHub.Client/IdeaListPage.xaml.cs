@@ -824,13 +824,26 @@ namespace PersonalHub.Client
             grid.Add(info, 0);
             grid.Add(actions, 1);
 
-            return new Border
+            var card = new Border
             {
                 Stroke = Color.FromArgb("#E3E0D8"),
                 StrokeThickness = 1,
                 Padding = new Thickness(14, 10),
                 Content = grid,
             };
+
+            // 长按卡片 → 轻动作菜单（复制等）。挂在整卡根上，正文/状态行任何地方按住都行。
+            // PointerGestureRecognizer 是鼠标/触控/笔统一事件，桌面按住不松、手机长按都触发。
+            // id 走闭包不走 CommandParameter —— Border 没有 CommandParameter 属性（CS0117），
+            // 而且手势事件的 sender 归属（识别器还是 View）版本间有差异，闭包是唯一不赌版本的写法。
+            string ideaId = idea.Id;
+            var longPress = new PointerGestureRecognizer();
+            longPress.PointerPressed += (_, _) => OnCardPointerPressed(ideaId);
+            longPress.PointerReleased += OnCardPointerReleased;
+            longPress.PointerExited += OnCardPointerReleased;   // 按着拖出卡片 = 这轮作废
+            card.GestureRecognizers.Add(longPress);
+
+            return card;
         }
 
         /// <summary>
@@ -1123,6 +1136,52 @@ namespace PersonalHub.Client
             {
                 await Clipboard.SetTextAsync(idea.ArtifactUri);
                 StatusLabel.Text = "没能直接打开，链接已复制 —— 粘到浏览器或 Obsidian 里。";
+            }
+        }
+
+        // ============================================================
+        // 长按卡片 → 轻动作菜单（右键菜单的触屏等价物）
+        // ============================================================
+
+        /// <summary>长按代数：每次按下 +1，弹菜单前再 +1（消费掉），松手再 +1。只比较不释放，没有 CTS 那种竞态。</summary>
+        private int _pressGen;
+
+        /// <summary>
+        /// 按下：记下是哪张卡，起一个 600ms 的延迟。醒来时代数对得上（没松手、没拖出）才弹菜单。
+        /// 用代数计数器而不是 CTS —— Cancel+Dispose 一个还挂着 await 的 CTS 会炸出
+        /// ObjectDisposedException（想法库搜索崩溃那次的老坑），这里结构上就不存在竞态。
+        /// </summary>
+        private void OnCardPointerPressed(string id)
+        {
+            int gen = ++_pressGen;
+
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(600);
+                if (gen != _pressGen) return;   // 中途松手/拖出/换了下一轮按压
+
+                // 弹菜单前先消费掉这轮代数：菜单开着的时候人才松手，晚到的 released 不该再算一轮
+                _pressGen++;
+                await MainThread.InvokeOnMainThreadAsync(() => ShowCardContextMenuAsync(id));
+            });
+        }
+
+        /// <summary>松手 / 按着拖出卡片：这轮长按作废（短按走原有的点击逻辑，不受影响）。</summary>
+        private void OnCardPointerReleased(object? sender, PointerEventArgs e) => _pressGen++;
+
+        /// <summary>长按弹出的菜单。给读的动作，不给写的动作 —— 写的动作都在按钮和「⋯」里。</summary>
+        private async Task ShowCardContextMenuAsync(string id)
+        {
+            var idea = await _ideas.FindAsync(id);
+            if (idea is null) return;
+
+            string pick = await DisplayActionSheet(
+                Shorten(idea.Text, 24), "取消", null, "复制全文");
+
+            if (pick == "复制全文")
+            {
+                await Clipboard.SetTextAsync(idea.Text ?? string.Empty);
+                StatusLabel.Text = "全文已复制到剪贴板。";
             }
         }
 
