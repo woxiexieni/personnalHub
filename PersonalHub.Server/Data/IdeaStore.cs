@@ -248,6 +248,26 @@ namespace personalHub.Server.Data
         // 工具
         // ============================================================
 
+        /// <summary>
+        /// id → 正文前 40 字，管理端把关系边两端的 id 翻成人能看的名字。
+        /// 词典**包含已作废/已删除的行**：边是软引用，目标没了也要能显示"（已不在库）"
+        /// 而不是 id —— 所以这里不做 deleted 过滤，由页面自己标记。
+        /// </summary>
+        public IReadOnlyDictionary<string, string> Titles()
+        {
+            lock (_db.Sync)
+            {
+                return _db.Conn
+                    .Query<IdText>("SELECT id, text FROM ideas")
+                    .Where(x => !string.IsNullOrEmpty(x.id))
+                    .ToDictionary(x => x.id, x =>
+                    {
+                        string t = (x.text ?? string.Empty).Trim().Replace('\n', ' ');
+                        return t.Length > 40 ? t.Substring(0, 40) + "…" : t;
+                    });
+            }
+        }
+
         private static IdeaRow ToRow(Idea p) => new()
         {
             Id = p.Id,
@@ -264,6 +284,7 @@ namespace personalHub.Server.Data
             LastPracticedAt = p.IsBelief ? p.LastPracticedAt : 0,
             IsVoided = p.IsVoided ? 1 : 0,
             VoidedAt = p.IsVoided ? p.VoidedAt : 0,
+            ArtifactUri = string.IsNullOrEmpty(p.ArtifactUri) ? null : p.ArtifactUri,
         };
 
         private static Idea ToProto(IdeaRow r) => new()
@@ -282,6 +303,7 @@ namespace personalHub.Server.Data
             LastPracticedAt = r.IsBelief != 0 ? r.LastPracticedAt : 0,
             IsVoided = r.IsVoided != 0,
             VoidedAt = r.IsVoided != 0 ? r.VoidedAt : 0,
+            ArtifactUri = r.ArtifactUri ?? string.Empty,
         };
 
         /// <summary>GROUP BY 的返回行。</summary>
@@ -289,6 +311,13 @@ namespace personalHub.Server.Data
         {
             public int kind { get; set; }
             public int cnt { get; set; }
+        }
+
+        /// <summary>id → 正文（Titles 用）。</summary>
+        private sealed class IdText
+        {
+            public string id { get; set; } = string.Empty;
+            public string? text { get; set; }
         }
     }
 }

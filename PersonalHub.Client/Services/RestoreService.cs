@@ -46,6 +46,7 @@ namespace PersonalHub.Client.Services
         private readonly LocalRecordStore<LocalPractice> _practices;
         private readonly LocalRecordStore<LocalIdea> _ideas;
         private readonly LocalRecordStore<LocalProblem> _problems;
+        private readonly LocalRecordStore<LocalIdeaLink> _ideaLinks;
         private readonly SemaphoreSlim _gate = new(1, 1);
 
         public RestoreService(
@@ -58,7 +59,8 @@ namespace PersonalHub.Client.Services
             LocalRecordStore<LocalPattern> patterns,
             LocalRecordStore<LocalPractice> practices,
             LocalRecordStore<LocalIdea> ideas,
-            LocalRecordStore<LocalProblem> problems)
+            LocalRecordStore<LocalProblem> problems,
+            LocalRecordStore<LocalIdeaLink> ideaLinks)
         {
             _conn = conn;
             _records = records;
@@ -70,6 +72,7 @@ namespace PersonalHub.Client.Services
             _practices = practices;
             _ideas = ideas;
             _problems = problems;
+            _ideaLinks = ideaLinks;
         }
 
         /// <summary>本地这台设备一共存了多少条（八类合计）。0 = 全新的空设备。</summary>
@@ -83,7 +86,8 @@ namespace PersonalHub.Client.Services
                  + await _patterns.CountAllAsync().ConfigureAwait(false)
                  + await _practices.CountAllAsync().ConfigureAwait(false)
                  + await _ideas.CountAllAsync().ConfigureAwait(false)
-                 + await _problems.CountAllAsync().ConfigureAwait(false);
+                 + await _problems.CountAllAsync().ConfigureAwait(false)
+                 + await _ideaLinks.CountAllAsync().ConfigureAwait(false);
         }
 
         /// <summary>
@@ -228,6 +232,22 @@ namespace PersonalHub.Client.Services
                         .ConfigureAwait(false);
 
                     return r.Problems.Select(x => x.ToLocalProblem()).ToList();
+                }, now, ct).ConfigureAwait(false));
+
+                // ---- 想法关系边（R9）----
+                // 放在想法之后：两端 id 是软引用，谁先到都不影响显示，
+                // 只是"卡片上的 ↔ chip 能翻到名字"会晚一轮。
+                lines.Add(await StepAsync("想法关系", _ideaLinks, progress, async c =>
+                {
+                    var r = await _conn.NewIdeaLinkClient()
+                        .ListIdeaLinksAsync(new ListIdeaLinksRequest
+                        {
+                            Kind = -1,
+                            IncludeDeleted = false,
+                        }, deadline: DateTime.UtcNow.Add(CallTimeout), cancellationToken: c)
+                        .ConfigureAwait(false);
+
+                    return r.Links.Select(x => x.ToLocalIdeaLink()).ToList();
                 }, now, ct).ConfigureAwait(false));
 
                 int added = lines.Where(l => l.Stats is not null).Sum(l => l.Stats!.Added);

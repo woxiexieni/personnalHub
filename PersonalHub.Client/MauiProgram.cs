@@ -50,6 +50,10 @@ namespace PersonalHub.Client
             // 只是把它当成一类普通记录存下来。
             builder.Services.AddSingleton(new LocalRecordStore<LocalProblem>(dbPath));
 
+            // R9：想法关系边（衍生 / 矛盾）—— 想法库的"这张卡连着哪张卡"。
+            // 同步照问题卡的模子：边也是认知资产，换机不丢。
+            builder.Services.AddSingleton(new LocalRecordStore<LocalIdeaLink>(dbPath));
+
             // ===== 上传器：每类记录一个（proto 差异全部关在这里）=====
             builder.Services.AddSingleton<IRecordUploader<LocalRecord>, RecordUploader>();
             builder.Services.AddSingleton<IRecordUploader<ThingRecord>, ThingUploader>();
@@ -60,6 +64,7 @@ namespace PersonalHub.Client
             builder.Services.AddSingleton<IRecordUploader<LocalPractice>, PracticeUploader>();
             builder.Services.AddSingleton<IRecordUploader<LocalIdea>, IdeaUploader>();
             builder.Services.AddSingleton<IRecordUploader<LocalProblem>, ProblemUploader>();
+            builder.Services.AddSingleton<IRecordUploader<LocalIdeaLink>, IdeaLinkUploader>();
 
             // ===== 同步器：泛型只吃本地模型，所以一个类服务三种记录 =====
             builder.Services.AddSingleton<RecordSyncService<LocalRecord>>();
@@ -71,6 +76,7 @@ namespace PersonalHub.Client
             builder.Services.AddSingleton<RecordSyncService<LocalPractice>>();
             builder.Services.AddSingleton<RecordSyncService<LocalIdea>>();
             builder.Services.AddSingleton<RecordSyncService<LocalProblem>>();
+            builder.Services.AddSingleton<RecordSyncService<LocalIdeaLink>>();
 
             // ===== 缓存层：最近 30 天镜像 + 今日汇总 + 分类 =====
             // 只负责"从服务端拉下来把本地副本对齐"，上传仍然归 RecordSyncService。
@@ -143,6 +149,7 @@ namespace PersonalHub.Client
             app.Services.GetRequiredService<RecordSyncService<LocalPractice>>().Start();
             app.Services.GetRequiredService<RecordSyncService<LocalIdea>>().Start();
             app.Services.GetRequiredService<RecordSyncService<LocalProblem>>().Start();
+            app.Services.GetRequiredService<RecordSyncService<LocalIdeaLink>>().Start();
 
             return app;
         }

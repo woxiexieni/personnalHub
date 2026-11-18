@@ -73,6 +73,13 @@ namespace PersonalHub.Client.Data
         /// <summary>作废的时刻（Unix 毫秒）。0 = 没作废过。恢复时清 0。</summary>
         public long VoidedAt { get; set; }
 
+        /// <summary>
+        /// 落实成果的链接（R9）：obsidian:// URI 或普通路径；空 = 没留。
+        /// 跟 GoalId 同一个模子 —— 是"落实"这个动作的附属信息，一对一，不进关系边表。
+        /// 软引用：不校验文件是否存在，跳转交给操作系统 / 对应 app。
+        /// </summary>
+        public string ArtifactUri { get; set; } = string.Empty;
+
         public long CreatedAt { get; set; }
 
         public long UpdatedAt { get; set; }

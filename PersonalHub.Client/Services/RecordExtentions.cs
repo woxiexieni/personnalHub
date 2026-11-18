@@ -256,6 +256,7 @@ namespace Personalhub
             LastPracticedAt = p.IsBelief ? p.LastPracticedAt : 0,
             IsVoided = p.IsVoided,
             VoidedAt = p.IsVoided ? p.VoidedAt : 0,
+            ArtifactUri = p.ArtifactUri ?? string.Empty,
         };
 
         /// <summary>镜像下载用：不设 Synced（下载 ≠ 已上传）。</summary>
@@ -275,6 +276,7 @@ namespace Personalhub
             LastPracticedAt = p.IsBelief ? p.LastPracticedAt : 0,
             IsVoided = p.IsVoided,
             VoidedAt = p.IsVoided ? p.VoidedAt : 0,
+            ArtifactUri = p.ArtifactUri ?? string.Empty,
         };
 
         // ============================================================
@@ -318,6 +320,34 @@ namespace Personalhub
             CreatedAt = p.CreatedAt,
             UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
             ClosedAt = p.ClosedAt,
+            Deleted = p.Deleted,
+        };
+
+        // ============================================================
+        // R9：想法关系边（衍生 / 矛盾）
+        // ============================================================
+
+        /// <summary>本地关系边 → proto IdeaLink。</summary>
+        public static IdeaLink ToProto(this LocalIdeaLink p) => new()
+        {
+            Id = p.Id,
+            FromId = p.FromId ?? string.Empty,
+            ToId = p.ToId ?? string.Empty,
+            Kind = p.Kind,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
+            Deleted = p.Deleted,
+        };
+
+        /// <summary>恢复/镜像用：不设 Synced（下载 ≠ 已上传）。</summary>
+        public static LocalIdeaLink ToLocalIdeaLink(this IdeaLink p) => new()
+        {
+            Id = p.Id,
+            FromId = p.FromId ?? string.Empty,
+            ToId = p.ToId ?? string.Empty,
+            Kind = p.Kind,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
             Deleted = p.Deleted,
         };
     }

@@ -573,6 +573,11 @@ message Idea {
     // 想岔了/不想要了，但不删 —— 留在库里，灰字删除线。
     optional bool is_voided = 13 [default = false];
     optional int64 voided_at = 14;                     // 作废时刻；0 = 没作废过（恢复时清零）
+
+    // ---- R9：落实成果 ----
+    // 已落实想法的"成果在哪"：obsidian:// URI 或普通路径，可空 = 没留。
+    // 只是个软引用 —— 系统不打开、不校验文件是否存在，跳转交给操作系统/对应 app。
+    optional string artifact_uri = 15;
 }
 
 message UploadIdeasRequest { repeated Idea ideas = 1; }
@@ -645,6 +650,49 @@ message ListProblemsRequest {
 }
 
 message ProblemList { repeated Problem problems = 1; }
+
+// =====================
+// 想法关系（R9）
+// =====================
+// 想法之间只有两种边，刻意不再细分（豆包那七种砍完剩下的）：
+//   0 衍生 —— A 想到 B，方向有意义：A 卡片显示「→ B」，B 卡片显示「← 来自 A」。
+//     它同时管"推理链"（MES 会被冲击 → 学具身智能）和"联想"（看到社保基数 → 想到养老）。
+//   1 矛盾 —— 对称，方向无意义：查询时两边都查，显示不带方向。
+//     两个想法打架是内耗的来源，摆在一起半年后自己就能裁决。
+//
+// 设计口径：
+//   - 软引用，没有外键 —— 一端被作废/删除，边不跟着删（想法"只进不出"的延伸：
+//     关系也是认知资产，删边等于毁证据）。显示时目标查不到就标灰。
+//   - kind 刻意只留一个 int：将来模式证据真关联（v2）加 kind=2 就接上了，不动底座。
+service IdeaLinkService {
+    rpc UploadIdeaLinks (UploadIdeaLinksRequest) returns (UploadIdeaLinksResponse);
+    rpc ListIdeaLinks (ListIdeaLinksRequest) returns (IdeaLinkList);
+}
+
+message IdeaLink {
+    optional string id = 1;
+    optional string from_id = 2;               // 边的起点（矛盾时无语义，只是记录方向）
+    optional string to_id = 3;                 // 边的终点
+    optional int32 kind = 4 [default = 0];     // 0 衍生 / 1 矛盾
+    optional int64 created_at = 5;
+    optional int64 updated_at = 6;             // 版本比较；0 = 未知版本，直接接受
+    optional bool deleted = 7 [default = false];
+}
+
+message UploadIdeaLinksRequest { repeated IdeaLink links = 1; }
+
+message UploadIdeaLinksResponse {
+    optional int32 accepted_count = 1 [default = 0];
+    repeated string failed_ids = 2;
+    optional string error_msg = 3;
+}
+
+message ListIdeaLinksRequest {
+    optional int32 kind = 1 [default = -1];    // -1 = 全部
+    optional bool include_deleted = 2 [default = false];
+}
+
+message IdeaLinkList { repeated IdeaLink links = 1; }
 
 // =====================
 // AI 助手（§27）

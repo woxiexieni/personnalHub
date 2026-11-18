@@ -135,6 +135,9 @@ namespace PersonHub.Server
             // 问题卡（R7.2）：从纯本地升级上来 —— 判据 + 试法 + 证据，管理端可看、可备份。
             builder.Services.AddSingleton<ProblemStore>();
 
+            // 想法关系（R9）：衍生 + 矛盾。软引用边表，管理端可看、可备份。
+            builder.Services.AddSingleton<IdeaLinkStore>();
+
             // ===== AI（§27）：配置 + DeepSeek 客户端 =====
             // AiConfig 是单例且会热加载：用户打开 ai.json 填上 key 保存，下一次点击就生效，
             // 不用重启服务端（重启服务端在这个项目里意味着"手机重连"）。
@@ -183,6 +186,7 @@ namespace PersonHub.Server
             app.MapGrpcService<PatternServiceImpl>();
             app.MapGrpcService<IdeaServiceImpl>();
             app.MapGrpcService<ProblemServiceImpl>();
+            app.MapGrpcService<IdeaLinkServiceImpl>();
             app.MapGrpcService<AiServiceImpl>();
 
             // 管理端页面（/、/records、/records/edit、/categories）

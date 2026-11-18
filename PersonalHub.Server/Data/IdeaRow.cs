@@ -74,5 +74,12 @@ namespace personalHub.Server.Data
         /// <summary>作废时刻（Unix 毫秒）；0 = 没作废过（恢复时清零）。</summary>
         [Column("voided_at")]
         public long VoidedAt { get; set; }
+
+        /// <summary>
+        /// 落实成果的链接（R9）：obsidian:// URI 或普通路径；空 = 没留。
+        /// 软引用 —— 系统不校验文件是否存在，跳转交给操作系统 / 对应 app。
+        /// </summary>
+        [Column("artifact_uri")]
+        public string? ArtifactUri { get; set; }
     }
 }

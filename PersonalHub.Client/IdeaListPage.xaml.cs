@@ -64,8 +64,10 @@ namespace PersonalHub.Client
 
         private readonly LocalRecordStore<LocalIdea> _ideas;
         private readonly LocalRecordStore<LocalGoal> _goals;
+        private readonly LocalRecordStore<LocalIdeaLink> _ideaLinks;
         private readonly RecordSyncService<LocalIdea> _ideaSync;
         private readonly RecordSyncService<LocalGoal> _goalSync;
+        private readonly RecordSyncService<LocalIdeaLink> _linkSync;
         private readonly IdeaHistoryService _history;
 
         /// <summary>-1 = 全部。</summary>
@@ -122,19 +124,39 @@ namespace PersonalHub.Client
         /// <summary>当前停在第几个命中（0 基）。</summary>
         private int _hitIndex;
 
+        // ============================================================
+        // 想法关系（R9）
+        // ============================================================
+
+        /// <summary>
+        /// 端点 → 关系边。建卡时从这里查"这张卡连着谁"。
+        /// 边是软引用，端点被删/作废不删边 —— 显示时目标查不到就标灰。
+        /// </summary>
+        private Dictionary<string, List<LocalIdeaLink>> _linksByIdea = new();
+
+        /// <summary>id → 正文前 30 字。关系行把 id 翻成人话；**含已作废/已删除的行**。</summary>
+        private Dictionary<string, string> _textById = new();
+
+        /// <summary>id → 当前渲染出来的卡片，供关联跳转（ScrollToAsync 需要 View）。</summary>
+        private readonly Dictionary<string, View> _cardsById = new();
+
         public IdeaListPage(
             LocalRecordStore<LocalIdea> ideas,
             LocalRecordStore<LocalGoal> goals,
+            LocalRecordStore<LocalIdeaLink> ideaLinks,
             RecordSyncService<LocalIdea> ideaSync,
             RecordSyncService<LocalGoal> goalSync,
+            RecordSyncService<LocalIdeaLink> linkSync,
             IdeaHistoryService history)
         {
             InitializeComponent();
 
             _ideas = ideas;
             _goals = goals;
+            _ideaLinks = ideaLinks;
             _ideaSync = ideaSync;
             _goalSync = goalSync;
+            _linkSync = linkSync;
             _history = history;
 
             BuildFilterChips();
@@ -407,10 +429,41 @@ namespace PersonalHub.Client
             // 否则两次加载交错，会把两批卡片叠在同一列里。
             if (seq != _loadSeq) return;
 
+            // R9：关系边 + id→文本。边表很小（人手建的关系不会多），全量载入换字典，
+            // 建卡时不用每张卡查一次库。
+            var links = await _ideaLinks.GetByRangeAsync(0, long.MaxValue);
+
+            // 上一次查询期间有边被改：等下一轮，别拿旧口径渲染。
+            if (seq != _loadSeq) return;
+
+            _linksByIdea = new Dictionary<string, List<LocalIdeaLink>>();
+            foreach (var l in links)
+            {
+                if (l.Deleted) continue;
+
+                if (!_linksByIdea.TryGetValue(l.FromId, out var a))
+                {
+                    a = new List<LocalIdeaLink>();
+                    _linksByIdea[l.FromId] = a;
+                }
+                a.Add(l);
+
+                if (!_linksByIdea.TryGetValue(l.ToId, out var b))
+                {
+                    b = new List<LocalIdeaLink>();
+                    _linksByIdea[l.ToId] = b;
+                }
+                b.Add(l);
+            }
+
+            // id → 正文（含作废/删除的行：目标不在了也要能显示"已不在库"，而不是 id）
+            _textById = snap.All.ToDictionary(x => x.Id, x => Shorten(x.Text, 30));
+
             var render = snap.Filtered.Take(_renderLimit).ToList();
 
             _lastDayKey = null;          // 整页重建，日期分节从头算
             _renderedCards.Clear();
+            _cardsById.Clear();
             IdeaRows.Children.Clear();
             RenderWithDayHeaders(render);
 
@@ -535,6 +588,7 @@ namespace PersonalHub.Client
 
                 var card = BuildCard(idea);
                 _renderedCards.Add(card);
+                _cardsById[idea.Id] = card;
                 IdeaRows.Children.Add(card);
             }
         }
@@ -662,6 +716,9 @@ namespace PersonalHub.Client
                 TextColor = IdeaKinds.ColorOf(idea.Kind),
             });
 
+            // R9：关系行。有边才出现 —— 没有关联的卡不带这块，扫起来跟以前一样。
+            BuildLinkRow(idea, info);
+
             var actions = new VerticalStackLayout { Spacing = 6, VerticalOptions = LayoutOptions.Start };
 
             if (idea.IsVoided)
@@ -719,6 +776,26 @@ namespace PersonalHub.Client
                 actions.Children.Add(convert);
             }
             }   // else（非作废）分支结束
+
+            // R9：已落实且留了成果链接才出现 —— 「查看成果」的入口。
+            // 不落实不显示：链接是"落实"的附属信息（见 LocalIdea.ArtifactUri 注释）。
+            // 作废的也不显示：废案不产生新动作，跟卡片上收掉转目标一个口径。
+            if (idea.Done && !idea.IsVoided && !string.IsNullOrEmpty(idea.ArtifactUri))
+            {
+                var artifact = new Button
+                {
+                    Text = "📄 成果",
+                    FontSize = 11,
+                    HeightRequest = 30,
+                    Padding = new Thickness(10, 0),
+                    CornerRadius = 8,
+                    BackgroundColor = Color.FromArgb("#E8F1EA"),
+                    TextColor = Color.FromArgb("#2F6B3C"),
+                    CommandParameter = idea.Id,
+                };
+                artifact.Clicked += OnArtifactClicked;
+                actions.Children.Add(artifact);
+            }
 
             var more = new Button
             {
@@ -817,6 +894,271 @@ namespace PersonalHub.Client
             }
 
             return TextPeek.Attach(label, () => idea.Text);
+        }
+
+        // ============================================================
+        // 想法关系（R9）
+        // ============================================================
+
+        /// <summary>
+        /// 卡片底部的关系行：「↔ N 条关联」，点开就地展开，再点收起。
+        /// 折叠用 TapGestureRecognizer 切 IsVisible —— MAUI 没有现成 Expander。
+        /// </summary>
+        private void BuildLinkRow(LocalIdea idea, VerticalStackLayout info)
+        {
+            if (!_linksByIdea.TryGetValue(idea.Id, out var links) || links.Count == 0) return;
+
+            var linkList = new VerticalStackLayout { Spacing = 4, IsVisible = false };
+
+            foreach (var link in links.OrderByDescending(l => l.CreatedAt))
+            {
+                bool outgoing = link.FromId == idea.Id;
+                string otherId = outgoing ? link.ToId : link.FromId;
+
+                string tag = link.Kind == 1 ? "⚡ 矛盾"
+                           : outgoing ? "→ 衍生"
+                           : "← 来自";
+
+                // 目标查不到（被删/在另一台设备还没同步过来）就明说，不显示裸 id
+                string text = _textById.TryGetValue(otherId, out var t) ? t : "（已不在库）";
+
+                var title = new Label
+                {
+                    FormattedText = BuildLinkLabel($"{tag} · {text}"),
+                    LineBreakMode = LineBreakMode.TailTruncation,
+                    MaxLines = 1,
+                    // 跳转参数：不是 CommandParameter（那是识别器的），从 TappedEventArgs.Parameter 取
+                    GestureRecognizers =
+                    {
+                        new TapGestureRecognizer { CommandParameter = otherId },
+                    },
+                };
+
+                // Span 必须显式给 TextColor（深色主题陷阱）—— BuildLinkLabel 统一处理
+                ((TapGestureRecognizer)title.GestureRecognizers[0]).Tapped += OnLinkJumpClicked;
+
+                var unlink = new Button
+                {
+                    Text = "✕",
+                    FontSize = 11,
+                    WidthRequest = 26,
+                    HeightRequest = 24,
+                    Padding = 0,
+                    CornerRadius = 6,
+                    BackgroundColor = Colors.Transparent,
+                    TextColor = Color.FromArgb("#8A8A8E"),
+                    CommandParameter = link.Id,
+                };
+                unlink.Clicked += OnUnlinkClicked;
+
+                var row = new Grid
+                {
+                    ColumnDefinitions =
+                    {
+                        new ColumnDefinition(GridLength.Star),
+                        new ColumnDefinition(GridLength.Auto),
+                    },
+                    ColumnSpacing = 6,
+                };
+                row.Add(title, 0);
+                row.Add(unlink, 1);
+
+                linkList.Children.Add(row);
+            }
+
+            var header = new Label
+            {
+                FormattedText = BuildLinkLabel($"↔ {links.Count} 条关联 ▸"),
+                GestureRecognizers =
+                {
+                    // 展开行记录在 tag 里，点一下切换 IsVisible（▸/▾ 只换符号，不换结构）
+                    new TapGestureRecognizer(),
+                },
+            };
+            ((TapGestureRecognizer)header.GestureRecognizers[0]).Tapped += (s, e) =>
+            {
+                linkList.IsVisible = !linkList.IsVisible;
+                header.FormattedText = BuildLinkLabel(
+                    linkList.IsVisible ? $"↔ {links.Count} 条关联 ▾" : $"↔ {links.Count} 条关联 ▸");
+            };
+
+            info.Children.Add(header);
+            info.Children.Add(linkList);
+        }
+
+        /// <summary>关系行的蓝色小字。Span 显式给 TextColor，深浅主题都读得清。</summary>
+        private static FormattedString BuildLinkLabel(string text) => new()
+        {
+            Spans =
+            {
+                new Span
+                {
+                    Text = text,
+                    TextColor = Color.FromArgb("#185FA5"),
+                    FontSize = 11,
+                },
+            },
+        };
+
+        /// <summary>点关联行跳到对面那张卡。不在当前列表里就明说为什么。</summary>
+        private async void OnLinkJumpClicked(object? sender, EventArgs e)
+        {
+            if (e is not TappedEventArgs t || t.Parameter is not string id) return;
+
+            if (_cardsById.TryGetValue(id, out var card))
+            {
+                await PageScroll.ScrollToAsync(card, ScrollToPosition.Center, true);
+            }
+            else
+            {
+                StatusLabel.Text = "那条不在当前列表里 —— 换个范围或清掉搜索框就能看到。";
+            }
+        }
+
+        /// <summary>关联行上的「✕」：软删这条边（服务端留墓碑，历史对得上）。</summary>
+        private async void OnUnlinkClicked(object? sender, EventArgs e)
+        {
+            if (sender is not Button b || b.CommandParameter is not string linkId) return;
+
+            var link = await _ideaLinks.FindAsync(linkId);
+            if (link is null || link.Deleted) return;
+
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            link.Deleted = true;
+            link.UpdatedAt = now;
+            link.Synced = false;
+            await _ideaLinks.UpdateAsync(link);
+
+            await LoadAsync();
+            StatusLabel.Text = "已取消这条关联。";
+            _ = _linkSync.SyncAsync();
+        }
+
+        /// <summary>
+        /// 「⋯」→「关联到…」：先选关系类型，再推选择器挑对面那条。
+        /// 边上服务端（R9），换机不丢；重复边（同向同类型）不重建，直接提示。
+        /// </summary>
+        private async Task LinkToAsync(LocalIdea idea)
+        {
+            string pick = await DisplayActionSheet("什么关系？", "取消", null,
+                "衍生 · 由它想到", "矛盾 · 跟它打架");
+
+            int kind = pick switch
+            {
+                "衍生 · 由它想到" => 0,
+                "矛盾 · 跟它打架" => 1,
+                _ => -1,
+            };
+
+            if (kind < 0) return;
+
+            var picker = new IdeaLinkPickerPage(_ideas, excludeId: idea.Id, kind: kind);
+            string? targetId = await picker.PickAsync(Navigation);
+            if (string.IsNullOrEmpty(targetId)) return;
+
+            var links = await _ideaLinks.GetByRangeAsync(0, long.MaxValue);
+
+            bool dup = links.Any(l => !l.Deleted && l.Kind == kind
+                && ((l.FromId == idea.Id && l.ToId == targetId)
+                    || (kind == 1 && l.FromId == targetId && l.ToId == idea.Id)));
+
+            if (dup)
+            {
+                StatusLabel.Text = "这条关联已经在了。";
+                return;
+            }
+
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            var link = new LocalIdeaLink
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                FromId = idea.Id,
+                ToId = targetId,
+                Kind = kind,
+                CreatedAt = now,
+                UpdatedAt = now,
+                Deleted = false,
+                Synced = false,
+                SyncedAt = 0,
+            };
+
+            await _ideaLinks.InsertAsync(link);
+
+            await LoadAsync();
+            StatusLabel.Text = kind == 0
+                ? "已标成「衍生」。两张卡上都能看到这条线。"
+                : "已标成「矛盾」。它俩摆在一起，半年后回看自己就能裁决。";
+
+            _ = _linkSync.SyncAsync();
+        }
+
+        // ============================================================
+        // 落实成果（R9）
+        // ============================================================
+
+        /// <summary>
+        /// 「📄 成果」：跳到成果所在的笔记/文件。obsidian:// URI 在装了 Obsidian 的设备上
+        /// 直达那篇笔记；打不开（没装 app / 路径失效）就把链接复制到剪贴板，不报错吓人。
+        /// </summary>
+        private async void OnArtifactClicked(object? sender, EventArgs e)
+        {
+            if (sender is not Button b || b.CommandParameter is not string id) return;
+
+            var idea = await _ideas.FindAsync(id);
+            if (idea is null || string.IsNullOrEmpty(idea.ArtifactUri)) return;
+
+            bool opened = false;
+            try
+            {
+                opened = await Launcher.TryOpenAsync(idea.ArtifactUri);
+            }
+            catch
+            {
+                // URI 格式坏 / 平台不认这个 scheme：按"没打开"处理，走复制兜底
+            }
+
+            if (!opened)
+            {
+                await Clipboard.SetTextAsync(idea.ArtifactUri);
+                StatusLabel.Text = "没能直接打开，链接已复制 —— 粘到浏览器或 Obsidian 里。";
+            }
+        }
+
+        /// <summary>
+        /// 「⋯」→「成果链接…」：贴一个 obsidian:// 链接或文件路径；清空输入 = 移除。
+        /// Obsidian 里拿链接：笔记右上角 ⋯ →「复制 Obsidian URL」。
+        /// </summary>
+        private async Task EditArtifactAsync(LocalIdea idea)
+        {
+            string? uri = await DisplayPromptAsync(
+                "成果链接",
+                "贴 obsidian:// 链接或文件路径。清空保存 = 移除链接。",
+                "保存", "取消",
+                placeholder: "obsidian://open?vault=…",
+                maxLength: 500,
+                keyboard: Keyboard.Url,
+                initialValue: idea.ArtifactUri);
+
+            if (uri is null) return;   // 取消不动
+
+            uri = uri.Trim();
+            if (uri == idea.ArtifactUri) return;   // 没改不动
+
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            idea.ArtifactUri = uri;
+            idea.UpdatedAt = now;
+            idea.Synced = false;
+            await _ideas.UpdateAsync(idea);
+
+            await LoadAsync();
+            StatusLabel.Text = uri.Length == 0
+                ? "已移除成果链接。"
+                : "已保存。已落实的卡片上会出现「📄 成果」。";
+
+            _ = _ideaSync.SyncAsync();
         }
 
         /// <summary>一条想法是否满足全部包含词、且不含任何排除词。</summary>
@@ -1146,6 +1488,11 @@ namespace PersonalHub.Client
             // 「升为信念」只在没升、也没作废时出现 —— 废案不该再产生新动作。
             var options = new List<string> { doneAction, voidAction };
             if (!idea.IsBelief && !idea.IsVoided) options.Add("↑ 信念");
+            if (!idea.IsVoided)
+            {
+                options.Add("关联到…");
+                options.Add(string.IsNullOrEmpty(idea.ArtifactUri) ? "留成果链接" : "改成果链接");
+            }
             options.Add("改类型");
             options.Add("删除");
 
@@ -1166,6 +1513,15 @@ namespace PersonalHub.Client
 
                 case "↑ 信念":
                     await MakeBeliefAsync(idea);
+                    break;
+
+                case "关联到…":
+                    await LinkToAsync(idea);
+                    break;
+
+                case "留成果链接":
+                case "改成果链接":
+                    await EditArtifactAsync(idea);
                     break;
 
                 case "改类型":

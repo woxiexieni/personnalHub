@@ -88,6 +88,9 @@ namespace personalHub.Server.Data
 
             // R7.2：问题卡（从纯本地升级上来，管理端可看 + 可备份）
             Conn.CreateTable<ProblemRow>();
+
+            // R9：想法关系（衍生 / 矛盾）。新表，CreateTable 就是完整建表语句。
+            Conn.CreateTable<IdeaLinkRow>();
         }
 
         /// <summary>
@@ -119,6 +122,9 @@ namespace personalHub.Server.Data
             EnsureColumn("ideas",   "last_practiced_at","INTEGER NOT NULL DEFAULT 0", "0");
             EnsureColumn("ideas",   "is_voided",        "INTEGER NOT NULL DEFAULT 0", "0");
             EnsureColumn("ideas",   "voided_at",        "INTEGER NOT NULL DEFAULT 0", "0");
+
+            // R9：想法「落实成果」链接。老行补空串（NULL 穿进 string 字段会变成空引用）。
+            EnsureColumn("ideas",   "artifact_uri", "TEXT NOT NULL DEFAULT ''", "''");
 
             // R7.2：事件卡挂问题卡。老行补空串（NULL 穿进 string 字段会变成空引用）。
             EnsureColumn("things",  "problem_id", "TEXT NOT NULL DEFAULT ''", "''");
@@ -152,6 +158,10 @@ namespace personalHub.Server.Data
             // 这张表一辈子只有几十上百行，索引只为将来证据统计不扫全表。
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_problems_status  ON problems(status, updated_at)");
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_things_problem   ON things(problem_id)");
+
+            // R9：想法关系按"端点反查"（点开一张卡看它连着谁）和"按类型翻"。
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_idea_links_from ON idea_links(from_id, deleted)");
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_idea_links_to   ON idea_links(to_id, deleted)");
 
             SeedCategories();
         }

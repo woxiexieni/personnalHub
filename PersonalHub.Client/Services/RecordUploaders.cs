@@ -342,4 +342,44 @@ namespace PersonalHub.Client.Services
             };
         }
     }
+
+    /// <summary>
+    /// 想法关系上传器：LocalIdeaLink 列表 → UploadIdeaLinksRequest → IdeaLinkService.UploadIdeaLinks。
+    ///
+    /// 与其它上传器结构对称。上传的是**边**不是卡：服务端会守"两端非空 / 不自连 / 不重复"，
+    /// 重复边返回已存在的那条（不算失败），客户端照常标记 Synced。
+    /// </summary>
+    public sealed class IdeaLinkUploader : IRecordUploader<LocalIdeaLink>
+    {
+        private static readonly TimeSpan UploadTimeout = TimeSpan.FromSeconds(10);
+
+        private readonly ServerConnection _conn;
+
+        public IdeaLinkUploader(ServerConnection conn) => _conn = conn;
+
+        public string DisplayName => "想法关系";
+
+        public async Task<UploadOutcome> UploadAsync(IReadOnlyList<LocalIdeaLink> items, CancellationToken ct = default)
+        {
+            if (items.Count == 0) return UploadOutcome.Empty;
+
+            await _conn.EnsureAsync().ConfigureAwait(false);
+
+            var request = new UploadIdeaLinksRequest();
+            request.Links.AddRange(items.Select(x => x.ToProto()));
+
+            var resp = await _conn.NewIdeaLinkClient()
+                .UploadIdeaLinksAsync(request,
+                    deadline: DateTime.UtcNow.Add(UploadTimeout),
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            return new UploadOutcome
+            {
+                Accepted = resp.AcceptedCount,
+                FailedIds = resp.FailedIds.ToArray(),
+                ErrorMsg = string.IsNullOrEmpty(resp.ErrorMsg) ? null : resp.ErrorMsg,
+            };
+        }
+    }
 }

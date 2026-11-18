@@ -74,6 +74,36 @@ namespace PersonalHub.Client
             var now = DateTime.Now;
             EventDatePicker.Date = now.Date;
             EventTimePicker.Time = now.TimeOfDay;
+            // TimePicker 没有 TimeSelected 事件（XAML 挂了报 XFC0009），改听 Time 属性变化
+            EventTimePicker.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(TimePicker.Time)) UpdateTimeFoldLabel();
+            };
+            UpdateTimeFoldLabel();
+        }
+
+        // ============ 大概时间：折叠成一行，默认"现在" ============
+
+        private void OnTimeFoldTapped(object? sender, EventArgs e)
+        {
+            TimePickers.IsVisible = !TimePickers.IsVisible;
+            UpdateTimeFoldLabel();
+        }
+
+        private void OnEventTimeChanged(object? sender, EventArgs e) => UpdateTimeFoldLabel();
+
+        /// <summary>折叠行的文案：与"现在"只差一分钟内显示"现在"，否则显示具体时间。</summary>
+        private void UpdateTimeFoldLabel()
+        {
+            var d = EventDatePicker.Date;
+            var t = EventTimePicker.Time;
+
+            bool isNow = d == DateTime.Today
+                && Math.Abs((DateTime.Now.TimeOfDay - t).TotalMinutes) < 1;
+            string when = isNow ? "现在" : $"{d:MM-dd} {t:hh\\:mm}";
+
+            TimeFoldLabel.Text =
+                (TimePickers.IsVisible ? "▾" : "▸") + $" 大概时间：{when}（点开改）";
         }
 
         protected override async void OnAppearing()

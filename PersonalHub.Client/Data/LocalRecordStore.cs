@@ -53,6 +53,9 @@ namespace PersonalHub.Client.Data
             // R8.2：想法「作废」。老行补 0。
             ("ideas",         "IsVoided",  "INTEGER NOT NULL DEFAULT 0"),
             ("ideas",         "VoidedAt",  "INTEGER NOT NULL DEFAULT 0"),
+
+            // R9：想法「落实成果」链接。老行补空串，避免 NULL 穿到字符串字段。
+            ("ideas",         "ArtifactUri", "TEXT NOT NULL DEFAULT ''"),
         };
 
         /// <summary>
@@ -124,8 +127,11 @@ namespace PersonalHub.Client.Data
 
                 if (cols.Contains(m.Column))
                 {
-                    // 列在但可能有 NULL（自动补列遗留），回填成 0
-                    await _db.ExecuteAsync($"UPDATE {m.Table} SET {m.Column} = 0 WHERE {m.Column} IS NULL")
+                    // 列在但可能有 NULL（自动补列遗留）。文本列回填空串、数值列回填 0 ——
+                    // 给 TEXT 回填 0 会让老行读出来是字符串 "0"
+                    //（比如 ArtifactUri="0" 会被当成一个假链接、ProblemId="0" 永远匹配不上）。
+                    string fill = m.Ddl.StartsWith("TEXT", StringComparison.OrdinalIgnoreCase) ? "''" : "0";
+                    await _db.ExecuteAsync($"UPDATE {m.Table} SET {m.Column} = {fill} WHERE {m.Column} IS NULL")
                         .ConfigureAwait(false);
                 }
                 else

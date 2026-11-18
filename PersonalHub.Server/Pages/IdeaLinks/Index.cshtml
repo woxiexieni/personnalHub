@@ -1,0 +1,104 @@
+@page
+@model PersonalHub.Server.Pages.IdeaLinks.IndexModel
+@{
+    ViewData["Title"] = "想法关系";
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>想法关系</h2>
+        <span class="hint">衍生 = 由它想到 · 矛盾 = 两个想法打架 · 建边/删边在手机上跟着想法走，网页只看不改</span>
+    </div>
+
+    <div class="kpis">
+        <div class="kpi">
+            <div class="label">全部关系</div>
+            <div class="num">@Model.Total</div>
+            <div class="sub">人手建出来的边，不是 AI 生成</div>
+        </div>
+        <div class="kpi">
+            <div class="label">衍生</div>
+            <div class="num">@Model.CountOf(0)</div>
+            <div class="sub">推理链和联想都算 —— 认知怎么长出来的</div>
+        </div>
+        <div class="kpi">
+            <div class="label">矛盾</div>
+            <div class="num">@Model.CountOf(1)</div>
+            <div class="sub">摆在一起，半年后自己裁决</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h2 style="font-size:14px">按类型</h2>
+        <span class="hint">类型刻意只有两种 —— 边本身比边的分类值钱</span>
+    </div>
+
+    <div class="filters">
+        <a class="btn sm @(Model.Kind < 0 ? "primary" : "")" href="/idealinks">
+            全部 <span style="opacity:.7">@Model.Total</span>
+        </a>
+        <a class="btn sm @(Model.Kind == 0 ? "primary" : "")" href="/idealinks?kind=0">
+            衍生 <span style="opacity:.7">@Model.CountOf(0)</span>
+        </a>
+        <a class="btn sm @(Model.Kind == 1 ? "primary" : "")" href="/idealinks?kind=1">
+            矛盾 <span style="opacity:.7">@Model.CountOf(1)</span>
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty">
+            @if (Model.Kind < 0)
+            {
+                <text>还没有想法关系。手机端想法库「⋯」→「关联到…」可以把两条想法连起来。</text>
+            }
+            else
+            {
+                <text>这个类型下还没有关系。</text>
+            }
+        </div>
+    }
+    else
+    {
+        <table class="grid">
+            <thead>
+            <tr>
+                <th style="width:88px">类型</th>
+                <th>起点（A）</th>
+                <th>终点（B）</th>
+                <th style="width:88px">建立</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var l in Model.Items)
+            {
+                <tr>
+                    <td><span class="@Model.KindClass(l.Kind)">@Model.KindText(l.Kind)</span></td>
+                    <td style="max-width:460px">
+                        <div style="overflow:hidden;text-overflow:ellipsis" title="@l.FromId">
+                            @Model.EndpointText(l.FromId)
+                        </div>
+                    </td>
+                    <td style="max-width:460px">
+                        <div style="overflow:hidden;text-overflow:ellipsis" title="@l.ToId">
+                            @(l.Kind == 1 ? Model.EndpointText(l.ToId) : "→ " + Model.EndpointText(l.ToId))
+                        </div>
+                    </td>
+                    <td style="white-space:nowrap;color:var(--muted)">@IndexModel.TimeText(l)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+
+        @if (Model.Hidden > 0)
+        {
+            <div class="hint" style="margin-top:12px">
+                还有 @Model.Hidden 条没有渲染（一次最多 300 条）。用上面的类型筛选收窄再看。
+            </div>
+        }
+    }
+</div>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.IdeaLinkPickerPage"
+             Title="选一条想法">
+
+    <!--
+        想法选择器（R9）：给「关联到…」用的。
+
+        整页只有一个搜索框 + 一列想法，点一条就带着结果回去。
+        刻意没有：多选、确认按钮、分类 —— 选一条想法不该是一个表单。
+    -->
+    <Grid RowDefinitions="Auto,*,Auto" Padding="20,14" RowSpacing="12">
+
+        <SearchBar Grid.Row="0"
+                   x:Name="SearchBox"
+                   Placeholder="搜正文里的词，空格隔开多个"
+                   TextChanged="OnSearchTextChanged"
+                   SearchButtonPressed="OnSearchCompleted"
+                   FontSize="14"/>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout x:Name="Rows" Spacing="8" Margin="0,2"/>
+        </ScrollView>
+
+        <VerticalStackLayout Grid.Row="2" Spacing="8">
+            <Label x:Name="HintLabel"
+                   Text="点一条就选它。当前显示最近的 200 条，搜词能翻全库。"
+                   FontSize="11"
+                   TextColor="{StaticResource Gray500}"
+                   LineBreakMode="WordWrap"/>
+
+            <Button Text="算了，不关联了"
+                    FontSize="13"
+                    HeightRequest="42"
+                    BackgroundColor="#F1EFE8"
+                    TextColor="#2C2C2A"
+                    Clicked="OnCancelClicked"/>
+        </VerticalStackLayout>
+
+    </Grid>
+
+</ContentPage>
