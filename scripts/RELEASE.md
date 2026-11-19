@@ -165,3 +165,45 @@ SHA1: 1A:99:28:70:12:50:C9:F0:4C:9D:E5:A0:C2:7E:5D:C7:7C:8E:80:08:75:58:6B:7A:EE
 ```bat
 adb shell dumpsys package com.companyname.personalhub.client | findstr versionName
 ```
+
+---
+
+## 八、服务端装成 Windows 服务（开机自启、无窗口）
+
+日常不用管。想要「开机就在跑、不占窗口、崩了自动重启」时做一次。
+
+**第一次装**（右键 → 以管理员身份运行）：
+
+```bat
+scripts\server-service.bat install
+```
+
+装完 `开机 → 什么都不用点 → 手机直接能连`。任务管理器 →「服务」里能看到 `PersonalHubServer`。
+
+**改完服务端代码后发新版**：
+
+```bat
+scripts\server-service.bat update
+```
+
+它会「重新 publish → 停服务 → 起服务」，一步到位。不要手动 `dotnet build` 再重启，
+服务跑的是 `out\server` 里的**发布版**，不是 `bin\Debug`。
+
+**其他命令**：
+
+| 命令 | 用途 | 要管理员 |
+|---|---|---|
+| `status` | 装了没 / 跑着没 / 端口通不通 | 否 |
+| `logs` | 打开 `logs\` 目录 | 否 |
+| `stop` / `start` / `restart` | 停 / 起 / 重启 | 是 |
+| `uninstall` | 卸载服务（**不动数据库和日志**） | 是 |
+
+### 三个必须知道的点
+
+1. **开发和它抢同一个数据库。** 服务和 `server-run.bat` 用的是同一个
+   `personalhub.db3`（都在仓库根）。写代码时先 `server-service.bat stop`，
+   否则端口 5000 被占、`server-run.bat` 起不来。
+2. **没有窗口，日志在 `logs\server-YYYY-MM-DD.log`**，保留 7 天。
+   服务起不来看日志第一行，通常是端口被占。
+3. **`sc create` 需要管理员**。脚本会自己检查，不是管理员会直接拒绝并提示。
+

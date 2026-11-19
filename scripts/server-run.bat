@@ -37,6 +37,10 @@ echo.
 echo     A server instance is probably ALREADY RUNNING.
 echo     Just keep using that one - no need to start another.
 echo.
+echo     If it is the Windows service (Task Manager - Services -^> PersonalHubServer):
+echo        scripts\server-service.bat status    ^(see it^)
+echo        scripts\server-service.bat stop      ^(stop it, then run this console one^)
+echo.
 echo     Listening PID:
 for /f "tokens=5" %%p in ('netstat -ano ^| findstr /C:":%PORT% " ^| findstr /C:"LISTENING"') do echo       %%p
 echo.

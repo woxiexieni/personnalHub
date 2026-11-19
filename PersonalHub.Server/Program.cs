@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.Extensions.Logging;
 using personalHub.Server.Data;
 using personalHub.Server.Services;
@@ -15,11 +16,24 @@ namespace PersonHub.Server
 {
     class Progrom
     {
+        /// <summary>是不是以 Windows 服务方式被 SCM 拉起来的（决定日志去哪、提示怎么写）。</summary>
+        private static bool _isService;
+
+        /// <summary>服务模式下的日志文件；控制台模式为 null。</summary>
+        private static string? _logFile;
+
         static void Main(string[] args)
         {
             // 控制台切到 UTF-8 输出（start-server.bat 里已执行 chcp 65001，这里再显式指定一次，
             // 保证中文提示不变成乱码）。可能被重定向/无控制台，失败就忽略。
             try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { }
+
+            // ===== 服务模式：没有窗口，Console 无处可去 =====
+            // 不做重定向的话，服务起来后所有启动信息（库路径、端口、AI 有没有配 key、
+            // 端口被占用导致退出的原因）全部消失 —— 出问题时只能猜。
+            // 所以这里把 Console 整体接到 logs\server-YYYY-MM-DD.log。
+            _isService = WindowsServiceHelpers.IsWindowsService();
+            if (_isService) InitFileLog();
 
             // ===== 版本号：来自仓库根目录 version.txt（Directory.Build.props 烧进程序集）=====
             // 用途：确认手机上连的、你启动的到底是哪一版。--version 只打印版本就退出。
@@ -69,6 +83,19 @@ namespace PersonHub.Server
                 Console.WriteLine($"      3) 想换个端口跑：set PERSONALHUB_PORT=5001 后再启动（客户端也要跟着改）；");
                 Console.WriteLine($"         只想换网页端口：set PERSONALHUB_WEB_PORT=8080。");
                 Console.WriteLine();
+                if (_isService)
+                {
+                    Console.WriteLine("      注意：本次是以 Windows 服务方式启动的 —— 端口被占说明");
+                    Console.WriteLine("            另有实例在跑（另一个服务实例，或一个没关的控制台窗口）。");
+                    Console.WriteLine("            查状态：scripts\\server-service.bat status");
+                }
+                else
+                {
+                    Console.WriteLine("      注意：如果它是以 Windows 服务在后台跑（任务管理器 →「服务」里能看到");
+                    Console.WriteLine("            PersonalHubServer），那就不是窗口，用下面这条停掉它再开控制台版：");
+                    Console.WriteLine("            scripts\\server-service.bat stop");
+                }
+                Console.WriteLine();
                 // 只有在真的有控制台时才等待按键（被脚本/管道调用时 ReadKey 会抛异常）
                 if (!Console.IsInputRedirected)
                 {
@@ -93,7 +120,16 @@ namespace PersonHub.Server
             // 排查「手机到底有没有连进来」时完全无从判断（看着像没收到，其实可能收到了）。
             // 这里显式开到 Information，之后每个请求都会打印一行：
             //   Request starting HTTP/2 POST /personalhub.System/System/Ping
-            builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Information);
+            //
+            // 服务模式例外：手机一天要发几十上百次请求，长期常驻会把日志文件写大，
+            // 而这时候没人盯着看。服务模式只留 Warning 以上，出问题也够定位。
+            builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics",
+                _isService ? LogLevel.Warning : LogLevel.Information);
+
+            // 关键的一行：告诉宿主「可能有个 SCM 在管我」。
+            // 服务模式下它接管启动/停止信号，并把 ContentRoot 钉到 exe 目录；
+            // 普通控制台运行时它是 no-op，`server-run.bat` 的行为一点不变。
+            if (_isService) builder.Host.UseWindowsService();
 
             // 1. 注册 gRPC 服务
             builder.Services.AddGrpc();
@@ -290,9 +326,78 @@ namespace PersonHub.Server
             Console.WriteLine("[OK] 服务端已启动，等待手机连接...");
             Console.WriteLine("     (手机要和这台电脑连同一个 Wi-Fi；客户端会自动扫描本网段找到它)");
             Console.WriteLine();
-            Console.WriteLine("     关闭这个窗口 = 停止服务端。");            Console.WriteLine();
+            if (_isService)
+            {
+                Console.WriteLine("     [服务模式] 后台常驻，没有窗口；开机自动启动。");
+                Console.WriteLine($"     日志: {_logFile}（保留 7 天）");
+                Console.WriteLine("     停/重启: scripts\\server-service.bat stop | restart");
+            }
+            else
+            {
+                Console.WriteLine("     关闭这个窗口 = 停止服务端。");
+            }
+            Console.WriteLine();
             Console.WriteLine("------------------------------------------------------------");
             app.WaitForShutdown();
+        }
+
+        /// <summary>
+        /// 服务模式：把 Console 整体接到 logs\server-YYYY-MM-DD.log。
+        /// 目录规则和 personalhub.db3 / ai.json 完全一致（向上找 .sln，找不到用 exe 目录），
+        /// 所以日志和数据库永远落在同一个地方，排查时不用两头找。
+        /// </summary>
+        private static void InitFileLog()
+        {
+            try
+            {
+                string root = FindRoot(AppContext.BaseDirectory);
+                string dir = Path.Combine(root, "logs");
+                Directory.CreateDirectory(dir);
+
+                // 只留最近 7 天：服务常年不重启，不清理会一直涨。
+                try
+                {
+                    foreach (string old in Directory.GetFiles(dir, "server-*.log"))
+                    {
+                        if (File.GetLastWriteTime(old) < DateTime.Now.AddDays(-7))
+                            File.Delete(old);
+                    }
+                }
+                catch { /* 清理失败不影响记录 */ }
+
+                _logFile = Path.Combine(dir, $"server-{DateTime.Now:yyyy-MM-dd}.log");
+
+                var stream = new FileStream(_logFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false)) { AutoFlush = true };
+
+                // TextWriter.Synchronized 是必需的：Kestrel 的日志是多线程并发写的。
+                Console.SetOut(TextWriter.Synchronized(writer));
+                Console.SetError(Console.Out);
+
+                // 写一行分界：服务异常崩溃被 SCM 重启时，日志里能数出启动了几次。
+                Console.WriteLine();
+                Console.WriteLine($"===== 服务启动 {DateTime.Now:yyyy-MM-dd HH:mm:ss} =====");
+            }
+            catch
+            {
+                // 日志开不起来也必须继续跑 —— 服务起不来比丢日志糟得多。
+            }
+        }
+
+        /// <summary>向上找含 .sln 的目录（与 Db / AiConfig 的解析规则一致）。</summary>
+        private static string FindRoot(string startDir)
+        {
+            try
+            {
+                var dir = new DirectoryInfo(startDir);
+                while (dir != null)
+                {
+                    if (dir.GetFiles("*.sln").Length > 0) return dir.FullName;
+                    dir = dir.Parent;
+                }
+            }
+            catch { }
+            return startDir;
         }
 
         /// <summary>

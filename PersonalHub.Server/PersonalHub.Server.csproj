@@ -16,6 +16,12 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <!-- Windows 服务宿主：`sc create` 注册的是"服务"，但控制台程序本身不会向 SCM 报到，
+         直接注册再启动会报 1053（服务未能及时响应）。UseWindowsService() 负责握住 SCM 的手：
+         启动/停止信号、以及在服务模式下把 ContentRoot 钉到 exe 目录（否则工作目录是 System32，
+         wwwroot 找不到 → 管理端页面能开但没样式）。
+         非服务方式运行时它什么都不做，同一个 exe 两种跑法互不影响。 -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
     <!-- 账单落盘：与服务端「换 SQLite」目标一致。自带 SQLitePCLRaw.bundle_green，Windows x64 直接可用。 -->
     <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
   </ItemGroup>
