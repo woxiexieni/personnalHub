@@ -123,6 +123,40 @@ namespace PersonalHub.Server.Pages.Ideas
             return t.Length <= 140 ? t : t.Substring(0, 140) + "…";
         }
 
+        // ============================================================
+        // 成果列（R9）：手机上报的 obsidian:// 链接，管理端也要能点开
+        // ============================================================
+
+        /// <summary>
+        /// 能直接做成超链接的才返回 href，否则返回 null（页面按纯文本显示文件名）。
+        ///
+        /// 只放行 obsidian:// 和 http(s):// 三种 scheme，不是洁癖：
+        /// 管理端跑在局域网里，同一 Wi-Fi 下谁都能打开，而这个字段的内容来自手机输入框。
+        /// 一个 javascript: 或 data: 开头的东西做成 href 就是存储型 XSS。
+        /// 本地路径（D:\…）浏览器一律拦 file://，做成链接点了也没反应，所以不走这里。
+        /// </summary>
+        public static string? ArtifactHref(Idea i)
+        {
+            string u = (i.ArtifactUri ?? string.Empty).Trim();
+            if (u.Length == 0) return null;
+
+            if (u.StartsWith("obsidian://", StringComparison.OrdinalIgnoreCase)) return u;
+            if (u.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) return u;
+            if (u.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return u;
+            return null;
+        }
+
+        /// <summary>不能点的那种（本地文件路径）：只显示最后一段，完整内容放 title 里。</summary>
+        public static string ArtifactText(Idea i)
+        {
+            string u = (i.ArtifactUri ?? string.Empty).Trim();
+            if (u.Length == 0) return "—";
+
+            int cut = u.LastIndexOfAny(new[] { '\\', '/' });
+            string name = cut >= 0 && cut < u.Length - 1 ? u.Substring(cut + 1) : u;
+            return name.Length <= 20 ? name : name.Substring(0, 20) + "…";
+        }
+
         /// <summary>本周一 00:00（固定 UTC+8），Unix 毫秒。</summary>
         private static long WeekStartMs()
         {

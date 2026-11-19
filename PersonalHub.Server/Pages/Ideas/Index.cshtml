@@ -106,6 +106,7 @@
                 <th style="width:88px">类型</th>
                 <th>正文</th>
                 <th style="width:104px">落实</th>
+                <th style="width:96px">成果</th>
                 <th style="width:88px">目标</th>
             </tr>
             </thead>
@@ -138,6 +139,21 @@
                         @if (i.Done)
                         {
                             <span class="tag done" title="标记于 @Fmt.DateTimeText(i.DoneAt)">@IndexModel.DoneText(i)</span>
+                        }
+                        else
+                        {
+                            <span style="color:var(--muted)">—</span>
+                        }
+                    </td>
+                    <td>
+                        @{ var artifactHref = IndexModel.ArtifactHref(i); }
+                        @if (artifactHref is not null)
+                        {
+                            <a class="btn sm" href="@artifactHref" title="@i.ArtifactUri">📄 打开</a>
+                        }
+                        else if (!string.IsNullOrEmpty(i.ArtifactUri))
+                        {
+                            <span style="color:var(--muted)" title="@i.ArtifactUri">@IndexModel.ArtifactText(i)</span>
                         }
                         else
                         {

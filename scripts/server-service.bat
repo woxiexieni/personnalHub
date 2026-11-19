@@ -51,10 +51,19 @@ if not defined PH_IS_ADMIN (
     if not errorlevel 1 set "PH_IS_ADMIN=1"
 )
 
-REM ---- no argument: elevated -> install (the usual intent), otherwise show help ----
-if "%CMD%"=="" (
-    if defined PH_IS_ADMIN (set "CMD=install") else (set "CMD=usage")
+REM ---- no argument: work out the usual intent so a plain double-click is ----
+REM ---- enough (no need to remember the command names).                      ----
+REM   elevated + not installed  -> install
+REM   elevated + already there  -> update   (stop, publish, start)
+REM   not elevated              -> usage
+if not "%CMD%"=="" goto :cmd_ready
+if not defined PH_IS_ADMIN (
+    set "CMD=usage"
+    goto :cmd_ready
 )
+sc.exe query "%SVC%" >nul 2>&1
+if errorlevel 1 (set "CMD=install") else (set "CMD=update")
+:cmd_ready
 
 echo ============================================================
 echo  PersonalHub service - %CMD%
@@ -108,10 +117,12 @@ echo     status      installed? running? which ports?                 [no admin]
 echo     logs        open the log folder                              [no admin]
 echo.
 echo HOW TO RUN:
-echo   1. For [admin] commands: close this window, RIGHT-CLICK this .bat,
-echo      choose "Run as administrator", and type the command you want.
-echo      Running it with no argument as administrator = install.
-echo   2. status / logs work from a normal double-click.
+echo   1. RIGHT-CLICK this .bat and choose "Run as administrator".
+echo      - If the service is NOT installed yet, it installs it.
+echo      - If it IS installed, it republishes and restarts (same as "update").
+echo   2. You only need to type a command when you want something else,
+echo      for example:  server-service.bat stop
+echo   3. status / logs work from a normal double-click.
 echo.
 goto :done
 
@@ -278,21 +289,41 @@ goto :done
 
 REM ===========================================================================
 :update
-echo [*] Publishing latest code...
-call :publish
-if errorlevel 1 goto :fail
-echo.
-
+REM  ORDER MATTERS: the running service holds out\server\PersonalHub.Server.exe
+REM  open, so publishing while it runs fails with MSB4018
+REM  ("The process cannot access the file ... being used by another process").
+REM  Stop FIRST, then publish, then start.
 sc.exe query "%SVC%" >nul 2>&1
 if errorlevel 1 (
-    echo [--] Service is not installed yet. Now run:
-    echo        server-service.bat install
+    echo [--] Service is not installed yet - publishing only.
+    echo.
+    call :publish
+    if errorlevel 1 goto :fail
+    echo.
+    echo     Now install it:  server-service.bat install
     goto :done
 )
 
 echo [*] Stopping service (it holds the exe open)...
 sc.exe stop "%SVC%" >nul 2>&1
 call :wait_state STOPPED 30
+if errorlevel 1 (
+    echo.
+    echo [!] Could not stop the service - the exe is still locked.
+    echo     Current state:
+    sc.exe query "%SVC%"
+    goto :fail
+)
+
+echo [*] Publishing latest code...
+call :publish
+if errorlevel 1 (
+    echo.
+    echo [!] Publish FAILED and the service is now STOPPED.
+    echo     Fix the error, then run: server-service.bat update
+    goto :fail
+)
+echo.
 
 echo [*] Starting service...
 sc.exe start "%SVC%"
