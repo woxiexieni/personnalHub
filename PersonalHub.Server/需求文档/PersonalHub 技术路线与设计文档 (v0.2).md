@@ -260,7 +260,7 @@ namespace PersonalHub.Server
 
 
 
-> ## 1018 今天主要是搞了Ptoto的后续新功能接入问题，
+> ## 1018 今天主要是搞了Proto的后续新功能接入问题，
 >
 > ### 1.新加入了事件反思录入功能。
 >
@@ -283,7 +283,34 @@ namespace PersonalHub.Server
 >
 > ##### 5服务器那边我还没写呢，害，我感觉以后全vibe coding得了。ai出现，就是降低门槛得，没必要去擅长自己不擅长得事情呀。
 
-
+> ## 1123 现在项目已经迭代了很多版了，我想现在开始去看一下项目的代码，把架构什么的搞清楚。
+>
+> 今天就是看了数据库如何增删查改。
+> 他使用了SQLite-net-pcl这个包 下面这些就是和他
+>
+> ```
+> 
+> （他对应的就是using  using SQLite;)
+>   [NotNull]
+>         [PrimaryKey]
+> SQLiteAsyncConnection
+> ```
+>
+> 然后支持异步信号量就是 SemaphoreSlim _initGate = new(1, 1);//SemaphoreSlim是异步锁。lock是同步锁，new(1,1) 1：初始可用信号量。1：允许执行最大个数
+>
+> 增删改查直接就是 return await _db.UpdateAsync(record).ConfigureAwait(false);
+> 我感觉这里最牛逼的地方
+> 就是一个连接可以查询多个库里的多个表。他这里设计的好的地方。
+>
+> | 序号 | 逻辑                                                         | 说明                                                         |
+> | ---- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+> | 1    | LocalRecordBase 基类；                                       |                                                              |
+> | 2    | 数据库一个表对应一个类：ThingRecord，LocalBlock等            |                                                              |
+> | 3    | public class LocalRecordStore<T> where T : LocalRecordBase, new() | 泛型类对应每个表存储：实现一个库多个表，一个连接，去查询多个。 |
+> | 4    | private static readonly ConcurrentDictionary<string, SQLiteAsyncConnection> SharedConnections = new(); | 全局共享的 SQLite 连接缓存容器，线程安全字典，多线程         |
+> | 5    | InsertAsync(T record)，UpdateAsync(T record)，DeleteAsync(string id)，FindAsync(string id) | 增删改查，                                                   |
+> | 6    | string dbPath = Path.Combine(FileSystem.AppDataDirectory, "personalhub.db3");<br/>builder.Services.AddSingleton(new LocalRecordStore<LocalRecord>(dbPath)); | DI 实现服务依赖注入                                          |
+>
 
 
 
