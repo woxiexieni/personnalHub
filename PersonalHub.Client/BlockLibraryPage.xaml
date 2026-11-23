@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.BlockLibraryPage"
+             Title="时间块库">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20,12" Spacing="10">
+
+            <!-- 顶部：哪一段 + 当前筛选摘要 -->
+            <Grid ColumnDefinitions="*,Auto">
+                <VerticalStackLayout Grid.Column="0" Spacing="1">
+                    <Label x:Name="RangeLabel" Text="全部" FontSize="15" FontAttributes="Bold"/>
+                    <Label x:Name="RangeSubLabel" Text="最近 30 天 · 本地副本" FontSize="11"
+                           TextColor="{StaticResource Gray500}"/>
+                </VerticalStackLayout>
+                <Button Grid.Column="1" x:Name="ClearBtn" Text="清筛选"
+                        IsVisible="False"
+                        FontSize="12" HeightRequest="32" Padding="12,0"
+                        BackgroundColor="Transparent"
+                        TextColor="{StaticResource Gray500}"
+                        BorderWidth="1" BorderColor="{StaticResource Gray300}"
+                        Clicked="OnClearClicked"/>
+            </Grid>
+
+            <!-- 搜索：常驻，空格 AND / -排除 / 引号短语，匹配备注 + 那句「下次怎么做」 -->
+            <Border Style="{StaticResource FieldBorder}" Padding="12,8">
+                <Entry x:Name="SearchEntry"
+                       Placeholder="搜备注、片名、目标…（空格分隔 = 同时含，-开头 = 不含）"
+                       FontSize="13"
+                       TextChanged="OnSearchTextChanged"/>
+            </Border>
+
+            <!-- 筛选 chips：全部 / 待同步 / 片 / 目标。只列数据里出现过的，不摆空格子 -->
+            <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+                <HorizontalStackLayout x:Name="ChipRow" Spacing="6" Padding="0,2"/>
+            </ScrollView>
+
+            <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
+
+            <!-- 按天倒序的分节列表 -->
+            <VerticalStackLayout x:Name="Rows" Spacing="6"/>
+
+            <Label x:Name="EmptyLabel" Text=" " IsVisible="False"
+                   FontSize="13" TextColor="{StaticResource Gray500}"
+                   HorizontalOptions="Center" Margin="0,24"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

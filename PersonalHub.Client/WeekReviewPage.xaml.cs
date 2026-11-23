@@ -217,7 +217,7 @@ namespace PersonalHub.Client
                 ? (_offset == 0 ? "这周还没有记录。记第一条就会出现在这里。" : "这一周没有记录。")
                 : $"这周的 7 天里有 {days} 天留下了记录"
                   + (prevMin > 0 ? $"，上周是 {prevDays} 天。" : "。")
-                  + $"共 {thisWeek.Count} 条。";
+                  + $"共 {thisWeek.Count} 条，点这张卡看每一条。";
 
             _thisMin = nowMin;
             _lastMin = prevMin;
@@ -338,6 +338,12 @@ namespace PersonalHub.Client
             };
             row.Add(right, 1);
 
+            // R10：整行可点 → 库里这个目标本周的块。用闭包捕获 id（sender 归属不赌版本）。
+            var goalTap = new TapGestureRecognizer();
+            goalTap.Tapped += async (_, _) =>
+                await OpenLibraryAsync($"goal={Uri.EscapeDataString(goal.Id)}");
+            row.GestureRecognizers.Add(goalTap);
+
             return row;
         }
 
@@ -449,6 +455,12 @@ namespace PersonalHub.Client
                 };
 
                 RepeatPanel.Children.Add(card);
+
+                // R10：点卡 → 库里搜这句话（本周）。Lesson 会跟着块走，搜索框预填原文。
+                string encoded = Uri.EscapeDataString(r.Display);
+                var repeatTap = new TapGestureRecognizer();
+                repeatTap.Tapped += async (_, _) => await OpenLibraryAsync($"q={encoded}");
+                card.GestureRecognizers.Add(repeatTap);
             }
         }
 
@@ -555,8 +567,44 @@ namespace PersonalHub.Client
                     HorizontalTextAlignment = TextAlignment.End,
                 }, 2);
 
+                // R10：点行 → 库里这个片本周的块。
+                string pieceCode = code;
+                var shiftTap = new TapGestureRecognizer();
+                shiftTap.Tapped += async (_, _) =>
+                    await OpenLibraryAsync($"piece={Uri.EscapeDataString(pieceCode)}");
+                row.GestureRecognizers.Add(shiftTap);
+
                 ShiftPanel.Children.Add(row);
             }
+        }
+
+        // ============================================================
+        // 点进明细（R10）：每个数都是通往时间块库的快捷方式
+        // ============================================================
+        //
+        // 这一页是汇总，汇总的宿命是"看的人想追问"。以前数字只能看着，
+        // 现在每一处都能点进库（BlockLibraryPage）—— 范围、片、目标、搜索词
+        // 由这里带过去，库里一进来就是"已经筛好的样子"。
+
+        /// <summary>跳库。extra 形如 "piece=code" / "goal=id" / "q=…"，已编码。</summary>
+        private async Task OpenLibraryAsync(string extra = "")
+        {
+            try
+            {
+                string url = $"{OverviewCatalog.BlockLibraryRoute}?range=week&offset={_offset}";
+                if (extra.Length > 0) url += "&" + extra;
+                await Shell.Current.GoToAsync(url);
+            }
+            catch
+            {
+                StatusLabel.Text = "没找到时间块库";
+            }
+        }
+
+        /// <summary>投入卡整卡可点（XAML 挂的手势）。</summary>
+        private async void OnOpenLibraryTapped(object? sender, TappedEventArgs e)
+        {
+            await OpenLibraryAsync();
         }
 
         // ============================================================

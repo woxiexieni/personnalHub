@@ -117,6 +117,7 @@ namespace PersonalHub.Client
             builder.Services.AddTransient<RecordDothingPage>(); // 目录 → 事件卡（录入）
             builder.Services.AddTransient<EventListPage>();     // 目录 → 事件卡库（全量 + 筛选）
             builder.Services.AddTransient<BlockEntryPage>();    // 目录 → 时间块（R2 主入口）
+            builder.Services.AddTransient<BlockLibraryPage>();  // 时间概览页内 → 时间块库（R10 全量可翻 + 轻编辑）
             builder.Services.AddTransient<GoalListPage>();      // 时间块页顶部 → 目标
             builder.Services.AddTransient<GoalDetailPage>();    // 目标列表 → 详情（带 ?id=）
             builder.Services.AddTransient<QuarterReviewPage>(); // 目标列表 → 回顾（三个数 + 该砍的）

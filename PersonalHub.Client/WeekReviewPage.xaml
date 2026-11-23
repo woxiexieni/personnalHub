@@ -23,8 +23,12 @@
             </Grid>
 
             <!-- ============ 一、投入：这周 vs 上周 ============ -->
-            <!-- 没有百分比完成率，也没有"效率"：分钟是记出来的，效率是估出来的 -->
+            <!-- 没有百分比完成率，也没有"效率"：分钟是记出来的，效率是估出来的。
+                 整卡可点 → 时间块库（本周）。数字是汇总，想追问"哪几条凑出来的"就该点进去。 -->
             <Border Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="14,12">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnOpenLibraryTapped"/>
+                </Border.GestureRecognizers>
                 <VerticalStackLayout Spacing="8">
                     <Label Text="这周投入" FontSize="12" TextColor="{StaticResource Gray500}"/>
 

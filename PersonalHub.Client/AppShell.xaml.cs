@@ -97,6 +97,11 @@ namespace PersonalHub.Client
                 OverviewCatalog.WeekReviewRoute,
                 new ServiceRouteFactory(typeof(WeekReviewPage)));
 
+            // R10：时间块库（全量可翻 + 筛选 + 轻编辑）。时间概览页内进；周回顾的数字也通到这里。
+            Routing.RegisterRoute(
+                OverviewCatalog.BlockLibraryRoute,
+                new ServiceRouteFactory(typeof(BlockLibraryPage)));
+
             // 以前这里还有一个「数据与恢复」页。2026-10-21 撤掉：
             // 它把"数据会不会丢"变成一件要用户记得去做的事。
             // 现在由 StartupRestoreService 在本机为空时自动跑一次，没有入口。

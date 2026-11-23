@@ -1277,133 +1277,21 @@ namespace PersonalHub.Client
             var row = await _blocks.FindAsync(id);
             if (row is null) return;
 
-            string name = _settings.DisplayName(row.PieceCode);
-            string pick = await DisplayActionSheet(
-                $"{name}　{(row.DurationMin > 0 ? FormatMinutes(row.DurationMin) : "未填时长")}",
-                "取消", null, "改时长", "换目标", "备注", "删除");
-
-            switch (pick)
-            {
-                case "改时长":
-                    await ChangeDurationAsync(row);
-                    break;
-                case "换目标":
-                    await ChangeGoalAsync(row);
-                    break;
-                case "备注":
-                    await ChangeNoteAsync(row);
-                    break;
-                case "删除":
-                    await DeleteAsync(row);
-                    break;
-            }
-        }
-
-        private async Task ChangeNoteAsync(LocalBlock row)
-        {
-            // 换成卡片式多行编辑：原来的单行弹框只露出尾巴，改一段旧备注等于盲改
-            string? input = await TextEditorPage.ShowAsync(
-                $"备注 · {_settings.DisplayName(row.PieceCode)}",
-                initial: row.Note,
-                placeholder: "比如「理发」「路上顺便买了电池」",
-                compact: true,
-                maxLength: 200);
-            if (input is null) return;   // 取消 = 不改
-
-            row.Note = input;
-            row.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            row.Synced = false;
-
-            await _blocks.UpdateAsync(row);
-            await RefreshTodayAsync();
-            await LoadNotePoolAsync();   // 备注改了，补全池跟着变
-            _ = SyncAndRefreshAsync();
-        }
-
-        private async Task ChangeDurationAsync(LocalBlock row)
-        {
-            var options = Pieces.Durations.Select(FormatMinutes).ToList();
-            options.Add("自定义…");
-
-            string pick = await DisplayActionSheet("改成多久", "取消", null, options.ToArray());
-            if (string.IsNullOrEmpty(pick) || pick == "取消") return;
-
-            int minutes;
-            if (pick == "自定义…")
-            {
-                string? input = await DisplayPromptAsync("自定义时长", "分钟数（1 ~ 1440）",
-                    initialValue: row.DurationMin > 0 ? row.DurationMin.ToString() : "30",
-                    maxLength: 4, keyboard: Keyboard.Numeric);
-                if (input is null) return;
-                if (!int.TryParse(input, out minutes) || minutes < 1 || minutes > 1440)
+            // 改时长/换目标/备注/删除的逻辑在 BlockRowEditor —— R10 时间块库用同一套，
+            // 这边只多了「删除」（库是回看用的不给删，今天记错的当场清掉）。
+            // 改完要刷的不只是列表：备注变了补全池也跟着变，所以刷新动作整体传过去。
+            string? message = await BlockRowEditor.MenuAsync(
+                this, row, _blocks, _goals, _settings, _blockSync, allowDelete: true,
+                onChanged: async () =>
                 {
-                    StatusLabel.Text = "时长要在 1 ~ 1440 分钟之间";
-                    return;
-                }
-            }
-            else
-            {
-                int idx = options.IndexOf(pick);
-                if (idx < 0) return;
-                minutes = Pieces.Durations[idx];
-            }
+                    await RefreshTodayAsync();
+                    await RefreshStatsAsync();
+                    await LoadNotePoolAsync();
+                });
 
-            row.DurationMin = minutes;
-            row.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            row.Synced = false;
+            if (message is null) return;   // 取消 = 不动界面
 
-            await _blocks.UpdateAsync(row);
-            StatusLabel.Text = $"已改成 {FormatMinutes(row.DurationMin)}";
-
-            await RefreshTodayAsync();
-            await RefreshStatsAsync();
-            _ = SyncAndRefreshAsync();
-        }
-
-        private async Task ChangeGoalAsync(LocalBlock row)
-        {
-            var names = new List<string> { "不归任何目标" };
-            names.AddRange(_activeGoals.Select(g => g.Title));
-
-            string? pick = await DisplayActionSheet("归到哪个目标", "取消", null, names.ToArray());
-            if (string.IsNullOrEmpty(pick) || pick == "取消") return;
-
-            int idx = names.IndexOf(pick);
-            row.GoalId = idx <= 0 ? string.Empty : _activeGoals[idx - 1].Id;
-            row.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            row.Synced = false;
-
-            await _blocks.UpdateAsync(row);
-            StatusLabel.Text = idx <= 0 ? "已取消目标归属" : $"已归到「{pick}」";
-
-            await RefreshTodayAsync();
-            _ = SyncAndRefreshAsync();
-        }
-
-        private async Task DeleteAsync(LocalBlock row)
-        {
-            bool ok = await DisplayAlert("删除这条？",
-                $"{_settings.DisplayName(row.PieceCode)}　{(row.DurationMin > 0 ? FormatMinutes(row.DurationMin) : "未填时长")}",
-                "删除", "取消");
-            if (!ok) return;
-
-            if (row.Synced)
-            {
-                // 已同步：留墓碑，否则下次镜像同步又会被拉回来
-                row.Deleted = true;
-                row.Synced = false;
-                row.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                await _blocks.UpdateAsync(row);
-            }
-            else
-            {
-                await _blocks.DeleteAsync(row.Id);
-            }
-
-            StatusLabel.Text = "已删除";
-            await RefreshTodayAsync();
-            await RefreshStatsAsync();
-            _ = SyncAndRefreshAsync();
+            StatusLabel.Text = message;
         }
 
         // ============================================================

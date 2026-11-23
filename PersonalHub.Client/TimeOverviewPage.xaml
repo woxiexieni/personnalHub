@@ -8,7 +8,7 @@
         <ScrollView>
             <VerticalStackLayout Padding="20,16" Spacing="14">
 
-                <Grid ColumnDefinitions="*,Auto">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                     <Label
                         x:Name="ConnLabel"
                         Grid.Column="1"
@@ -16,6 +16,15 @@
                         FontSize="11"
                         TextColor="{StaticResource Gray500}"
                         VerticalOptions="Center"/>
+
+                    <!-- R10：时间块库入口。统计页回答"花在哪"，库回答"具体是哪几条" ——
+                         两个问题要在同一个地方能互相走过去，不然看统计时想追问只能干瞪眼。 -->
+                    <Button x:Name="LibraryBtn" Grid.Column="2" Text="翻库 ›"
+                            FontSize="12" Padding="12,0" HeightRequest="32"
+                            BackgroundColor="Transparent"
+                            TextColor="{StaticResource Gray500}"
+                            BorderWidth="1" BorderColor="{StaticResource Gray300}"
+                            Clicked="OnLibraryClicked"/>
                 </Grid>
 
                 <!-- 三个档位。不做自定义区间：时间块的用途是"看清这段日子怎么过的"，

@@ -21,6 +21,12 @@ namespace PersonalHub.Client.Services
         /// <summary>周回顾页路由（WeekReviewPage）：这周 vs 上周，四个数，0 输入。</summary>
         public const string WeekReviewRoute = "view/week";
 
+        /// <summary>
+        /// 时间块库路由（BlockLibraryPage，R10）：全量可翻的时间块明细。
+        /// 入口在时间概览页内；这周回顾的每个数字也通到这里（带 range/piece/goal/q 参数）。
+        /// </summary>
+        public const string BlockLibraryRoute = "view/blocklib";
+
         public static List<DirectoryItem> Build(
             LocalRecordStore<LocalRecord> expenses,
             LocalRecordStore<LocalBlock> blocks,

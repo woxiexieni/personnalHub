@@ -406,6 +406,19 @@ namespace PersonalHub.Client
             }
         }
 
+        /// <summary>R10：去时间块库翻明细。不带参数 = 全部，想看哪段在库里自己筛。</summary>
+        private async void OnLibraryClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                await Shell.Current.GoToAsync(OverviewCatalog.BlockLibraryRoute);
+            }
+            catch
+            {
+                FooterLabel.Text = "没找到时间块库";
+            }
+        }
+
         // ============================================================
         // 口径与格式化
         // ============================================================
