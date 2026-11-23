@@ -129,6 +129,13 @@ namespace personalHub.Server.Data
             // R9：想法「落实成果」链接。老行补空串（NULL 穿进 string 字段会变成空引用）。
             EnsureColumn("ideas",   "artifact_uri", "TEXT NOT NULL DEFAULT ''", "''");
 
+            // R11：计划行动的二次分类（0 能干的 / 1 计划）+ 四象限两个布尔。
+            // 老行全部落 0 = 能干的。刻意不猜：判错的代价不对称，
+            // 高估"能做"撞一次就知道，低估则会让小事永远动不了。
+            EnsureColumn("ideas",   "plan_kind",  "INTEGER NOT NULL DEFAULT 0", "0");
+            EnsureColumn("ideas",   "urgent",     "INTEGER NOT NULL DEFAULT 0", "0");
+            EnsureColumn("ideas",   "important",  "INTEGER NOT NULL DEFAULT 0", "0");
+
             // R7.2：事件卡挂问题卡。老行补空串（NULL 穿进 string 字段会变成空引用）。
             EnsureColumn("things",  "problem_id", "TEXT NOT NULL DEFAULT ''", "''");
 

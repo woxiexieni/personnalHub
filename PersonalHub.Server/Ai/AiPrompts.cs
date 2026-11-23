@@ -388,6 +388,9 @@ namespace personalHub.Server.Ai
                 7. 命中 match_problem_id 时，可以给一条 suggested_attempt（≤30字）：
                    针对"这一件事"给一个具体可做的应对动作，不是人生建议。
                    说不出具体动作就留空，宁缺毋滥。
+                8. title 是"这件事叫什么"，不是原文第一句的抄写。
+                   ≤16 字，说清"谁 + 发生了什么"，例如「被说撒谎时用重话自证」。
+                   细节全部放 facts，标题只留一句概括。超过 16 字就会在手机上变成半句话。
 
                 只输出 JSON，格式：
                 {"events":[{"event_index":0,"title":"...","emotion":"...","tag":"...","facts":"...","action":"...","initial_thought":"...","result":"...","question":"..."}],
@@ -454,8 +457,11 @@ namespace personalHub.Server.Ai
                     if (!emotions.Contains(emotion)) continue;       // 编出来的情绪整张丢
                     if (!tags.Contains(tag)) continue;
 
-                    string title = OneLine(Str(el, "title"), 20);
-                    if (title.Length == 0) title = OneLine(facts, 15);
+                    // 提示词要求 ≤16 字；这里留到 28 是防呆（AI 偶尔不听话），
+                    // 真超了就带省略号，别让用户看到半句话还以为是自己的数据坏了
+                    string title = OneLine(Str(el, "title"), 28, ellipsis: true);
+                    if (title.Length == 0) title = FirstSentence(facts, 20);
+                    if (title.Length == 0) title = "（未命名）";
 
                     events.Add(new EventDraftRow(
                         Int(el, "event_index"),
@@ -656,12 +662,45 @@ namespace personalHub.Server.Ai
         }
 
         /// <summary>压成一行：模型很爱在 JSON 字符串里塞 \n，那会让卡片突然变很高。</summary>
-        private static string OneLine(string? s, int max)
+        private static string OneLine(string? s, int max, bool ellipsis = false)
         {
             s = (s ?? string.Empty).Replace("\r", " ").Replace("\n", " ").Trim();
             while (s.Contains("  ")) s = s.Replace("  ", " ");
-            if (s.Length > max) s = s.Substring(0, max).TrimEnd('，', '。', ',', ' ');
+            if (s.Length > max)
+            {
+                s = s.Substring(0, max).TrimEnd('，', '。', ',', ' ', '、');
+                // 静默截断是这次 bug 的根源：用户看到"她说我容"会以为是 AI 出错，
+                // 而不是"后面还有字没显示"。宁可多一个省略号，也不要留半句话。
+                if (ellipsis) s += "…";
+            }
             return s;
+        }
+
+        /// <summary>
+        /// 取第一句完整的话（遇到句末标点就停）。标题兜底用 ——
+        /// 硬切会把句子砍成半截（"她说我容"），半截句子看不出被截断，只会看着像 bug。
+        /// </summary>
+        private static string FirstSentence(string? s, int max)
+        {
+            s = OneLine(s, 400);
+            if (s.Length == 0) return string.Empty;
+
+            // 找最靠前的句末标点
+            int end = s.Length;
+            foreach (char c in "。！？；!?;")
+            {
+                int i = s.IndexOf(c);
+                if (i > 0 && i < end) end = i;
+            }
+
+            if (end > max)
+            {
+                // 一句话太长：退到第一个逗号；逗号也在太前面（不足 5 字）就硬切
+                int comma = s.IndexOfAny(new[] { '，', ',', '、' });
+                end = comma > 4 ? comma : max;
+            }
+
+            return s.Substring(0, Math.Min(end, s.Length)).TrimEnd('，', '。', ',', ' ', '、');
         }
 
         private static int NearestDuration(int minutes)

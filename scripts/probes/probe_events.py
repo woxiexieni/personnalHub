@@ -101,7 +101,17 @@ def main():
         check(f"[{e.event_index}] 有事实原文", bool(e.facts and e.facts.strip()))
         check(f"[{e.event_index}] tag 在词表内", e.tag in TAGS, repr(e.tag))
         check(f"[{e.event_index}] emotion 在词表内", e.emotion in EMOTIONS, repr(e.emotion))
-        check(f"[{e.event_index}] 有标题", bool((e.title or "").strip()))
+
+        t = (e.title or "").strip()
+        check(f"[{e.event_index}] 有标题", bool(t), repr(e.title))
+        # 这两个断言守的是同一件事：标题不许变成半句话。
+        # 旧代码硬切 20 字且不留痕迹，用户看到"她说我容"以为是 AI 坏了。
+        check(f"[{e.event_index}] 标题不超过 28 字", len(t) <= 28, f"{len(t)} 字：{t}")
+        check(f"[{e.event_index}] 超长必须带省略号", len(t) < 26 or t.endswith("…"),
+              f"{len(t)} 字且无省略号：{t}")
+        if len(t) > 16:
+            print(f"  [note] [{e.event_index}] 标题 {len(t)} 字，比提示词要求的 16 字长"
+                  f"（不致命，但手机上会占两行）")
 
     print()
     for e in events:

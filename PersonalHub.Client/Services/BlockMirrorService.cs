@@ -91,6 +91,44 @@ namespace PersonalHub.Client.Services
         }
 
         /// <summary>
+        /// 直接查服务器上的历史块，**只读、不写本地副本**。
+        ///
+        /// 用途是时间块库的「查服务器」：本地只有 30 天镜像，想看更早的只能问服务端。
+        /// 刻意不落库 —— 一是镜像窗口一刷新就会把它们 pruning 掉，二是写进来会污染
+        /// 「待同步」判断（服务端的数据本来就已经同步过了）。
+        ///
+        /// 连不上返回 null，调用方静默退回本地，不弹框（连不上是常态，不是错误）。
+        /// </summary>
+        public async Task<IReadOnlyList<LocalBlock>?> FetchBlocksAsync(
+            long from, long to, int limit, CancellationToken ct = default)
+        {
+            try
+            {
+                if (!await _conn.EnsureAsync().ConfigureAwait(false)) return null;
+
+                var resp = await _conn.NewBlockClient()
+                    .ListBlocksAsync(
+                        new ListBlocksRequest
+                        {
+                            From = from,
+                            To = to,
+                            Limit = limit,
+                            // 已删的不看：这是回看/查询，不是镜像
+                            IncludeDeleted = false,
+                        },
+                        deadline: DateTime.UtcNow.Add(CallTimeout),
+                        cancellationToken: ct)
+                    .ConfigureAwait(false);
+
+                return resp.Blocks.Select(b => b.ToLocalBlock()).ToList();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
         /// 拉服务端目标列表并覆盖本地（跳过本地未同步的）。
         ///
         /// 目标的"累计投入 / 最后活动"是服务端现算的，本地算不出来（本地只有 30 天），

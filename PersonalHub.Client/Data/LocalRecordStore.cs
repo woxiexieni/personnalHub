@@ -56,6 +56,15 @@ namespace PersonalHub.Client.Data
 
             // R9：想法「落实成果」链接。老行补空串，避免 NULL 穿到字符串字段。
             ("ideas",         "ArtifactUri", "TEXT NOT NULL DEFAULT ''"),
+
+            // R11：计划行动二次分类 + 四象限。
+            // Important 的默认值是 **1** 而不是 0：ALTER TABLE ADD COLUMN 带 DEFAULT
+            // 会给所有老行一次性填上这个值，等于"默认落 Ⅱ（重要不紧急）"。
+            // 这正是我们要的 —— 老数据不需要人一条条归档，30 天没人碰会自己落 Ⅳ。
+            ("ideas",         "PlanKind",  "INTEGER NOT NULL DEFAULT 0"),
+            ("ideas",         "Urgent",    "INTEGER NOT NULL DEFAULT 0"),
+            ("ideas",         "Important", "INTEGER NOT NULL DEFAULT 1"),
+            ("ideas",         "TouchedAt", "INTEGER NOT NULL DEFAULT 0"),
         };
 
         /// <summary>

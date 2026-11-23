@@ -285,6 +285,9 @@ namespace personalHub.Server.Data
             IsVoided = p.IsVoided ? 1 : 0,
             VoidedAt = p.IsVoided ? p.VoidedAt : 0,
             ArtifactUri = string.IsNullOrEmpty(p.ArtifactUri) ? null : p.ArtifactUri,
+            PlanKind = p.Kind == 3 ? p.PlanKind : 0,
+            Urgent = p.Urgent ? 1 : 0,
+            Important = p.Important ? 1 : 0,
         };
 
         private static Idea ToProto(IdeaRow r) => new()
@@ -304,6 +307,9 @@ namespace personalHub.Server.Data
             IsVoided = r.IsVoided != 0,
             VoidedAt = r.IsVoided != 0 ? r.VoidedAt : 0,
             ArtifactUri = r.ArtifactUri ?? string.Empty,
+            PlanKind = r.Kind == 3 ? r.PlanKind : 0,
+            Urgent = r.Urgent != 0,
+            Important = r.Important != 0,
         };
 
         /// <summary>GROUP BY 的返回行。</summary>

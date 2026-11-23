@@ -7,16 +7,26 @@
     <ScrollView>
         <VerticalStackLayout Padding="20,12" Spacing="10">
 
-            <!-- 顶部：哪一段 + 当前筛选摘要 -->
-            <Grid ColumnDefinitions="*,Auto">
+            <!-- 顶部：哪一段 + 数据源（本地 30 天 / 服务器全部）+ 清筛选 -->
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                 <VerticalStackLayout Grid.Column="0" Spacing="1">
                     <Label x:Name="RangeLabel" Text="全部" FontSize="15" FontAttributes="Bold"/>
                     <Label x:Name="RangeSubLabel" Text="最近 30 天 · 本地副本" FontSize="11"
                            TextColor="{StaticResource Gray500}"/>
                 </VerticalStackLayout>
-                <Button Grid.Column="1" x:Name="ClearBtn" Text="清筛选"
+
+                <!-- 数据源：显示的是"现在在看哪里"，点一下就切过去。
+                     本地只有 30 天镜像，更早的都在服务端，所以必须能切。 -->
+                <Button Grid.Column="1" x:Name="SourceBtn" Text="本地 30 天"
+                        FontSize="12" HeightRequest="32" Padding="10,0"
+                        BackgroundColor="Transparent"
+                        TextColor="{StaticResource Gray500}"
+                        BorderWidth="1" BorderColor="{StaticResource Gray300}"
+                        Clicked="OnSourceClicked"/>
+
+                <Button Grid.Column="2" x:Name="ClearBtn" Text="清筛选"
                         IsVisible="False"
-                        FontSize="12" HeightRequest="32" Padding="12,0"
+                        FontSize="12" HeightRequest="32" Padding="10,0"
                         BackgroundColor="Transparent"
                         TextColor="{StaticResource Gray500}"
                         BorderWidth="1" BorderColor="{StaticResource Gray300}"
@@ -31,10 +41,18 @@
                        TextChanged="OnSearchTextChanged"/>
             </Border>
 
-            <!-- 筛选 chips：全部 / 待同步 / 片 / 目标。只列数据里出现过的，不摆空格子 -->
-            <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
-                <HorizontalStackLayout x:Name="ChipRow" Spacing="6" Padding="0,2"/>
-            </ScrollView>
+            <!-- 筛选 chips：全部 / 待同步 / 片 / 目标。只列数据里出现过的，不摆空格子。
+
+                 这里**故意不用 FlexLayout**：.NET 8 的 FlexLayout 遇上 Button 时
+                 Wrap 会退化成单行（dotnet/maui#30957，修到 .NET 10 才进主线），
+                 表现就是手机上挤成一行、要往右划很久才能看完。
+                 改成自己按可用宽度折行（PackChips）：每一行是一个
+                 HorizontalStackLayout，行数由内容决定，宽度永远不溢出屏幕。
+
+                 也别引 CommunityToolkit.Maui 的 WrapLayout：项目里只有
+                 CommunityToolkit.Mvvm（那是 MVVM 源生成器，没有 UI 控件）。 -->
+            <VerticalStackLayout x:Name="ChipRow" Spacing="6"/>
+
 
             <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
 

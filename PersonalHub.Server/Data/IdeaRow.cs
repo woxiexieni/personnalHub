@@ -81,5 +81,23 @@ namespace personalHub.Server.Data
         /// </summary>
         [Column("artifact_uri")]
         public string? ArtifactUri { get; set; }
+
+        /// <summary>
+        /// 计划行动的二次分类，只对 kind = 3 有意义：0 能干的（默认）/ 1 计划。
+        ///
+        /// 这两个值回答的是**形状**（现在能不能动手），不是意图。
+        /// 「打算做」可以打上 kind=3，但「打算做 ≠ 现在能做」——
+        /// 混在一起的后果是想法库里一半的条目永远不会有"做完"的一天。
+        /// </summary>
+        [Column("plan_kind")]
+        public int PlanKind { get; set; }
+
+        /// <summary>紧急：**过了这周就不值钱了**，不是"今天必须做"。</summary>
+        [Column("urgent")]
+        public int Urgent { get; set; }
+
+        /// <summary>重要：没它也行，但有它别的事会更顺。</summary>
+        [Column("important")]
+        public int Important { get; set; }
     }
 }

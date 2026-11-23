@@ -330,7 +330,9 @@ namespace PersonalHub.Client
         {
             var chip = new Button
             {
-                Text = label,
+                // 「计划行动」点进去是另一页（四象限），加个箭头让人知道会有跳转，
+                // 而不是以为点了没反应。其它类型原地筛选，不加。
+                Text = kind == 3 ? label + " ›" : label,
                 FontSize = 12,
                 HeightRequest = 32,
                 Padding = new Thickness(13, 0),
@@ -355,6 +357,15 @@ namespace PersonalHub.Client
         private async void OnFilterClicked(object? sender, EventArgs e)
         {
             if (sender is not Button b || b.CommandParameter is not int kind) return;
+
+            // 「计划行动」不是一个列表，是一张地图（R11）。
+            // 点它直接进四象限，不在这里过滤：那个类型的两半（能干的 / 计划）
+            // 在那一页里各自有位置，而列表形态会把"要动手的"和"还没形状的"重新混回去。
+            if (kind == 3)
+            {
+                await Shell.Current.GoToAsync(RecordCatalog.QuadrantRoute);
+                return;
+            }
 
             _filter = kind;
 
@@ -759,7 +770,14 @@ namespace PersonalHub.Client
                     actions.Children.Add(play);
                 }
 
-            if (string.IsNullOrEmpty(idea.GoalId))
+            // 「转成目标」只属于「计划行动 → 计划」：能干的那些直接做掉就行，不需要目标；
+            // 别的事实/评价/脑补更不该有 —— 历史数据证明，从非「计划行动」转出去的目标
+            // 三次全部零投入（转的是愿望，不是能启动的事）。按钮少一个，页面上少一次犹豫。
+            bool canConvertToGoal = idea.Kind == IdeaKinds.Plan
+                && idea.PlanKind == 1
+                && string.IsNullOrEmpty(idea.GoalId);
+
+            if (canConvertToGoal)
             {
                 var convert = new Button
                 {
@@ -1675,14 +1693,30 @@ namespace PersonalHub.Client
             var match = IdeaKinds.All.FirstOrDefault(k => k.Label == pick);
             if (match.Label is null) return;
 
+            bool wasPlan = idea.Kind == IdeaKinds.Plan;
+
             idea.Kind = match.Kind;
+
+            // 从别的类型改成「计划行动」的，一律先落「计划 · 还没形状」，不直接进四象限。
+            //
+            // 四象限的默认落点是 Ⅱ（重要不紧急），而能站上那个位置的前提是它已经写成
+            // 「把 X 改成 Y」了。改类型这一步没有那句话 —— 一条半成品直接落到地图正中间，
+            // 会把真能干的往下挤，也会让人以为"改个类型 = 我准备做了"。
+            // 想动手时在「计划」带里点一下「能动手」，那才算真的承认它能干。
+            //
+            // 录入页选「计划行动」默认「能干的」不冲突：那时候你正在写它，写的就是你要干的事。
+            if (match.Kind == IdeaKinds.Plan && !wasPlan) idea.PlanKind = 1;
+
             idea.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             idea.Synced = false;
 
             await _ideas.UpdateAsync(idea);
             await LoadAsync();
 
-            StatusLabel.Text = $"已改成「{match.Label}」。";
+            StatusLabel.Text = match.Kind == IdeaKinds.Plan && !wasPlan
+                ? "已改成「计划行动」，先放在「计划 · 还没形状」里。能动手了去四象限点「能动手」。"
+                : $"已改成「{match.Label}」。";
+
             _ = _ideaSync.SyncAsync();
         }
 

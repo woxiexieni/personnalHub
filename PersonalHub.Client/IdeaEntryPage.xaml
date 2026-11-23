@@ -32,6 +32,24 @@
             <Label x:Name="KindHintLabel" Text="" FontSize="11"
                    TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
 
+            <!--
+                只在我选了「计划行动」时出现（R11）。
+
+                这一问回答的是**形状**，不是意图："打算做"和"现在能动手"是两件事。
+                默认「能干的」—— 两个方向判错的代价不对称：
+                  默认错成"能干的"：大愿望混进来，动手时撞一次就知道，代价是一次尝试；
+                  默认错成"计划"：真能做的小事被扔进计划，而计划要转目标才能动，
+                                  小事又不值得建目标，于是卡死。
+            -->
+            <VerticalStackLayout x:Name="PlanKindBox" Spacing="6" IsVisible="False">
+                <Label Text="这个现在能动手吗？" FontSize="12" TextColor="{StaticResource Gray500}"/>
+                <FlexLayout x:Name="PlanKindChips"
+                            Wrap="Wrap" Direction="Row"
+                            JustifyContent="Start" AlignItems="Start"/>
+                <Label x:Name="PlanKindHintLabel" Text="" FontSize="11"
+                       TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
+            </VerticalStackLayout>
+
             <Button x:Name="SaveBtn" Text="记下" HeightRequest="46" Clicked="OnSaveClicked"/>
 
             <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>

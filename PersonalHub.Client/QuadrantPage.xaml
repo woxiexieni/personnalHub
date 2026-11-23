@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.QuadrantPage"
+             Title="计划行动">
+
+    <!--
+        四象限（R11）。
+
+        为什么这页的根是 Grid 而不是 ScrollView：
+        四个格子要**固定高度、各自滚动**。整页能滚的话，格子会被内容撑开，
+        「象限」就散成一列卡片，"一眼看到四个格子"这个唯一的用处就没了。
+        代价是小格子里划起来空间窄 —— 认了，换来的是形状稳定。
+
+        底部两条是**原地折叠**，不是弹层：点「计划 · 还没形状」或「已落实」，
+        四象限收起来、列表占它那块高度，再点一次收回去。
+        不用遮罩、不用关按钮 —— 弹层每次都要多点一下才能关，而这两个列表是回看用的，
+        看完想立刻回到地图，多一步就是每次多一步。
+
+        列表里的卡片跟想法库同款（白底细描边、左正文右按钮），不另造一套样式：
+        同一批数据在两页长成两个样子，会让人以为是两种东西。
+    -->
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12,10,12,12" RowSpacing="10">
+
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <Label x:Name="HeaderLabel"
+                   Text="点一下卡片展开「留成果 / 删除」；长按拖到别的格子 = 改它有多着急、多重要。"
+                   FontSize="11" TextColor="#888780" LineBreakMode="WordWrap"
+                   VerticalOptions="Center"/>
+            <Button Grid.Column="1" x:Name="RefreshBtn" Text="刷新"
+                    FontSize="11" HeightRequest="28" Padding="10,0" CornerRadius="14"
+                    BackgroundColor="#F1EFE8" TextColor="#5F5E5A"
+                    Clicked="OnRefreshClicked"/>
+        </Grid>
+
+        <!--
+            舞台：四象限 / 计划列表 / 已落实列表 共用这一块高度，同一时间只亮一个。
+            折叠在这里发生 —— 列表拿到的是整屏高度，不是小格子里的一条缝。
+        -->
+        <Grid Grid.Row="1">
+
+            <!-- 1px 的格子缝：四格本身就是一张表，用背景色透出分隔线比给每格描边更稳 -->
+            <Grid x:Name="QuadGrid"
+                  RowDefinitions="*,*" ColumnDefinitions="*,*"
+                  RowSpacing="1" ColumnSpacing="1"
+                  BackgroundColor="#D3D1C7">
+
+                <!-- Ⅰ 重要且紧急 -->
+                <Grid x:Name="Cell1" Grid.Row="0" Grid.Column="0"
+                      RowDefinitions="Auto,*" BackgroundColor="#FCEBEB">
+                    <Grid Grid.Row="0" Padding="9,7" ColumnDefinitions="*,Auto">
+                        <Label Text="Ⅰ 重要且紧急" FontSize="12" FontAttributes="Bold" TextColor="#A32D2D"/>
+                        <Label Grid.Column="1" x:Name="Cell1Count" Text="" FontSize="10" TextColor="#A32D2D"/>
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <ScrollView x:Name="Cell1Scroll" VerticalScrollBarVisibility="Never" Padding="6,0,6,6">
+                            <VerticalStackLayout x:Name="Cell1Body" Spacing="5"/>
+                        </ScrollView>
+                        <Label x:Name="Cell1Empty" Text="当前暂无内容" FontSize="11" TextColor="#C9A5A5"
+                               HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Grid>
+                </Grid>
+
+                <!-- Ⅱ 重要不紧急 -->
+                <Grid x:Name="Cell2" Grid.Row="0" Grid.Column="1"
+                      RowDefinitions="Auto,*" BackgroundColor="#FAEEDA">
+                    <Grid Grid.Row="0" Padding="9,7" ColumnDefinitions="*,Auto">
+                        <Label Text="Ⅱ 重要不紧急" FontSize="12" FontAttributes="Bold" TextColor="#854F0B"/>
+                        <Label Grid.Column="1" x:Name="Cell2Count" Text="" FontSize="10" TextColor="#854F0B"/>
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <ScrollView x:Name="Cell2Scroll" VerticalScrollBarVisibility="Never" Padding="6,0,6,6">
+                            <VerticalStackLayout x:Name="Cell2Body" Spacing="5"/>
+                        </ScrollView>
+                        <Label x:Name="Cell2Empty" Text="当前暂无内容" FontSize="11" TextColor="#C6AE86"
+                               HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Grid>
+                </Grid>
+
+                <!-- Ⅲ 不重要且紧急 -->
+                <Grid x:Name="Cell3" Grid.Row="1" Grid.Column="0"
+                      RowDefinitions="Auto,*" BackgroundColor="#EAF3DE">
+                    <Grid Grid.Row="0" Padding="9,7" ColumnDefinitions="*,Auto">
+                        <Label Text="Ⅲ 不重要且紧急" FontSize="12" FontAttributes="Bold" TextColor="#3B6D11"/>
+                        <Label Grid.Column="1" x:Name="Cell3Count" Text="" FontSize="10" TextColor="#3B6D11"/>
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <ScrollView x:Name="Cell3Scroll" VerticalScrollBarVisibility="Never" Padding="6,0,6,6">
+                            <VerticalStackLayout x:Name="Cell3Body" Spacing="5"/>
+                        </ScrollView>
+                        <Label x:Name="Cell3Empty" Text="当前暂无内容" FontSize="11" TextColor="#A9BE92"
+                               HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Grid>
+                </Grid>
+
+                <!-- Ⅳ 不重要不紧急 -->
+                <Grid x:Name="Cell4" Grid.Row="1" Grid.Column="1"
+                      RowDefinitions="Auto,*" BackgroundColor="#E6F1FB">
+                    <Grid Grid.Row="0" Padding="9,7" ColumnDefinitions="*,Auto">
+                        <Label Text="Ⅳ 不重要不紧急" FontSize="12" FontAttributes="Bold" TextColor="#185FA5"/>
+                        <Label Grid.Column="1" x:Name="Cell4Count" Text="" FontSize="10" TextColor="#185FA5"/>
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <ScrollView x:Name="Cell4Scroll" VerticalScrollBarVisibility="Never" Padding="6,0,6,6">
+                            <VerticalStackLayout x:Name="Cell4Body" Spacing="5"/>
+                        </ScrollView>
+                        <Label x:Name="Cell4Empty" Text="当前暂无内容" FontSize="11" TextColor="#9FBBDA"
+                               HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Grid>
+                </Grid>
+
+            </Grid>
+
+            <!-- 计划列表（原地展开时顶掉四象限的位置） -->
+            <ScrollView x:Name="PlanScroll" IsVisible="False" VerticalScrollBarVisibility="Never">
+                <VerticalStackLayout x:Name="PlanBody" Spacing="10" Padding="0,0,0,6"/>
+            </ScrollView>
+
+            <!-- 已落实列表 -->
+            <ScrollView x:Name="DoneScroll" IsVisible="False" VerticalScrollBarVisibility="Never">
+                <VerticalStackLayout x:Name="DoneBody" Spacing="10" Padding="0,0,0,6"/>
+            </ScrollView>
+
+        </Grid>
+
+        <!-- 底部两条折叠带：只做开关，收纳的东西在上面那块舞台里 -->
+        <VerticalStackLayout Grid.Row="2" Spacing="6">
+
+            <Border x:Name="PlanBand" Stroke="#E3E0D8" StrokeThickness="1" Padding="12,10">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="10"/>
+                </Border.StrokeShape>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnPlanBandTapped"/>
+                </Border.GestureRecognizers>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                    <Label x:Name="PlanChevron" Text="›" FontSize="13" TextColor="#888780" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="计划 · 还没形状" FontSize="13" TextColor="#5F5E5A"
+                           VerticalOptions="Center"/>
+                    <Label Grid.Column="2" x:Name="PlanBandCount" Text="" FontSize="11" TextColor="#B4B2A9"
+                           VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+
+            <Border x:Name="DoneBand" Stroke="#E3E0D8" StrokeThickness="1" Padding="12,10">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="10"/>
+                </Border.StrokeShape>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnDoneBandTapped"/>
+                </Border.GestureRecognizers>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                    <Label x:Name="DoneChevron" Text="›" FontSize="13" TextColor="#888780" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="已落实" FontSize="13" TextColor="#5F5E5A"
+                           VerticalOptions="Center"/>
+                    <Label Grid.Column="2" x:Name="DoneBandCount" Text="" FontSize="11" TextColor="#B4B2A9"
+                           VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+
+            <Label x:Name="StatusLabel" Text="" FontSize="11" TextColor="#888780"
+                   LineBreakMode="WordWrap" IsVisible="False"/>
+
+        </VerticalStackLayout>
+
+    </Grid>
+
+</ContentPage>

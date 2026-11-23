@@ -32,6 +32,15 @@ namespace PersonalHub.Client
 
         private int _kind;
 
+        /// <summary>计划行动的二次分类：0 能干的（默认）/ 1 计划。只在 kind = 3 时有意义。</summary>
+        private int _planKind;
+
+        private static readonly (int Value, string Label, string Hint)[] PlanKinds =
+        {
+            (0, "能干的", "今天就能动手，做完能看见东西。它会进四象限。"),
+            (1, "计划", "还写不出「把 X 改成 Y」。先留在这儿，转成目标才动得了。"),
+        };
+
         public IdeaEntryPage(
             LocalRecordStore<LocalIdea> ideas,
             RecordSyncService<LocalIdea> ideaSync)
@@ -42,6 +51,7 @@ namespace PersonalHub.Client
             _ideaSync = ideaSync;
 
             BuildKindChips();
+            BuildPlanKindChips();
             ApplyKindHint();
         }
 
@@ -106,6 +116,66 @@ namespace PersonalHub.Client
         private void ApplyKindHint()
         {
             KindHintLabel.Text = IdeaKinds.HintOf(_kind);
+
+            // 第二问只在「计划行动」下出现。别的类型没有"能不能动手"这个问题 ——
+            // 情绪和判断本来就不该动手，问了只会让人以为还得做点什么。
+            PlanKindBox.IsVisible = _kind == 3;
+
+            if (_kind == 3) ApplyPlanKindHint();
+        }
+
+        // ============================================================
+        // 计划行动的二次分类（R11）
+        // ============================================================
+
+        private void BuildPlanKindChips()
+        {
+            PlanKindChips.Children.Clear();
+
+            foreach (var (value, label, _) in PlanKinds)
+            {
+                var chip = new Button
+                {
+                    Text = label,
+                    FontSize = 12,
+                    HeightRequest = 32,
+                    Padding = new Thickness(13, 0),
+                    CornerRadius = 16,
+                    Margin = new Thickness(0, 0, 8, 8),
+                    CommandParameter = value,
+                };
+
+                StylePlanKindChip(chip, value);
+                chip.Clicked += OnPlanKindClicked;
+                PlanKindChips.Children.Add(chip);
+            }
+        }
+
+        private void StylePlanKindChip(Button chip, int value)
+        {
+            bool active = value == _planKind;
+            chip.BackgroundColor = active ? ChipActiveBg : ChipBg;
+            chip.TextColor = active ? Colors.White : ChipText;
+            chip.BorderWidth = 0;
+        }
+
+        private void OnPlanKindClicked(object? sender, EventArgs e)
+        {
+            if (sender is not Button b || b.CommandParameter is not int value) return;
+
+            _planKind = value;
+
+            foreach (var child in PlanKindChips.Children)
+            {
+                if (child is Button c && c.CommandParameter is int v) StylePlanKindChip(c, v);
+            }
+
+            ApplyPlanKindHint();
+        }
+
+        private void ApplyPlanKindHint()
+        {
+            PlanKindHintLabel.Text = PlanKinds.First(x => x.Value == _planKind).Hint;
         }
 
         // ============================================================
@@ -131,6 +201,17 @@ namespace PersonalHub.Client
                 GoalId = string.Empty,
                 CreatedAt = now,
                 UpdatedAt = now,
+
+                // 只有「计划行动」带这一层。别的类型恒为 0，不留半截状态。
+                PlanKind = _kind == 3 ? _planKind : 0,
+
+                // 新条目默认落 Ⅱ（重要不紧急），而且算"刚碰过" ——
+                // 30 天没人动它才会自己落 Ⅳ。这条默认值就是四象限的入口，
+                // 所以录入时不需要多问一句"这重要吗"。
+                Urgent = false,
+                Important = true,
+                TouchedAt = now,
+
                 Deleted = false,
                 Synced = false,
                 SyncedAt = 0,
@@ -143,9 +224,14 @@ namespace PersonalHub.Client
             IdeaEditor.Text = string.Empty;
 
             await RefreshLibraryButtonAsync();
-            StatusLabel.Text = _kind == 0
-                ? "已记下（未分类）。想分类可以到想法库里改。"
-                : $"已记下，标成了「{IdeaKinds.LabelOf(_kind)}」。";
+            StatusLabel.Text = _kind switch
+            {
+                0 => "已记下（未分类）。想分类可以到想法库里改。",
+                3 => _planKind == 0
+                    ? "已记下，能动手的那种。它在四象限里。"
+                    : "已记下，标成计划了。它在四象限下面的「计划」里。",
+                _ => $"已记下，标成了「{IdeaKinds.LabelOf(_kind)}」。",
+            };
 
             // 后台传，不阻塞下一次记录
             _ = _ideaSync.SyncAsync();

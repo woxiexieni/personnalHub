@@ -51,6 +51,15 @@ namespace PersonalHub.Client.Services
         /// <summary>想法库路由（列表 + 转成目标）。</summary>
         public const string IdeaListRoute = "idea/list";
 
+        /// <summary>
+        /// 计划行动的四象限视图（R11）。
+        ///
+        /// 不挂在目录里：它不是一个"新的功能入口"，而是「计划行动」这个类型**自己的样子** ——
+        /// 从想法库顶部那个 chip 点进来，跟点其它类型是一模一样的动作。
+        /// 单独开一个目录项等于告诉用户"这里还有一个你该去的地方"。
+        /// </summary>
+        public const string QuadrantRoute = "idea/quadrant";
+
         /// <summary>信念拼词（玩具，带 ?id= 指定哪条想法）。不挂在目录里，从想法行上进。</summary>
         public const string BeliefGameRoute = "belief/game";
 

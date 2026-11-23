@@ -257,6 +257,9 @@ namespace Personalhub
             IsVoided = p.IsVoided,
             VoidedAt = p.IsVoided ? p.VoidedAt : 0,
             ArtifactUri = p.ArtifactUri ?? string.Empty,
+            PlanKind = p.Kind == 3 ? p.PlanKind : 0,
+            Urgent = p.Urgent,
+            Important = p.Important,
         };
 
         /// <summary>镜像下载用：不设 Synced（下载 ≠ 已上传）。</summary>
@@ -277,6 +280,9 @@ namespace Personalhub
             IsVoided = p.IsVoided,
             VoidedAt = p.IsVoided ? p.VoidedAt : 0,
             ArtifactUri = p.ArtifactUri ?? string.Empty,
+            PlanKind = p.Kind == 3 ? p.PlanKind : 0,
+            Urgent = p.Urgent,
+            Important = p.Important,
         };
 
         // ============================================================

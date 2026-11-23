@@ -80,6 +80,45 @@ namespace PersonalHub.Client.Data
         /// </summary>
         public string ArtifactUri { get; set; } = string.Empty;
 
+        /// <summary>
+        /// 计划行动的二次分类，只对 <see cref="Kind"/> = 3 有意义：
+        /// 0 能干的（默认）/ 1 计划。其它 kind 恒为 0。
+        ///
+        /// 它回答的是**形状**（现在能不能动手），不是意图。方向是单向的：
+        /// 1 → 0 允许（想清楚了），0 → 1 禁止（把答应自己的事降级 = 逃避）。
+        /// 不新增两个 kind 值 —— 那会让已存的 31 条 kind=3 全部失去归类。
+        /// </summary>
+        public int PlanKind { get; set; }
+
+        /// <summary>
+        /// 四象限的「急」：**过了这周就不值钱了**，不是"今天必须做"。
+        ///
+        /// 口径刻意不放宽：他这里没有老板和交付日，用"今天必须做"这一格会永远是空的，
+        /// 空着又没解释，人就会以为功能坏了。用"会过期"至少能覆盖报名截止、面试、约人这几类。
+        /// </summary>
+        public bool Urgent { get; set; }
+
+        /// <summary>
+        /// 四象限的「重」：没它也行，但有它别的事会更顺。
+        ///
+        /// **默认 true**，新条目直接落 Ⅱ。理由是"能记下来就说明当时觉得有价值"，
+        /// 而"不重要"是少数，应该由人主动拖出去，而不是让所有人先证明自己重要。
+        /// 它也会被算：Ⅱ 里 30 天没人碰 → 自动落 Ⅳ（见 IdeaQuadrantRules）。
+        /// </summary>
+        public bool Important { get; set; } = true;
+
+        /// <summary>
+        /// 你最后一次**真的动过**这条的时刻（Unix 毫秒）；0 = 从没动过（老数据）。
+        ///
+        /// 为什么不复用 <see cref="UpdatedAt"/>：那是版本比较字段，同步回写、镜像覆盖都会改它。
+        /// 拿它判"30 天没人碰"，会让一条从没被打开的旧想法在每次同步后都变成"刚碰过"，
+        /// 于是永远不落 Ⅳ —— 规则静默失效，而且看不出来。
+        ///
+        /// 只在本地存，不上服务端：它只服务于客户端的一条显示规则，
+        /// 换机后从 CreatedAt 重算，最坏结果是旧条目早点落 Ⅳ，本来就是它该去的地方。
+        /// </summary>
+        public long TouchedAt { get; set; }
+
         public long CreatedAt { get; set; }
 
         public long UpdatedAt { get; set; }

@@ -64,6 +64,11 @@ namespace PersonalHub.Client
                 RecordCatalog.IdeaListRoute,
                 new ServiceRouteFactory(typeof(IdeaListPage)));
 
+            // R11：计划行动的四象限视图。从想法库顶部「计划行动」chip 进。
+            Routing.RegisterRoute(
+                RecordCatalog.QuadrantRoute,
+                new ServiceRouteFactory(typeof(QuadrantPage)));
+
             // R8：信念拼词（从想法行上进，带 ?id=）
             Routing.RegisterRoute(
                 RecordCatalog.BeliefGameRoute,
