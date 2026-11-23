@@ -68,8 +68,8 @@ namespace PersonalHub.Client.Data
         /// </summary>
         private static readonly ConcurrentDictionary<string, SQLiteAsyncConnection> SharedConnections = new();
 
-        private readonly SQLiteAsyncConnection _db;
-        private readonly SemaphoreSlim _initGate = new(1, 1);
+        private readonly SQLiteAsyncConnection _db;//共享数据库连接
+        private readonly SemaphoreSlim _initGate = new(1, 1);//SemaphoreSlim是异步锁。lock是同步锁，new(1,1) 1：初始可用信号量。1：允许执行最大个数
         private bool _ready;
 
         public LocalRecordStore(string dbPath)
@@ -102,7 +102,7 @@ namespace PersonalHub.Client.Data
             }
             finally
             {
-                _initGate.Release();
+                _initGate.Release();//异步资源释放
             }
         }
 
@@ -147,6 +147,8 @@ namespace PersonalHub.Client.Data
         // ============================================================
 
         /// <summary>写入一条本地记录。返回受影响行数（1 = 成功）。</summary>
+        /// 使用sqlite的SQLite-net-pcl实现增删查改
+
         public async Task<int> InsertAsync(T record)
         {
             await EnsureReadyAsync().ConfigureAwait(false);
@@ -332,7 +334,7 @@ namespace PersonalHub.Client.Data
 
         public async Task<int> ExecuteAsync(string sql, params object[] args)
         {
-            await EnsureReadyAsync().ConfigureAwait(false);
+            await EnsureReadyAsync().ConfigureAwait(false);//无需切换上下文
             return await _db.ExecuteAsync(sql, args).ConfigureAwait(false);
         }
 

@@ -70,6 +70,9 @@ namespace personalHub.Server.Data
             }
         }
 
+        /// <summary>
+        /// 创建表
+        /// </summary>
         private void CreateTables()
         {
             Conn.CreateTable<RecordRow>();

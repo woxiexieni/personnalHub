@@ -130,9 +130,11 @@
 	<ItemGroup>
 	  <None Remove="hs_err_pid12256.log" />
 	  <None Remove="hs_err_pid2424.log" />
+	  <None Remove="hs_err_pid28356.log" />
 	  <None Remove="hs_err_pid30688.log" />
 	  <None Remove="hs_err_pid31088.log" />
 	  <None Remove="hs_err_pid31808.log" />
+	  <None Remove="hs_err_pid37348.log" />
 	</ItemGroup>
 
 	<ItemGroup>
