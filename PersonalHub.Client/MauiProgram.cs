@@ -34,6 +34,13 @@ namespace PersonalHub.Client
             builder.Services.AddSingleton(new LocalRecordStore<LocalRecord>(dbPath));
             builder.Services.AddSingleton(new LocalRecordStore<ThingRecord>(dbPath));
 
+            // R12：自动记账的待确认流水（纯本地表 pending_pays，不走同步）。
+            builder.Services.AddSingleton(new LocalRecordStore<LocalPendingPay>(dbPath));
+
+            // R13：自动时间片的待确认段（纯本地表 pending_segments，不走同步 ——
+            // 理由同 pending_pays：待确认的价值只在当天，确认后的正式块才走同步）。
+            builder.Services.AddSingleton(new LocalRecordStore<LocalPendingSegment>(dbPath));
+
             // R2：时间块 + 目标（同一库文件，表名 blocks / goals）。
             builder.Services.AddSingleton(new LocalRecordStore<LocalBlock>(dbPath));
             builder.Services.AddSingleton(new LocalRecordStore<LocalGoal>(dbPath));
@@ -117,6 +124,7 @@ namespace PersonalHub.Client
             builder.Services.AddTransient<RecordDothingPage>(); // 目录 → 事件卡（录入）
             builder.Services.AddTransient<EventListPage>();     // 目录 → 事件卡库（全量 + 筛选）
             builder.Services.AddTransient<BlockEntryPage>();    // 目录 → 时间块（R2 主入口）
+            builder.Services.AddTransient<TimelineConfirmPage>(); // 时间块页顶部 → 自动时间线确认（R13）
             builder.Services.AddTransient<BlockLibraryPage>();  // 时间概览页内 → 时间块库（R10 全量可翻 + 轻编辑）
             builder.Services.AddTransient<GoalListPage>();      // 时间块页顶部 → 目标
             builder.Services.AddTransient<GoalDetailPage>();    // 目标列表 → 详情（带 ?id=）
@@ -152,6 +160,13 @@ namespace PersonalHub.Client
             app.Services.GetRequiredService<RecordSyncService<LocalIdea>>().Start();
             app.Services.GetRequiredService<RecordSyncService<LocalProblem>>().Start();
             app.Services.GetRequiredService<RecordSyncService<LocalIdeaLink>>().Start();
+
+            // R12：自动记账 —— 把待确认流水的 store 交给静态捕获桥。
+            // Android 通知监听服务在 DI 容器外面（系统直接绑定它），只能走静态入口。
+            PaymentCapture.Initialize(app.Services.GetRequiredService<LocalRecordStore<LocalPendingPay>>());
+
+            // R13：自动时间片 —— 同一个道理，前台服务由系统拉起，走静态入口。
+            SegmentCapture.Initialize(app.Services.GetRequiredService<LocalRecordStore<LocalPendingSegment>>());
 
             return app;
         }

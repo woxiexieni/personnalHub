@@ -43,6 +43,12 @@
                 </Grid>
             </Border>
 
+            <!-- ============ 自动记账（R12）：待确认流水 / 授权入口 ============
+                 仅 Android 渲染内容；Windows 下 code-behind 不往里加东西，
+                 这个容器始终为空。优先级摆在"今天花了"下面：抓到的流水
+                 是"你刚花的钱"，比表单更急。 -->
+            <VerticalStackLayout x:Name="PendingPanel" Spacing="8"/>
+
             <!-- ============ 支出 / 收入 ============ -->
             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                 <Button

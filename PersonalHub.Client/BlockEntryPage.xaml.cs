@@ -38,6 +38,9 @@ namespace PersonalHub.Client
         private readonly BlockMirrorService _mirror;
         private readonly PieceSettings _settings;
 
+        /// <summary>R13：自动时间片待确认段（纯本地表，Android 才用）。</summary>
+        private readonly LocalRecordStore<LocalPendingSegment> _pendingSegs;
+
         private List<LocalGoal> _activeGoals = new();
         private List<LocalPlan> _todayPlans = new();
 
@@ -95,6 +98,7 @@ namespace PersonalHub.Client
             LocalRecordStore<LocalPlan> plans,
             LocalRecordStore<LocalPattern> patterns,
             LocalRecordStore<LocalPractice> practices,
+            LocalRecordStore<LocalPendingSegment> pendingSegs,
             RecordSyncService<LocalBlock> blockSync,
             RecordSyncService<LocalGoal> goalSync,
             RecordSyncService<LocalPlan> planSync,
@@ -110,6 +114,7 @@ namespace PersonalHub.Client
             _plans = plans;
             _patterns = patterns;
             _practices = practices;
+            _pendingSegs = pendingSegs;
             _blockSync = blockSync;
             _goalSync = goalSync;
             _planSync = planSync;
@@ -144,7 +149,23 @@ namespace PersonalHub.Client
 
             await RefreshStatsAsync();
 
+            await RefreshSegmentPanelAsync();
+
             _ = SyncAndRefreshAsync();
+        }
+
+        protected override void OnDisappearing()
+        {
+            base.OnDisappearing();
+
+            // 切片在服务后台线程落库，事件从后台线程发 —— 退订要跟 OnAppearing 的订阅配对
+            SegmentCapture.SegmentsChanged -= OnSegmentCaptured;
+        }
+
+        private void OnSegmentCaptured()
+        {
+            // 服务后台线程发的，UI 操作必须回主线程
+            MainThread.BeginInvokeOnMainThread(() => _ = RefreshSegmentPanelAsync());
         }
 
         // ============================================================
@@ -1765,6 +1786,207 @@ namespace PersonalHub.Client
             int m = minutes % 60;
             return m == 0 ? $"{h} 小时" : $"{h} 小时 {m} 分";
         }
+
+        // ============================================================
+        // R13 自动时间片：顶部卡（仅 Android）
+        // ============================================================
+        // 卡片状态机：
+        //   没授"使用情况访问权限" → 引导卡（去开启）
+        //   已授权 + 总开关开      → 自动拉起前台服务 + 待确认段卡（点进时间线确认页）
+        //   已授权 + 总开关关      → 一行"已关闭"，点一下重新开
+        // Windows 目标整块编译为空 —— 前台服务/权限都是 Android 独有的。
+
+        private const string SegmentEnabledKey = "ph.segment.enabled";
+
+        private async Task RefreshSegmentPanelAsync()
+        {
+            await Task.CompletedTask;   // Windows 目标下整段为空
+#if ANDROID
+            SegmentCapture.SegmentsChanged -= OnSegmentCaptured;
+            SegmentCapture.SegmentsChanged += OnSegmentCaptured;
+
+            SegmentPanel.Children.Clear();
+
+            bool enabled = Preferences.Default.Get(SegmentEnabledKey, true);
+
+            if (!SegmentServiceHelper.HasUsageAccess())
+            {
+                SegmentPanel.IsVisible = true;
+                SegmentPanel.Children.Add(BuildSegmentGrantCard());
+                return;
+            }
+
+            if (!enabled)
+            {
+                SegmentPanel.IsVisible = true;
+                SegmentPanel.Children.Add(BuildSegmentClosedCard());
+                return;
+            }
+
+            // 总开关开着：拉起服务（幂等），然后看今天攒了几段
+            SegmentServiceHelper.EnsureStarted();
+
+            var (dayFrom, dayTo) = Period.Today();
+            var pending = (await _pendingSegs.GetAllAsync())
+                .Where(s => s.Status == 0 && s.StartedAt >= dayFrom)
+                .ToList();
+
+            int unknown = pending.Count(s => string.IsNullOrEmpty(s.PieceCode));
+
+            var lines = new VerticalStackLayout { Spacing = 2 };
+            lines.Children.Add(new Label
+            {
+                Text = "时间片自动记录中",
+                FontSize = 13,
+            });
+            lines.Children.Add(new Label
+            {
+                Text = pending.Count == 0
+                    ? "手机用过一段时间后，会自动攒出候选时间段，晚上进来过一遍就行。"
+                    : $"今天自动抓了 {pending.Count} 段" + (unknown > 0 ? $"（{unknown} 段没猜出标签）" : "") + "，进时间线确认一下。",
+                FontSize = 11,
+                TextColor = Color.FromArgb("#78766E"),
+            });
+
+            var btn = new Button
+            {
+                Text = pending.Count > 0 ? $"确认时间线（{pending.Count} 段）" : "看时间线",
+                FontSize = 12,
+                HeightRequest = 32,
+                Padding = new Thickness(12, 0),
+                HorizontalOptions = LayoutOptions.Start,
+            };
+            btn.Clicked += async (_, _) => await Shell.Current.GoToAsync("segmentTimeline");
+
+            var off = new Button
+            {
+                Text = "关闭自动记录",
+                FontSize = 11,
+                HeightRequest = 26,
+                Padding = new Thickness(8, 0),
+                BackgroundColor = Colors.Transparent,
+                TextColor = Color.FromArgb("#78766E"),
+                HorizontalOptions = LayoutOptions.Start,
+            };
+            off.Clicked += (_, _) =>
+            {
+                Preferences.Default.Set(SegmentEnabledKey, false);
+                SegmentServiceHelper.Stop();
+                _ = RefreshSegmentPanelAsync();
+            };
+
+            var stack = new VerticalStackLayout { Spacing = 8 };
+            stack.Children.Add(lines);
+            stack.Children.Add(btn);
+            if (!SegmentServiceHelper.IsIgnoringBattery())
+            {
+                stack.Children.Add(new Label
+                {
+                    Text = "提示：把本 app 加进电池优化白名单，后台记录不容易被系统掐断。",
+                    FontSize = 11,
+                    TextColor = Color.FromArgb("#D97706"),
+                });
+                var bat = new Button
+                {
+                    Text = "去设置电池",
+                    FontSize = 11,
+                    HeightRequest = 26,
+                    Padding = new Thickness(8, 0),
+                    BackgroundColor = Colors.Transparent,
+                    TextColor = Color.FromArgb("#D97706"),
+                    HorizontalOptions = LayoutOptions.Start,
+                };
+                bat.Clicked += (_, _) => SegmentServiceHelper.OpenBatterySettings();
+                stack.Children.Add(bat);
+            }
+            stack.Children.Add(off);
+
+            SegmentPanel.IsVisible = true;
+            SegmentPanel.Children.Add(new Border
+            {
+                Stroke = Color.FromArgb("#D9CDEA"),
+                StrokeThickness = 1,
+                Padding = new Thickness(12, 10),
+                Content = stack,
+            });
+#endif
+        }
+
+#if ANDROID
+        private View BuildSegmentGrantCard()
+        {
+            var label = new Label
+            {
+                Text = "自动时间片未开启。开启「使用情况访问权限」后，app 会根据屏幕亮灭、前台应用自动划分你的时间，晚上确认一遍就行。全程只在本机，不上传。",
+                FontSize = 12,
+                LineBreakMode = LineBreakMode.WordWrap,
+                TextColor = Color.FromArgb("#78766E"),
+            };
+
+            var btn = new Button
+            {
+                Text = "去开启",
+                FontSize = 12,
+                HeightRequest = 32,
+                Padding = new Thickness(12, 0),
+                HorizontalOptions = LayoutOptions.Start,
+            };
+            btn.Clicked += (_, _) =>
+            {
+                SegmentServiceHelper.OpenUsageAccessSettings();
+                _ = RefreshSegmentPanelAsync();
+            };
+
+            var stack = new VerticalStackLayout { Spacing = 8 };
+            stack.Children.Add(label);
+            stack.Children.Add(btn);
+
+            return new Border
+            {
+                Stroke = Color.FromArgb("#E3E0D8"),
+                StrokeThickness = 1,
+                Padding = new Thickness(12, 10),
+                Content = stack,
+            };
+        }
+
+        private View BuildSegmentClosedCard()
+        {
+            var label = new Label
+            {
+                Text = "时间片自动记录已关闭。",
+                FontSize = 12,
+                TextColor = Color.FromArgb("#78766E"),
+            };
+
+            var btn = new Button
+            {
+                Text = "重新开启",
+                FontSize = 12,
+                HeightRequest = 32,
+                Padding = new Thickness(12, 0),
+                HorizontalOptions = LayoutOptions.Start,
+            };
+            btn.Clicked += (_, _) =>
+            {
+                Preferences.Default.Set(SegmentEnabledKey, true);
+                SegmentServiceHelper.EnsureStarted();
+                _ = RefreshSegmentPanelAsync();
+            };
+
+            var stack = new VerticalStackLayout { Spacing = 8 };
+            stack.Children.Add(label);
+            stack.Children.Add(btn);
+
+            return new Border
+            {
+                Stroke = Color.FromArgb("#E3E0D8"),
+                StrokeThickness = 1,
+                Padding = new Thickness(12, 10),
+                Content = stack,
+            };
+        }
+#endif
     }
 
     /// <summary>今日列表的展示行。</summary>

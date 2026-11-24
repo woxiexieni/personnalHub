@@ -29,6 +29,7 @@ namespace PersonalHub.Client
         private readonly LocalRecordStore<LocalRecord> _store;
         private readonly RecordSyncService<LocalRecord> _sync;
         private readonly LocalCacheService _cache;
+        private readonly LocalRecordStore<LocalPendingPay> _pending;   // R12 自动记账待确认
 
         private IReadOnlyList<CategoryDto> _categories = Array.Empty<CategoryDto>();
         private bool _categoriesLoaded;
@@ -40,12 +41,14 @@ namespace PersonalHub.Client
         public RecordEntryPage(
             LocalRecordStore<LocalRecord> store,
             RecordSyncService<LocalRecord> sync,
-            LocalCacheService cache)
+            LocalCacheService cache,
+            LocalRecordStore<LocalPendingPay> pending)
         {
             InitializeComponent();
             _store = store;
             _sync = sync;
             _cache = cache;
+            _pending = pending;
 
             PayPicker.ItemsSource = PayMethods.ToList();
             PayPicker.SelectedIndex = 0;
@@ -57,6 +60,9 @@ namespace PersonalHub.Client
         protected override async void OnAppearing()
         {
             base.OnAppearing();
+
+            // R12：监听服务落了新流水会发事件（后台线程），要在主线程刷新卡片
+            PaymentCapture.CandidateCaptured += OnCandidateCaptured;
 
             // 1) 分类：先用兜底渲染（离线也能记），拿到服务端的再重建
             if (!_categoriesLoaded)
@@ -73,9 +79,209 @@ namespace PersonalHub.Client
             await RefreshTodayFromServerAsync();
             await RefreshTodayListAsync();
 
-            // 4) 后台把待同步传上去，再对齐 30 天镜像
+            // 4) 待确认流水卡（仅 Android）
+            await RefreshPendingPanelAsync();
+
+            // 5) 后台把待同步传上去，再对齐 30 天镜像
             _ = SyncInBackgroundAsync();
         }
+
+        protected override void OnDisappearing()
+        {
+            base.OnDisappearing();
+            PaymentCapture.CandidateCaptured -= OnCandidateCaptured;
+        }
+
+        // ============================================================
+        // R12 自动记账：待确认流水卡（仅 Android）
+        // ============================================================
+
+        private void OnCandidateCaptured()
+        {
+            // 事件从监听服务的后台线程发出，UI 操作必须回主线程
+            MainThread.BeginInvokeOnMainThread(() => _ = RefreshPendingPanelAsync());
+        }
+
+        /// <summary>
+        /// 刷新顶部区域：未授权给"去开启"引导卡；已授权给待确认流水卡（最多 3 张）。
+        /// Windows 目标整块编译为空 —— 监听服务和权限都是 Android 独有的。
+        /// </summary>
+        private async Task RefreshPendingPanelAsync()
+        {
+            await Task.CompletedTask;   // Windows 目标下整段为空（监听与权限都是 Android 独有的）
+#if ANDROID
+            PendingPanel.Children.Clear();
+
+            if (!PaymentListenerHelper.IsListening())
+            {
+                PendingPanel.Children.Add(BuildGrantCard());
+                return;
+            }
+
+            long minAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - 48 * 3_600_000L;
+            var pending = (await _pending.GetAllAsync())
+                .Where(p => p.Status == 0 && p.NotifiedAt >= minAt)
+                .OrderByDescending(p => p.NotifiedAt)
+                .Take(3)
+                .ToList();
+
+            foreach (var p in pending)
+            {
+                PendingPanel.Children.Add(BuildPendingCard(p));
+            }
+#endif
+        }
+
+#if ANDROID
+        private View BuildGrantCard()
+        {
+            var label = new Label
+            {
+                Text = "自动记账未开启。开启后，支付宝/微信的支付通知会自动抓成待确认流水，金额不用再手输。",
+                FontSize = 12,
+                LineBreakMode = LineBreakMode.WordWrap,
+                TextColor = Color.FromArgb("#78766E"),
+            };
+
+            var btn = new Button
+            {
+                Text = "去开启",
+                FontSize = 12,
+                HeightRequest = 32,
+                Padding = new Thickness(12, 0),
+                HorizontalOptions = LayoutOptions.Start,
+            };
+            btn.Clicked += (_, _) => PaymentListenerHelper.OpenListenerSettings();
+
+            var stack = new VerticalStackLayout { Spacing = 8 };
+            stack.Children.Add(label);
+            stack.Children.Add(btn);
+
+            return new Border
+            {
+                Stroke = Color.FromArgb("#E3E0D8"),
+                StrokeThickness = 1,
+                Padding = new Thickness(12, 10),
+                Content = stack,
+            };
+        }
+
+        private View BuildPendingCard(LocalPendingPay p)
+        {
+            string srcName = p.Source == "alipay" ? "支付宝" : "微信";
+            string dirText = p.Direction == 1 ? "收入" : "支出";
+            string timeText = Period.ToLocalTime(p.NotifiedAt).ToString("MM-dd HH:mm");
+
+            var info = new VerticalStackLayout { Spacing = 2 };
+            info.Children.Add(new Label
+            {
+                Text = $"{dirText} ¥{p.Amount:F2} · {srcName}",
+                FontSize = 14,
+                FontAttributes = FontAttributes.Bold,
+            });
+            info.Children.Add(new Label
+            {
+                Text = $"{timeText} · 来自支付通知",
+                FontSize = 11,
+                TextColor = Color.FromArgb("#78766E"),
+            });
+
+            var confirm = new Button
+            {
+                Text = "记一笔",
+                FontSize = 12,
+                HeightRequest = 32,
+                Padding = new Thickness(10, 0),
+                CornerRadius = 8,
+                CommandParameter = p.Id,
+            };
+            confirm.Clicked += OnPendingConfirmClicked;
+
+            var ignore = new Button
+            {
+                Text = "忽略",
+                FontSize = 12,
+                HeightRequest = 32,
+                Padding = new Thickness(10, 0),
+                CornerRadius = 8,
+                BackgroundColor = Colors.Transparent,
+                TextColor = Color.FromArgb("#78766E"),
+                CommandParameter = p.Id,
+            };
+            ignore.Clicked += OnPendingIgnoreClicked;
+
+            var btns = new HorizontalStackLayout { Spacing = 6, VerticalOptions = LayoutOptions.Center };
+            btns.Children.Add(confirm);
+            btns.Children.Add(ignore);
+
+            var grid = new Grid
+            {
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Auto),
+                },
+                ColumnSpacing = 8,
+            };
+            grid.Add(info, 0);
+            grid.Add(btns, 1);
+
+            return new Border
+            {
+                Stroke = Color.FromArgb("#E3E0D8"),
+                StrokeThickness = 1,
+                Padding = new Thickness(12, 8),
+                Content = grid,
+            };
+        }
+
+        /// <summary>「记一笔」：消耗这条待确认 + 把金额/方向/时间/支付方式预填进表单，用户核对分类后点保存。</summary>
+        private async void OnPendingConfirmClicked(object? sender, EventArgs e)
+        {
+            if (sender is not Button b || b.CommandParameter is not string id) return;
+
+            var p = await _pending.FindAsync(id);
+            if (p is null || p.Status != 0)
+            {
+                await RefreshPendingPanelAsync();
+                return;
+            }
+
+            p.Status = 1;   // 已用：消耗掉，不再出现在卡片里
+            await _pending.UpdateAsync(p);
+
+            // 预填表单（方向、金额、时间、支付方式；分类留给用户核对 —— 分类是账本的骨架，机器猜错代价大）
+            _direction = p.Direction;
+            _selectedCategoryId = 0;
+            ApplyDirectionStyle();
+            BuildCategoryChips();
+
+            AmountEntry.Text = p.Amount.ToString("F2");
+            PayPicker.SelectedItem = p.Source == "alipay" ? "支付宝" : "微信";
+
+            var local = Period.ToLocalTime(p.NotifiedAt);
+            DatePicker.Date = local.Date;
+            TimePicker.Time = local.TimeOfDay;
+
+            StatusLabel.Text = "已按通知填好金额，核对分类后点保存";
+            await RefreshPendingPanelAsync();
+        }
+
+        private async void OnPendingIgnoreClicked(object? sender, EventArgs e)
+        {
+            if (sender is not Button b || b.CommandParameter is not string id) return;
+
+            var p = await _pending.FindAsync(id);
+            if (p is null) return;
+
+            p.Status = 2;   // 已忽略
+            await _pending.UpdateAsync(p);
+
+            StatusLabel.Text = "已忽略这条流水";
+            await RefreshPendingPanelAsync();
+        }
+#endif
+        // ↑ #if ANDROID 结束：待确认卡的渲染与两个处理器都是 Android 独有的（Windows 上没有监听服务）
 
         // ============================================================
         // 分类

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.TimelineConfirmPage"
+             Title="时间线确认">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16,12" Spacing="10">
+
+            <Label x:Name="HeadLabel"
+                   FontSize="13"
+                   TextColor="{StaticResource Gray500}"/>
+
+            <Button x:Name="ApplyAllBtn"
+                    Text="剩下的按候选全部入库"
+                    FontSize="13"
+                    HeightRequest="38"
+                    Padding="14,0"
+                    HorizontalOptions="Start"
+                    Clicked="OnApplyAllClicked"/>
+
+            <VerticalStackLayout x:Name="Rows" Spacing="10"/>
+
+            <Label x:Name="EmptyLabel"
+                   Text="没有待确认的时间片。手机用过一段时间后，这里会自动攒出候选段。"
+                   FontSize="13"
+                   TextColor="{StaticResource Gray500}"
+                   IsVisible="False"/>
+
+            <Label Text="关掉这页时，没处理的段会按候选标签自动入库（带「自动」标记，随时可在时间块库里改）。"
+                   FontSize="11"
+                   TextColor="{StaticResource Gray500}"/>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -79,6 +79,11 @@ namespace PersonalHub.Client
                 RecordCatalog.BlockRoute,
                 new ServiceRouteFactory(typeof(BlockEntryPage)));
 
+            // R13：自动时间线确认页（时间块页顶部进，不进目录）
+            Routing.RegisterRoute(
+                "segmentTimeline",
+                new ServiceRouteFactory(typeof(TimelineConfirmPage)));
+
             Routing.RegisterRoute(
                 RecordCatalog.GoalRoute,
                 new ServiceRouteFactory(typeof(GoalListPage)));

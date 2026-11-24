@@ -6,6 +6,18 @@
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.INTERNET" />
 
+	<!-- R13 自动时间片：前台服务采集屏幕亮灭/网络切换/前台应用。
+	     FOREGROUND_SERVICE(_SPECIAL_USE)：Android 14+ 要求前台服务声明类型（specialUse），
+	     service 节点的类型由 C# [Service] 特性生成（见 SegmentForegroundService）。
+	     PACKAGE_USAGE_STATS：signature|appop 级特殊权限，manifest 声明 +
+	     用户在「使用情况访问权限」设置里手动开（SegmentServiceHelper 引导）。
+	     POST_NOTIFICATIONS：Android 13+ 常驻通知的显示权限；没有它通知不显示但服务照跑，
+	     v0 不做运行时申请（省一个授权弹窗），需要看常驻通知时再去应用设置里开。 -->
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+	<uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+
 	<!-- Android 11+ 包可见性（targetSdk 30 起强制）：Launcher.TryOpenAsync 打开 obsidian://
 	     之前要先查系统里有没有 app 认这个 scheme，不声明 <queries> 查询结果永远是空，
 	     就算装了 Obsidian 也返回 false——表现为「点了成果没反应」（R9 踩坑，2026-11-19）。 -->
