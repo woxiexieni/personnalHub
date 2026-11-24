@@ -1,6 +1,8 @@
 using PersonalHub.Client.Controls;
 using PersonalHub.Client.Data;
 using PersonalHub.Client.Services;
+using Microsoft.Maui.Layouts;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace PersonalHub.Client
 {
@@ -17,11 +19,19 @@ namespace PersonalHub.Client
     public partial class TimeOverviewPage : ContentPage
     {
         private static readonly Color ActiveBg = Color.FromArgb("#185FA5");
-        private static readonly Color InactiveBg = Color.FromArgb("#F1EFE8");
-        private static readonly Color ChipText = Color.FromArgb("#2C2C2A");
-        private static readonly Color Muted = Color.FromArgb("#78766E");
         private static readonly Color BarColor = Color.FromArgb("#185FA5");
         private static readonly Color GoalColor = Color.FromArgb("#6B5CA5");
+
+        // 主题色对：这一页有数字和日历两套视图，深色主题下硬编码浅色底会翻车
+        // （BlockLibraryPage 踩过同款坑），文字/底色一律成对给。
+        private static readonly Color InactiveBgLight = Color.FromArgb("#F1EFE8");
+        private static readonly Color InactiveBgDark = Color.FromArgb("#2C2C2A");
+        private static readonly Color ChipTextLight = Color.FromArgb("#2C2C2A");
+        private static readonly Color ChipTextDark = Color.FromArgb("#D9D7CF");
+        private static readonly Color MutedLight = Color.FromArgb("#78766E");
+        private static readonly Color MutedDark = Color.FromArgb("#A8A69E");
+        private static readonly Color LineLight = Color.FromArgb("#E3E1DA");
+        private static readonly Color LineDark = Color.FromArgb("#3A3A36");
 
         private readonly LocalRecordStore<LocalBlock> _blocks;
         private readonly LocalRecordStore<LocalGoal> _goals;
@@ -30,6 +40,11 @@ namespace PersonalHub.Client
 
         private string _period = "today";
         private bool _busy;
+
+        // R14：视图状态。_viewMode = "stats" | "calendar"；_calendarDay 是日历态里选中的那天。
+        private string _viewMode = "stats";
+        private DateTimeOffset _calendarDay = Period.StartOfDay(DateTimeOffset.UtcNow);
+        private List<LocalBlock> _calBlocks = new();
 
         public TimeOverviewPage(
             LocalRecordStore<LocalBlock> blocks,
@@ -45,6 +60,7 @@ namespace PersonalHub.Client
             _settings = settings;
 
             StylePeriodButtons();
+            StyleModeButtons();
         }
 
         protected override async void OnAppearing()
@@ -67,6 +83,13 @@ namespace PersonalHub.Client
             _period = p;
             StylePeriodButtons();
 
+            // R14：日历态切档 = 重画日历（纯本地数据）；统计态照旧走本地 + 服务端校正
+            if (_viewMode == "calendar")
+            {
+                await RenderCalendarAsync();
+                return;
+            }
+
             await LoadLocalAsync();
             await RefreshFromServerAsync();
         }
@@ -79,8 +102,51 @@ namespace PersonalHub.Client
                      })
             {
                 bool active = key == _period;
-                btn.BackgroundColor = active ? ActiveBg : InactiveBg;
-                btn.TextColor = active ? Colors.White : ChipText;
+                btn.SetAppThemeColor(Button.BackgroundColorProperty,
+                    active ? ActiveBg : InactiveBgLight, active ? ActiveBg : InactiveBgDark);
+                btn.TextColor = active ? Colors.White
+                    : (Application.Current?.RequestedTheme == AppTheme.Dark ? ChipTextDark : ChipTextLight);
+            }
+        }
+
+        // ============================================================
+        // R14：统计 / 日历视图切换
+        // ============================================================
+
+        private async void OnViewModeClicked(object? sender, EventArgs e)
+        {
+            if (sender is not Button b || b.CommandParameter is not string m) return;
+            if (m == _viewMode) return;
+
+            _viewMode = m;
+            StyleModeButtons();
+            StatsBody.IsVisible = _viewMode == "stats";
+            CalendarBody.IsVisible = _viewMode == "calendar";
+
+            if (_viewMode == "calendar")
+            {
+                _calendarDay = Period.StartOfDay(DateTimeOffset.UtcNow);
+                await RenderCalendarAsync();
+            }
+            else
+            {
+                await LoadLocalAsync();
+                await RefreshFromServerAsync();
+            }
+        }
+
+        private void StyleModeButtons()
+        {
+            foreach (var (btn, key) in new[]
+                     {
+                         (StatsModeBtn, "stats"), (CalendarModeBtn, "calendar"),
+                     })
+            {
+                bool active = key == _viewMode;
+                btn.SetAppThemeColor(Button.BackgroundColorProperty,
+                    active ? ActiveBg : InactiveBgLight, active ? ActiveBg : InactiveBgDark);
+                btn.TextColor = active ? Colors.White
+                    : (Application.Current?.RequestedTheme == AppTheme.Dark ? ChipTextDark : ChipTextLight);
             }
         }
 
@@ -280,15 +346,16 @@ namespace PersonalHub.Client
                 var trend = TrendOf(g.Id);
                 var trendRow = new HorizontalStackLayout { Spacing = 8 };
                 trendRow.Children.Add(BuildSpark(trend));
-                trendRow.Children.Add(new Label
+                var trendLabel = new Label
                 {
                     Text = trend[3] > 0
                         ? $"本周 {Fmt(trend[3])} · 最后活动 {last}"
                         : $"本周没动 · 最后活动 {last}",
                     FontSize = 11,
-                    TextColor = Muted,
                     VerticalOptions = LayoutOptions.End,
-                });
+                };
+                trendLabel.SetAppThemeColor(Label.TextColorProperty, MutedLight, MutedDark);
+                trendRow.Children.Add(trendLabel);
 
                 stack.Children.Add(trendRow);
 
@@ -305,14 +372,22 @@ namespace PersonalHub.Client
             foreach (int m in buckets)
             {
                 double h = m == 0 ? 3 : Math.Max(6, m * 22.0 / max);
-                row.Children.Add(new BoxView
+                var bar = new BoxView
                 {
                     WidthRequest = 7,
                     HeightRequest = h,
                     CornerRadius = 2,
-                    Color = m == 0 ? Color.FromArgb("#E3E1DA") : GoalColor,
                     VerticalOptions = LayoutOptions.End,
-                });
+                };
+                if (m == 0)
+                {
+                    bar.SetAppThemeColor(BoxView.ColorProperty, LineLight, LineDark);
+                }
+                else
+                {
+                    bar.Color = GoalColor;
+                }
+                row.Children.Add(bar);
             }
             return row;
         }
@@ -355,14 +430,15 @@ namespace PersonalHub.Client
                 VerticalOptions = LayoutOptions.Center,
             }, 1);
 
-            head.Add(new Label
+            var pctLabel = new Label
             {
                 Text = pct,
                 FontSize = 11,
-                TextColor = Muted,
                 HorizontalTextAlignment = TextAlignment.End,
                 VerticalOptions = LayoutOptions.Center,
-            }, 2);
+            };
+            pctLabel.SetAppThemeColor(Label.TextColorProperty, MutedLight, MutedDark);
+            head.Add(pctLabel, 2);
 
             var stack = new VerticalStackLayout { Spacing = 4 };
             stack.Children.Add(head);
@@ -418,6 +494,367 @@ namespace PersonalHub.Client
                 FooterLabel.Text = "没找到时间块库";
             }
         }
+
+        // ============================================================
+        // R14：日历视图（只读）
+        //
+        // 三档三个形态：
+        //   today → 单日时刻轴；week → 一周日期条 + 单日时刻轴；month → 月历格子 + 单日时刻轴。
+        //
+        // 数据分两层（决定了"打开空不空"）：
+        //   * 月历格子 / 周日期条按 OccurredAt 分天聚合 —— 手动块也能画；
+        //   * 单日时刻轴必须 StartedAt/EndedAt —— 只有 R13 自动切片确认入库的块才有。
+        //     手动块没有起止，不画：按录入时刻假摆 = "我几点点的按钮"，不是"我几点干了啥"。
+        //
+        // 重叠规则：贪心分轨（轨尾 ≤ 本段起点才能进），竖屏最多 2 轨，塞不下的计数说明。
+        // ============================================================
+
+        private const double HourPx = 52;   // 一小时的高度
+        private const double Gutter = 0.07; // 左侧时刻标签占的宽度比例
+
+        private async Task RenderCalendarAsync()
+        {
+            var (from, to) = RangeOf(_period);
+            _calBlocks = await _blocks.GetByRangeAsync(from, to);
+
+            // 切档时把选中日重置到今天：避免停在上一档选过的那天让人找不到
+            _calendarDay = Period.StartOfDay(DateTimeOffset.UtcNow);
+            RenderCalendar();
+        }
+
+        private void RenderCalendar()
+        {
+            CalendarBody.Children.Clear();
+
+            switch (_period)
+            {
+                case "week":
+                    var monday = DateTimeOffset.FromUnixTimeMilliseconds(RangeOf("week").From);
+                    CalendarBody.Children.Add(BuildWeekBar(monday));
+                    break;
+
+                case "month":
+                    CalendarBody.Children.Add(BuildMonthGrid());
+                    break;
+            }
+
+            CalendarBody.Children.Add(BuildDayTimeline());
+        }
+
+        /// <summary>周档顶部的一行日期条：点选切天，"•"= 那天有记录。</summary>
+        private View BuildWeekBar(DateTimeOffset monday)
+        {
+            long today = Period.StartOfDay(DateTimeOffset.UtcNow).ToUnixTimeMilliseconds();
+            string[] wd = { "一", "二", "三", "四", "五", "六", "日" };
+
+            var row = new Grid { ColumnSpacing = 4 };
+            for (int i = 0; i < 7; i++) row.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+
+            for (int i = 0; i < 7; i++)
+            {
+                var day = monday.AddDays(i);
+                long ds = day.ToUnixTimeMilliseconds();
+                long de = day.AddDays(1).ToUnixTimeMilliseconds();
+                bool has = _calBlocks.Any(b => b.OccurredAt >= ds && b.OccurredAt < de);
+                bool sel = ds == _calendarDay.ToUnixTimeMilliseconds();
+
+                var btn = new Button
+                {
+                    Text = wd[i] + "\n" + day.Day,
+                    FontSize = 12,
+                    Padding = 0,
+                    HeightRequest = 46,
+                    CornerRadius = 8,
+                };
+
+                if (sel)
+                {
+                    btn.BackgroundColor = ActiveBg;
+                    btn.TextColor = Colors.White;
+                }
+                else
+                {
+                    btn.SetAppThemeColor(Button.BackgroundColorProperty, InactiveBgLight, InactiveBgDark);
+                    btn.SetAppThemeColor(Button.TextColorProperty, ChipTextLight, ChipTextDark);
+                }
+
+                if (has && !sel) btn.Text = wd[i] + "\n" + day.Day + " •";
+
+                var captured = day;
+                btn.Clicked += (_, _) =>
+                {
+                    _calendarDay = captured;
+                    RenderCalendar();
+                };
+                row.Add(btn, i, 0);
+            }
+            return row;
+        }
+
+        /// <summary>月历格子：格内数字 + 1~3 根片色条（那天记过的前三类片）。点格子看那天的时刻轴。</summary>
+        private View BuildMonthGrid()
+        {
+            var monthStart = new DateTimeOffset(_calendarDay.Year, _calendarDay.Month, 1, 0, 0, 0, Period.Cst);
+            int daysInMonth = DateTime.DaysInMonth(monthStart.Year, monthStart.Month);
+            int lead = ((int)monthStart.DayOfWeek + 6) % 7; // 周一=0
+            int rows = (lead + daysInMonth + 6) / 7;
+
+            var grid = new Grid { RowSpacing = 3, ColumnSpacing = 3 };
+            for (int c = 0; c < 7; c++) grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+            grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto)); // 表头
+            for (int r = 0; r < rows; r++) grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+
+            string[] wd = { "一", "二", "三", "四", "五", "六", "日" };
+            for (int c = 0; c < 7; c++)
+            {
+                var head = new Label { Text = wd[c], FontSize = 10, HorizontalTextAlignment = TextAlignment.Center };
+                head.SetAppThemeColor(Label.TextColorProperty, MutedLight, MutedDark);
+                grid.Add(head, c, 0);
+            }
+
+            long today = Period.StartOfDay(DateTimeOffset.UtcNow).ToUnixTimeMilliseconds();
+
+            for (int d = 1; d <= daysInMonth; d++)
+            {
+                var day = monthStart.AddDays(d - 1);
+                long ds = day.ToUnixTimeMilliseconds();
+                long de = day.AddDays(1).ToUnixTimeMilliseconds();
+                bool isToday = ds == today;
+                bool sel = ds == _calendarDay.ToUnixTimeMilliseconds();
+
+                var cell = new VerticalStackLayout { Spacing = 2 };
+
+                var num = new Label
+                {
+                    Text = d.ToString(),
+                    FontSize = 11,
+                    HorizontalTextAlignment = TextAlignment.Center,
+                    FontAttributes = isToday || sel ? FontAttributes.Bold : FontAttributes.None,
+                };
+                if (sel || isToday) num.TextColor = ActiveBg;
+                else num.SetAppThemeColor(Label.TextColorProperty, ChipTextLight, ChipTextDark);
+                cell.Children.Add(num);
+
+                // 那天记过哪些片：按片聚合分钟，前三类各一根色条
+                var bars = new HorizontalStackLayout { Spacing = 2, HorizontalOptions = LayoutOptions.Center };
+                var piecesOfDay = _calBlocks
+                    .Where(b => b.OccurredAt >= ds && b.OccurredAt < de && !string.IsNullOrEmpty(b.PieceCode))
+                    .GroupBy(b => Pieces.Canonical(b.PieceCode))
+                    .Select(g => (Code: g.Key, Minutes: g.Sum(b => Math.Max(0, b.DurationMin))))
+                    .Where(x => x.Minutes > 0)
+                    .OrderByDescending(x => x.Minutes)
+                    .Take(3)
+                    .ToList();
+                foreach (var p in piecesOfDay)
+                {
+                    bars.Children.Add(new BoxView
+                    {
+                        WidthRequest = 10,
+                        HeightRequest = 4,
+                        CornerRadius = 2,
+                        Color = PieceColors.For(p.Code),
+                    });
+                }
+                if (piecesOfDay.Count > 0) cell.Children.Add(bars);
+
+                var tap = new TapGestureRecognizer();
+                var captured = day;
+                tap.Tapped += (_, _) =>
+                {
+                    _calendarDay = captured;
+                    RenderCalendar();
+                };
+                cell.GestureRecognizers.Add(tap);
+
+                int col = (lead + d - 1) % 7;
+                int row = (lead + d - 1) / 7 + 1;
+                grid.Add(cell, col, row);
+            }
+            return grid;
+        }
+
+        /// <summary>
+        /// 单日时刻轴：纵轴 0~24 点，块按起止时刻贴上去，同段并排最多 2 轨。
+        /// 手动块（无起止）不画，只在底下说明数量。
+        /// </summary>
+        private View BuildDayTimeline()
+        {
+            var stack = new VerticalStackLayout { Spacing = 6 };
+
+            var dayStart = Period.StartOfDay(_calendarDay);
+            long ds = dayStart.ToUnixTimeMilliseconds();
+            long de = dayStart.AddDays(1).ToUnixTimeMilliseconds();
+
+            var dayBlocks = _calBlocks.Where(b => b.OccurredAt >= ds && b.OccurredAt < de).ToList();
+
+            // 只有带真实起止的块才进时刻轴；跨天块按天夹紧（Anomaly 已有标记，这里不重复处理）
+            var timed = dayBlocks
+                .Where(b => b.StartedAt > 0 && b.EndedAt > b.StartedAt)
+                .Select(b => (B: b, S: Math.Max(b.StartedAt, ds), E: Math.Min(b.EndedAt, de)))
+                .Where(x => x.E > x.S)
+                .OrderBy(x => x.S)
+                .ToList();
+            int manual = dayBlocks.Count(b => !(b.StartedAt > 0 && b.EndedAt > b.StartedAt));
+
+            // 标题行
+            var head = new Grid
+            {
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Auto),
+                },
+                ColumnSpacing = 8,
+            };
+            var title = new Label
+            {
+                Text = dayStart.ToString("M月d日") + WeekName(dayStart) + $" · {timed.Count} 段",
+                FontSize = 14,
+                FontAttributes = FontAttributes.Bold,
+                VerticalOptions = LayoutOptions.Center,
+            };
+            title.SetAppThemeColor(Label.TextColorProperty, ChipTextLight, ChipTextDark);
+            head.Add(title, 0);
+            var legend = new Label
+            {
+                Text = "只画自动切片（带起止）的块",
+                FontSize = 10,
+                VerticalOptions = LayoutOptions.Center,
+                HorizontalTextAlignment = TextAlignment.End,
+            };
+            legend.SetAppThemeColor(Label.TextColorProperty, MutedLight, MutedDark);
+            head.Add(legend, 1);
+            stack.Children.Add(head);
+
+            // 贪心分轨：轨尾 ≤ 本段起点才能进这条轨；最多 2 轨，塞不下的进 overflow
+            var trackEnds = new List<long>();
+            var placed = new List<((LocalBlock B, long S, long E) X, int Track)>();
+            int overflow = 0;
+            foreach (var x in timed)
+            {
+                int t = trackEnds.FindIndex(end => end <= x.S);
+                if (t < 0)
+                {
+                    if (trackEnds.Count >= 2)
+                    {
+                        overflow++;
+                        continue;
+                    }
+                    trackEnds.Add(x.E);
+                    t = trackEnds.Count - 1;
+                }
+                else
+                {
+                    trackEnds[t] = x.E;
+                }
+                placed.Add((x, t));
+            }
+            int tracks = Math.Max(1, trackEnds.Count);
+
+            var layout = new AbsoluteLayout { HeightRequest = 24 * HourPx };
+
+            // 时刻刻度线 + 左侧标签
+            for (int h = 0; h <= 24; h++)
+            {
+                double y = h * HourPx;
+
+                var line = new BoxView { HeightRequest = 1 };
+                line.SetAppThemeColor(BoxView.ColorProperty, LineLight, LineDark);
+                AbsoluteLayout.SetLayoutBounds(line, new Rect(Gutter, y, 1 - Gutter, 1));
+                AbsoluteLayout.SetLayoutFlags(line,
+                    AbsoluteLayoutFlags.XProportional | AbsoluteLayoutFlags.WidthProportional);
+                layout.Children.Add(line);
+
+                if (h < 24)
+                {
+                    var lab = new Label { Text = $"{h:00}:00", FontSize = 9 };
+                    lab.SetAppThemeColor(Label.TextColorProperty, MutedLight, MutedDark);
+                    AbsoluteLayout.SetLayoutBounds(lab, new Rect(0, y, 44, 12));
+                    layout.Children.Add(lab);
+                }
+            }
+
+            // 时间块
+            foreach (var (x, track) in placed)
+            {
+                double fx = Gutter + track * ((1 - Gutter) / tracks);
+                double fw = (1 - Gutter) / tracks - 0.006;
+                double yStart = (x.S - ds) / 60000.0 / 60.0 * HourPx;
+                double hPx = Math.Max(4, (x.E - x.S) / 60000.0 / 60.0 * HourPx);
+
+                var fill = PieceColors.For(x.B.PieceCode);
+                string name = _settings.DisplayName(x.B.PieceCode);
+
+                View block;
+                if (hPx >= 18)
+                {
+                    // 高度够才写字：太窄的块只出色条，字挤进去谁都读不了
+                    string text = hPx >= 34 ? $"{name} {FormatHm(x.S)}-{FormatHm(x.E)}" : name;
+                    block = new Border
+                    {
+                        BackgroundColor = fill,
+                        StrokeThickness = 0,
+                        // Border 没有 CornerRadius（CS0117），圆角走 StrokeShape
+                        StrokeShape = new RoundRectangle { CornerRadius = 4 },
+                        Content = new Label
+                        {
+                            Text = text,
+                            FontSize = 10,
+                            TextColor = PieceColors.OnFill,
+                            Padding = new Thickness(4, 1),
+                            LineBreakMode = LineBreakMode.TailTruncation,
+                            VerticalOptions = LayoutOptions.Center,
+                        },
+                    };
+                }
+                else
+                {
+                    block = new BoxView { Color = fill, CornerRadius = 4 };
+                }
+
+                AbsoluteLayout.SetLayoutBounds(block, new Rect(fx, yStart, fw, hPx));
+                AbsoluteLayout.SetLayoutFlags(block,
+                    AbsoluteLayoutFlags.XProportional | AbsoluteLayoutFlags.WidthProportional);
+                layout.Children.Add(block);
+            }
+
+            // "现在"红线（只有看今天时画）：一眼看到此刻在轴上哪儿
+            if (ds == Period.StartOfDay(DateTimeOffset.UtcNow).ToUnixTimeMilliseconds())
+            {
+                long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                if (now >= ds && now < de)
+                {
+                    double y = (now - ds) / 60000.0 / 60.0 * HourPx;
+                    var nowLine = new BoxView { Color = Color.FromArgb("#C24A4A"), HeightRequest = 2 };
+                    AbsoluteLayout.SetLayoutBounds(nowLine, new Rect(Gutter, y, 1 - Gutter, 2));
+                    AbsoluteLayout.SetLayoutFlags(nowLine,
+                        AbsoluteLayoutFlags.XProportional | AbsoluteLayoutFlags.WidthProportional);
+                    layout.Children.Add(nowLine);
+                }
+            }
+
+            stack.Children.Add(layout);
+
+            // 底部说明：说清楚"轴上没有"不等于"没记录"
+            void Note(string text)
+            {
+                var lab = new Label { Text = text, FontSize = 10 };
+                lab.SetAppThemeColor(Label.TextColorProperty, MutedLight, MutedDark);
+                stack.Children.Add(lab);
+            }
+
+            if (timed.Count == 0 && manual == 0) Note("这一天还没有时间块");
+            if (overflow > 0) Note($"另有 {overflow} 段重叠没画下（一天最多并排 2 轨）");
+            if (manual > 0) Note($"{manual} 条手动记录没有起止时刻，画不进时间轴");
+
+            return stack;
+        }
+
+        private static string FormatHm(long unixMs)
+            => DateTimeOffset.FromUnixTimeMilliseconds(unixMs).ToOffset(Period.Cst).ToString("HH:mm");
+
+        private static string WeekName(DateTimeOffset d)
+            => "周" + "一二三四五六日"[((int)d.DayOfWeek + 6) % 7];
 
         // ============================================================
         // 口径与格式化

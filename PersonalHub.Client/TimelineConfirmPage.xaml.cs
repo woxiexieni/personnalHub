@@ -90,18 +90,20 @@ namespace PersonalHub.Client
 
             var info = new VerticalStackLayout { Spacing = 2 };
             info.Children.Add(new Label { Text = timeText, FontSize = 14 });
-            info.Children.Add(new Label
+            var candidate = new Label
             {
                 Text = $"候选：{pieceText} · {appText}",
                 FontSize = 12,
-                TextColor = Color.FromArgb("#78766E"),
-            });
+            };
+            candidate.SetAppThemeColor(Label.TextColorProperty,
+                Color.FromArgb("#78766E"), Color.FromArgb("#A8A69E"));
+            info.Children.Add(candidate);
 
             // ---- 换片网格：先建好藏起来，点「换片」再展开（折叠套路：切 IsVisible）----
             var picker = BuildPiecePicker(seg);
             picker.IsVisible = false;
 
-            var btnApply = MakePill("记入", "#185FA5", "#FFFFFF");
+            var btnApply = MakePill("记入", "#185FA5", "#FFFFFF", "#185FA5", "#FFFFFF");
             btnApply.Clicked += async (_, _) =>
             {
                 if (string.IsNullOrEmpty(seg.PieceCode))
@@ -112,10 +114,10 @@ namespace PersonalHub.Client
                 await ApplySegmentAsync(seg, seg.PieceCode, confirmed: true);
             };
 
-            var btnChange = MakePill("换片", "#E6F1FB", "#185FA5");
+            var btnChange = MakePill("换片", "#E6F1FB", "#185FA5", "#1E3550", "#7FB4E8");
             btnChange.Clicked += (_, _) => picker.IsVisible = !picker.IsVisible;
 
-            var btnIgnore = MakePill("忽略", "#F1EFE8", "#78766E");
+            var btnIgnore = MakePill("忽略", "#F1EFE8", "#78766E", "#2C2C2A", "#A8A69E");
             btnIgnore.Clicked += async (_, _) =>
             {
                 seg.Status = 2;
@@ -133,13 +135,15 @@ namespace PersonalHub.Client
             stack.Children.Add(buttons);
             stack.Children.Add(picker);
 
-            return new Border
+            var card = new Border
             {
-                Stroke = Color.FromArgb("#E3E0D8"),
                 StrokeThickness = 1,
                 Padding = new Thickness(12, 10),
                 Content = stack,
             };
+            card.SetAppThemeColor(Border.StrokeProperty,
+                Color.FromArgb("#E3E0D8"), Color.FromArgb("#3A3A36"));
+            return card;
         }
 
         /// <summary>12 个片的胶囊网格，点一个 = 按这个片记入（confirmed 路径）。</summary>
@@ -160,9 +164,11 @@ namespace PersonalHub.Client
                     HeightRequest = 32,
                     Padding = new Thickness(10, 0),
                     CornerRadius = 16,
-                    BackgroundColor = Color.FromArgb("#E6F1FB"),
-                    TextColor = Color.FromArgb("#185FA5"),
                 };
+                btn.SetAppThemeColor(Button.BackgroundColorProperty,
+                    Color.FromArgb("#E6F1FB"), Color.FromArgb("#1E3550"));
+                btn.SetAppThemeColor(Button.TextColorProperty,
+                    Color.FromArgb("#185FA5"), Color.FromArgb("#7FB4E8"));
                 // 闭包捕获 seg 和 piece.Code（Border/手势传参的坑见 memory，闭包不赌版本）
                 btn.Clicked += async (_, _) =>
                     await ApplySegmentAsync(seg, piece.Code, confirmed: true);
@@ -255,16 +261,22 @@ namespace PersonalHub.Client
         private static string FormatMin(int minutes)
             => minutes >= 60 ? $"{minutes / 60} 小时 {minutes % 60} 分" : $"{minutes} 分钟";
 
-        private static Button MakePill(string text, string bg, string fg)
-            => new()
+        /// <summary>胶囊按钮。浅色/深色主题各给一对色（bg/fg 各两份），压住两套主题。</summary>
+        private static Button MakePill(string text, string bgL, string fgL, string bgD, string fgD)
+        {
+            var btn = new Button
             {
                 Text = text,
                 FontSize = 12,
                 HeightRequest = 32,
                 Padding = new Thickness(12, 0),
                 CornerRadius = 16,
-                BackgroundColor = Color.FromArgb(bg),
-                TextColor = Color.FromArgb(fg),
             };
+            btn.SetAppThemeColor(Button.BackgroundColorProperty,
+                Color.FromArgb(bgL), Color.FromArgb(bgD));
+            btn.SetAppThemeColor(Button.TextColorProperty,
+                Color.FromArgb(fgL), Color.FromArgb(fgD));
+            return btn;
+        }
     }
 }

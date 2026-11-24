@@ -1801,6 +1801,7 @@ namespace PersonalHub.Client
         private async Task RefreshSegmentPanelAsync()
         {
             await Task.CompletedTask;   // Windows 目标下整段为空
+//只有在安卓编译下才有效
 #if ANDROID
             SegmentCapture.SegmentsChanged -= OnSegmentCaptured;
             SegmentCapture.SegmentsChanged += OnSegmentCaptured;

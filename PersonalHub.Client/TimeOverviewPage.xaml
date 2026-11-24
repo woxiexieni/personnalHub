@@ -27,8 +27,18 @@
                             Clicked="OnLibraryClicked"/>
                 </Grid>
 
+                <!-- R14：统计 / 日历两种视图。统计回答"花在哪"，日历回答"几点到几点"。
+                     切换摆在最上面——日历入口不再藏在别的页面里（时间线入口藏录入页那次被吐槽过）。 -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <Button x:Name="StatsModeBtn" Text="统计" FontSize="13" Padding="0" HeightRequest="34"
+                            Clicked="OnViewModeClicked" CommandParameter="stats"/>
+                    <Button x:Name="CalendarModeBtn" Grid.Column="1" Text="日历" FontSize="13" Padding="0" HeightRequest="34"
+                            Clicked="OnViewModeClicked" CommandParameter="calendar"/>
+                </Grid>
+
                 <!-- 三个档位。不做自定义区间：时间块的用途是"看清这段日子怎么过的"，
-                     不是做财务对账，多一个日期选择器只多一次操作。 -->
+                     不是做财务对账，多一个日期选择器只多一次操作。
+                     统计态=今日/本周/本月聚合；日历态=单日时刻轴/周/月历。 -->
                 <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
                     <Button x:Name="TodayBtn" Text="今日" FontSize="13" Padding="0" HeightRequest="34"
                             Clicked="OnPeriodClicked" CommandParameter="today"/>
@@ -38,8 +48,9 @@
                             Clicked="OnPeriodClicked" CommandParameter="month"/>
                 </Grid>
 
-                <!-- 大数字：已记录 + 未记录。未记录不是缺口提示，是这个系统最值钱的一栏。 -->
-                <Border Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="16,14">
+                <VerticalStackLayout x:Name="StatsBody" Spacing="14">
+                    <!-- 大数字：已记录 + 未记录。未记录不是缺口提示，是这个系统最值钱的一栏。 -->
+                    <Border Stroke="{StaticResource Gray300}" StrokeThickness="1" Padding="16,14">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="已记录" FontSize="12" TextColor="{StaticResource Gray500}"/>
                         <Label x:Name="RecordedLabel" Text="0 分钟" FontSize="32" FontAttributes="Bold"/>
@@ -75,7 +86,11 @@
                            HorizontalOptions="Center" TextColor="{StaticResource Gray500}"/>
                     <Button Text="去记一条" FontSize="13" HorizontalOptions="Center"
                             Padding="18,0" HeightRequest="34" Clicked="OnGoRecordClicked"/>
+                    </VerticalStackLayout>
                 </VerticalStackLayout>
+
+                <!-- R14：日历视图容器，内容全部由 code-behind 按 日/周/月 三档现搭 -->
+                <VerticalStackLayout x:Name="CalendarBody" Spacing="12" IsVisible="False"/>
 
                 <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,4"/>
 
