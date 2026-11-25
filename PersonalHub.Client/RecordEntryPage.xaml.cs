@@ -30,6 +30,7 @@ namespace PersonalHub.Client
         private readonly RecordSyncService<LocalRecord> _sync;
         private readonly LocalCacheService _cache;
         private readonly LocalRecordStore<LocalPendingPay> _pending;   // R12 自动记账待确认
+        private readonly LocalRecordStore<LocalWalletProbe> _probes;   // R15 钱包通知排查
 
         private IReadOnlyList<CategoryDto> _categories = Array.Empty<CategoryDto>();
         private bool _categoriesLoaded;
@@ -42,13 +43,15 @@ namespace PersonalHub.Client
             LocalRecordStore<LocalRecord> store,
             RecordSyncService<LocalRecord> sync,
             LocalCacheService cache,
-            LocalRecordStore<LocalPendingPay> pending)
+            LocalRecordStore<LocalPendingPay> pending,
+            LocalRecordStore<LocalWalletProbe> probes)
         {
             InitializeComponent();
             _store = store;
             _sync = sync;
             _cache = cache;
             _pending = pending;
+            _probes = probes;
 
             PayPicker.ItemsSource = PayMethods.ToList();
             PayPicker.SelectedIndex = 0;
@@ -129,6 +132,19 @@ namespace PersonalHub.Client
             {
                 PendingPanel.Children.Add(BuildPendingCard(p));
             }
+
+            // 没有待确认流水时，把最近收到的钱包通知原文摆出来（最多 3 条）：
+            // 自动记账抓不到时，人第一句话总是"是不是我的问题" ——
+            // 这几行就是答案：通知根本没来 / 来了但没认出来 / 认出来了但还没确认。
+            if (pending.Count == 0)
+            {
+                var probes = (await _probes.GetAllAsync())
+                    .OrderByDescending(x => x.NotifiedAt)
+                    .Take(3)
+                    .ToList();
+
+                PendingPanel.Children.Add(BuildProbeCard(probes));
+            }
 #endif
         }
 
@@ -165,6 +181,78 @@ namespace PersonalHub.Client
                 Content = stack,
             };
         }
+
+        /// <summary>
+        /// 排查卡：最近收到的钱包通知（原文）。没有待确认流水时才出现。
+        ///
+        /// 它回答的是"到底卡在哪一步"，而不是再给一个要处理的列表：
+        ///   空列表  → 通知根本没来（碰一碰这类支付本来就可能不发通知，谁也抓不到）
+        ///   没认出来 → 通知来了但文本格式变了，把原文贴给开发者就能改解析
+        ///   已识别但还没确认 → 上面那张卡应该已经出现了，这里只是兜底
+        /// </summary>
+        private View BuildProbeCard(List<LocalWalletProbe> probes)
+        {
+            var stack = new VerticalStackLayout { Spacing = 4 };
+
+            stack.Children.Add(new Label
+            {
+                Text = "自动记账 · 最近收到的钱包通知",
+                FontSize = 12,
+                FontAttributes = FontAttributes.Bold,
+                TextColor = Color.FromArgb("#5F5E5A"),
+            });
+
+            if (probes.Count == 0)
+            {
+                stack.Children.Add(new Label
+                {
+                    Text = "没收到过支付宝/微信的通知。有些支付（比如支付宝「碰一碰」）"
+                         + "支付成功只弹页面、不发通知 —— 这种谁也抓不到，只能手记。",
+                    FontSize = 11,
+                    LineBreakMode = LineBreakMode.WordWrap,
+                    TextColor = Color.FromArgb("#78766E"),
+                });
+
+                return WrapProbeCard(stack);
+            }
+
+            foreach (var p in probes)
+            {
+                string src = p.Source == "alipay" ? "支付宝" : "微信";
+                string time = Period.ToLocalTime(p.NotifiedAt).ToString("MM-dd HH:mm");
+
+                stack.Children.Add(new Label
+                {
+                    Text = $"{time} · {src} · " + (p.Parsed ? "已识别" : "没认出来"),
+                    FontSize = 11,
+                    TextColor = p.Parsed
+                        ? Color.FromArgb("#3B6D11")
+                        : Color.FromArgb("#A32D2D"),
+                });
+
+                if (!string.IsNullOrWhiteSpace(p.Text) || !string.IsNullOrWhiteSpace(p.Title))
+                {
+                    stack.Children.Add(new Label
+                    {
+                        Text = string.IsNullOrWhiteSpace(p.Text) ? p.Title : p.Text,
+                        FontSize = 10,
+                        MaxLines = 2,
+                        LineBreakMode = LineBreakMode.TailTruncation,
+                        TextColor = Color.FromArgb("#9A9891"),
+                    });
+                }
+            }
+
+            return WrapProbeCard(stack);
+        }
+
+        private static View WrapProbeCard(View content) => new Border
+        {
+            Stroke = Color.FromArgb("#E3E0D8"),
+            StrokeThickness = 1,
+            Padding = new Thickness(12, 10),
+            Content = content,
+        };
 
         private View BuildPendingCard(LocalPendingPay p)
         {

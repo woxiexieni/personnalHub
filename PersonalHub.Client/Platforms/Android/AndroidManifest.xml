@@ -1,8 +1,47 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
 	<!-- usesCleartextTraffic：局域网内服务端是明文 http（h2c），targetSdk 34 默认禁止明文，
 	     不放开会导致模拟器/真机直接连不上。仅用于家庭内网调试。 -->
-	<application android:allowBackup="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true" android:usesCleartextTraffic="true"></application>
+	<application android:allowBackup="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true" android:usesCleartextTraffic="true">
+
+		<!-- specialUse 前台服务要挂两样东西：<property>（用途子类型）和 foregroundServiceType。
+		     C# 的 [Service] 特性带不了 <property>，只能在这里手写同名节点。
+
+		     ⚠️ 手写节点会**顶掉** [Service] 特性生成的那份属性（实测：1.0.20 的 APK 里
+		     这个 service 只剩 android:name，Enabled/Exported/Label/ForegroundServiceType
+		     全没了）。所以下面的 enabled/exported/label/foregroundServiceType 必须写全，
+		     不要指望特性里那行 ForegroundServiceType 生效。
+
+		     foregroundServiceType 缺失的后果（2026-11-25 查出来的真因）：
+		     代码里 StartForeground(id, 通知, 0x40000000) 在 Android 10+ 会被框架按
+		     "清单里没声明的类型" 直接抛 IllegalArgumentException，catch 一吞 ——
+		     服务进不了前台，通知栏什么都没有。
+		     0x40000000 = specialUse，0x8 = location（读 Wi-Fi SSID 要用）。
+		     这里必须写枚举名，不能写数值 —— aapt2 对 flags 属性只认清单编译时的名字
+		     （数字会被 APT2259 判成 incompatible）。 -->
+		<service android:name="com.personalhub.client.PomodoroForegroundService"
+		         android:enabled="true"
+		         android:exported="false"
+		         android:stopWithTask="false"
+		         android:label="PersonalHub 番茄钟"
+		         android:foregroundServiceType="specialUse"
+		         tools:node="merge">
+			<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+			          android:value="pomodoro_countdown_timer" />
+		</service>
+		<service android:name="com.personalhub.client.SegmentForegroundService"
+		         android:enabled="true"
+		         android:exported="false"
+		         android:stopWithTask="false"
+		         android:label="PersonalHub 时间片"
+		         android:foregroundServiceType="specialUse|location"
+		         tools:node="merge">
+			<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+			          android:value="automatic_time_block_capture" />
+		</service>
+
+	</application>
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.INTERNET" />
 
@@ -11,13 +50,19 @@
 	     service 节点的类型由 C# [Service] 特性生成（见 SegmentForegroundService）。
 	     PACKAGE_USAGE_STATS：signature|appop 级特殊权限，manifest 声明 +
 	     用户在「使用情况访问权限」设置里手动开（SegmentServiceHelper 引导）。
-	     POST_NOTIFICATIONS：Android 13+ 常驻通知的显示权限；没有它通知不显示但服务照跑，
-	     v0 不做运行时申请（省一个授权弹窗），需要看常驻通知时再去应用设置里开。 -->
+	     POST_NOTIFICATIONS：Android 13+ 通知权限。R15 起改为**按需申请** ——
+	     只在点「开始专注」时问一次（NotificationPermissionHelper）。
+	     不申请的话 Android 13+ 一条通知都发不出来，前台服务的常驻通知也不进通知栏。 -->
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 	<uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+
+	<!-- R15：开机自启。手机重启后没人拉起前台服务，只有开机广播能补
+	     （BootReceiver → SegmentServiceHelper.EnsureStarted）。没有这条权限，
+	     接收器收不到 ACTION_BOOT_COMPLETED，时间片会在重启后永久停摆。 -->
+	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
 	<!-- R14.5：读 Wi-Fi SSID（「在家/在公司」的主证据）要求精确定位权限 +
 	     定位服务开着 + FGS 带 location 类型（Android 8.1+ 的硬规定）。

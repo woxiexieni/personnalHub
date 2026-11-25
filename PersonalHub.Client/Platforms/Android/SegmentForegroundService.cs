@@ -67,7 +67,15 @@ namespace PersonalHub.Client
                 StartForegroundCompat();
                 SegmentCapture.ServiceRunning = true;
             }
-            catch { /* 抢不到前台也别崩 —— 下一次 StartForegroundService 会再试 */ }
+            catch (Exception ex)
+            {
+                // 进不了前台就主动退场：系统给 startForegroundService 的窗口只有 5 秒，
+                // 超时会以 "did not then call Service.startForeground()" 杀掉整个进程。
+                // 留日志 + 下次 StartForegroundService 会再来一次。
+                global::Android.Util.Log.Error("PH.Segment", "startForeground 失败：" + ex);
+                try { StopSelf(); } catch { }
+                return StartCommandResult.NotSticky;
+            }
 
             return StartCommandResult.Sticky;
         }
@@ -118,13 +126,50 @@ namespace PersonalHub.Client
         {
             var notification = BuildNotification();
 
-            if (OperatingSystem.IsAndroidVersionAtLeast(29))
-            {
-                StartForeground(NotificationId, notification, (ForegroundService)(0x40000000 | 0x8));
-            }
-            else
+            if (!OperatingSystem.IsAndroidVersionAtLeast(29))
             {
                 StartForeground(NotificationId, notification);
+                return;
+            }
+
+            // 0x40000000 = specialUse，0x8 = location。
+            // 两个值都必须写在清单的 foregroundServiceType 里（AndroidManifest.xml），
+            // 否则框架按"清单未声明的类型"抛 IllegalArgumentException，服务进不了前台。
+            //
+            // location 这一段要按权限决定：Android 10+ 声明了 location 类型却**没拿到**
+            // 定位权限时，startForeground 会抛 SecurityException（不是静默失败）。
+            // 拿不到就只报 specialUse —— 代价是 SSID 读不出来，其余信号照常。
+            int type = 0x40000000;
+            if (HasLocationPermission()) type |= 0x8;
+
+            try
+            {
+                StartForeground(NotificationId, notification, (ForegroundService)type);
+            }
+            catch when (type != 0x40000000)
+            {
+                // 带 location 被拒：Android 14 起「从后台启动的定位前台服务」要求
+                // 后台定位权限，开机广播拉起的那一次正好属于这种情况。
+                // 退回只报 specialUse —— 代价是 SSID 读不出来，
+                // 亮灭 / 网络 / 前台 app / 运动这些主信号照常。
+                global::Android.Util.Log.Warn("PH.Segment", "带 location 的 startForeground 被拒，退回 specialUse");
+                StartForeground(NotificationId, notification, (ForegroundService)0x40000000);
+            }
+        }
+
+        /// <summary>粗/精定位任一授权即可（读 SSID 只要求其一，各机型要求不同）。</summary>
+        private bool HasLocationPermission()
+        {
+            try
+            {
+                if (!OperatingSystem.IsAndroidVersionAtLeast(23)) return true;
+
+                return CheckSelfPermission(global::Android.Manifest.Permission.AccessFineLocation) == Permission.Granted
+                    || CheckSelfPermission(global::Android.Manifest.Permission.AccessCoarseLocation) == Permission.Granted;
+            }
+            catch
+            {
+                return false;
             }
         }
 

@@ -96,6 +96,22 @@ namespace PersonalHub.Client.Controls
             IsVisible = false,
         };
 
+        /// <summary>
+        /// 通知权限没开时的补救入口。
+        ///
+        /// Android 13+ 不给通知权限，前台服务的常驻通知也不进通知栏 ——
+        /// 番茄钟就变成"看不见的计时器"，到点也没有任何提示。
+        /// 这个提示只在真没权限时出现，点一下直接进系统设置。
+        /// </summary>
+        private readonly Label _notifyHint = new()
+        {
+            Text = "通知被关了（权限或渠道）—— 倒计时和到点提醒都不会出现。点这里去打开。",
+            FontSize = 11,
+            TextColor = Color.FromArgb("#A32D2D"),
+            LineBreakMode = LineBreakMode.WordWrap,
+            IsVisible = false,
+        };
+
         private readonly VerticalStackLayout _idlePanel;
         private readonly VerticalStackLayout _runningPanel;
 
@@ -128,6 +144,7 @@ namespace PersonalHub.Client.Controls
                     _durationRow,
                     _noteEditor,
                     _startBtn,
+                    _notifyHint,
                     _resultLabel,
                 },
             };
@@ -178,6 +195,10 @@ namespace PersonalHub.Client.Controls
             _pauseBtn.Clicked += OnPauseClicked;
             _stopBtn.Clicked += OnStopClicked;
 
+#if ANDROID
+            _notifyHint.GestureRecognizers.Add(NotifyHintTap());
+#endif
+
             PomodoroState.Changed += OnStateChanged;
             PomodoroState.Finished += OnFinished;
             Unloaded += (_, _) =>
@@ -187,7 +208,48 @@ namespace PersonalHub.Client.Controls
             };
 
             Refresh();
+
+#if ANDROID
+            _ = CheckNotifyPermissionAsync();
+#endif
+
+            // 清后台导致"到点那一刻进程不在"时，时间块是在下次启动才补记的，
+            // 那次 Finished 没有界面订阅，所以在这里补一句，免得用户以为白专注了。
+            int recovered = PomodoroState.TakeRecoveredMinutes();
+            if (recovered > 0)
+            {
+                _resultLabel.Text = $"✓ 上次那段 {recovered} 分钟已补记进时间块";
+                _resultLabel.IsVisible = true;
+                _ = HideResultLaterAsync();
+            }
         }
+
+#if ANDROID
+        private static TapGestureRecognizer NotifyHintTap()
+        {
+            var tap = new TapGestureRecognizer();
+            tap.Tapped += (_, _) => NotificationPermissionHelper.OpenSettings();
+            return tap;
+        }
+
+        private async Task CheckNotifyPermissionAsync()
+        {
+            try
+            {
+                bool granted = await NotificationPermissionHelper.IsGrantedAsync();
+
+                // 权限开着但渠道被关成"没有任何提示"时，通知同样不会出现在通知栏。
+                // 这两种情况用户看到的都是"番茄钟没有通知"，所以合并成一个提示。
+                bool blocked = NotificationPermissionHelper.IsChannelBlocked(NotificationChannels.Pomodoro);
+
+                _notifyHint.IsVisible = !granted || blocked;
+            }
+            catch
+            {
+                // 查不到就当有权限，不吓人
+            }
+        }
+#endif
 
         // ============================================================
         // 构建胶囊
@@ -278,15 +340,29 @@ namespace PersonalHub.Client.Controls
         // 动作
         // ============================================================
 
-        private void OnStartClicked(object? sender, EventArgs e)
+        private async void OnStartClicked(object? sender, EventArgs e)
         {
             if (string.IsNullOrEmpty(_selectedPiece)) return;
 
-            PomodoroState.Start(_selectedPiece, _noteEditor.Text ?? string.Empty, _selectedMinutes);
+            try
+            {
+#if ANDROID
+                // 只在真要用番茄钟的时候问一次通知权限 —— 启动流程里弹框八成被随手点掉，
+                // 而点掉之后 Android 13+ 一条通知都不显示，番茄钟就成了看不见的计时器。
+                bool granted = await NotificationPermissionHelper.EnsureAsync();
+                _notifyHint.IsVisible = !granted
+                    || NotificationPermissionHelper.IsChannelBlocked(NotificationChannels.Pomodoro);
+#endif
+                PomodoroState.Start(_selectedPiece, _noteEditor.Text ?? string.Empty, _selectedMinutes);
 
 #if ANDROID
-            Platforms.Android.PomodoroServiceHelper.StartService();
+                Platforms.Android.PomodoroServiceHelper.StartService();
 #endif
+            }
+            catch
+            {
+                // 权限申请/服务启动任何意外都不该让这一下点击变成闪退
+            }
         }
 
         private void OnPauseClicked(object? sender, EventArgs e)

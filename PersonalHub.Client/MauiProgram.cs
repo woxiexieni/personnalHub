@@ -37,6 +37,10 @@ namespace PersonalHub.Client
             // R12：自动记账的待确认流水（纯本地表 pending_pays，不走同步）。
             builder.Services.AddSingleton(new LocalRecordStore<LocalPendingPay>(dbPath));
 
+            // R15：钱包通知探针（纯本地表 wallet_probes）。只用来回答"通知到底有没有来"，
+            // 留最近 40 条，不进同步、不进账本。
+            builder.Services.AddSingleton(new LocalRecordStore<LocalWalletProbe>(dbPath));
+
             // R13：自动时间片的待确认段（纯本地表 pending_segments，不走同步 ——
             // 理由同 pending_pays：待确认的价值只在当天，确认后的正式块才走同步）。
             builder.Services.AddSingleton(new LocalRecordStore<LocalPendingSegment>(dbPath));
@@ -164,10 +168,21 @@ namespace PersonalHub.Client
 
             // R12：自动记账 —— 把待确认流水的 store 交给静态捕获桥。
             // Android 通知监听服务在 DI 容器外面（系统直接绑定它），只能走静态入口。
-            PaymentCapture.Initialize(app.Services.GetRequiredService<LocalRecordStore<LocalPendingPay>>());
+            PaymentCapture.Initialize(
+                app.Services.GetRequiredService<LocalRecordStore<LocalPendingPay>>(),
+                app.Services.GetRequiredService<LocalRecordStore<LocalWalletProbe>>());
+
 
             // R13：自动时间片 —— 同一个道理，前台服务由系统拉起，走静态入口。
             SegmentCapture.Initialize(app.Services.GetRequiredService<LocalRecordStore<LocalPendingSegment>>());
+
+            // R14.5：番茄钟状态必须能跨进程复活。
+            // 卡片里也会 Initialize，那是"用户打开过录入页"的路径；而清后台之后
+            // START_STICKY 把前台服务单独拉起来时，界面上根本没卡片 —— 只能在这里初始化，
+            // 顺便把上次没走完的番茄钟恢复出来（PomodoroState.Initialize 内部会 TryRestore）。
+            PomodoroState.Initialize(
+                app.Services.GetRequiredService<LocalRecordStore<LocalBlock>>(),
+                app.Services.GetRequiredService<PieceSettings>());
 
             return app;
         }
