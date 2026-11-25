@@ -38,6 +38,18 @@ namespace PersonalHub.Client.Data
         /// <summary>收口依据的信号（"screen_off" / "timeout"），纯本地排查用。</summary>
         public string BoundarySignal { get; set; } = string.Empty;
 
+        /// <summary>
+        /// 段内运动状态（R14.5 特征列）："still" 基本没动 / "move" 有动作 / "big" 大幅移动
+        /// （加速度方差按分钟折算取众数）。空 = 传感器不可用或没采到。
+        /// </summary>
+        public string Motion { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 段内 Wi-Fi 身份（R14.5 特征列）：连接的 SSID 原文（只在机内，不上传）。
+        /// 空 = 没连 Wi-Fi 或没权限读。这是「在家 / 在公司」的主要证据 —— 比定位便宜得多。
+        /// </summary>
+        public string Wifi { get; set; } = string.Empty;
+
         /// <summary>true = 没经人确认、按候选标签自动入库的（关页/全部入库的兜底路径）。</summary>
         public bool AutoApplied { get; set; }
 

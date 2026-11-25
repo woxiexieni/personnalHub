@@ -11,10 +11,22 @@
                 <!-- ============ 连接状态（正常时几乎看不见，出问题才有内容） ============
                      标题不再写在这里：这一页现在是从「概览」目录推进来的，
                      导航栏已经显示"支出概览"，同屏写两遍会像没加载完。 -->
-                <Grid ColumnDefinitions="*,Auto">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                    <Button
+                        x:Name="DetailBtn"
+                        Grid.Column="1"
+                        Text="明细 ›"
+                        FontSize="12"
+                        HeightRequest="28"
+                        Padding="10,0"
+                        BackgroundColor="Transparent"
+                        TextColor="{StaticResource Gray500}"
+                        BorderWidth="1"
+                        BorderColor="{StaticResource Gray300}"
+                        Clicked="OnDetailClicked"/>
                     <Label
                         x:Name="ConnLabel"
-                        Grid.Column="1"
+                        Grid.Column="2"
                         Text="连接中…"
                         FontSize="11"
                         TextColor="{StaticResource Gray500}"

@@ -18,11 +18,10 @@ namespace PersonalHub.Client
     ///   3. 前台应用 —— UsageStatsManager 每 15 分钟查一次最近的前台应用
     ///      （需要"使用情况访问权限"，由 SegmentServiceHelper 领用户去开）。
     ///
-    /// 前台服务类型 = specialUse（Android 14+ 硬性要求声明类型；dataSync 在
-    /// Android 15 有 6 小时限额会半夜被杀，specialUse 没有限额，自装 app 不走
-    /// Play 审核，不需要 PROPERTY_SPECIAL_USE_FGS_SUBTYPE property）。
-    /// 0x40000000 就是 ForegroundServiceType.SpecialUse 的数值 —— 写数值而不引用
-    /// 枚举成员，是因为那个成员标注 API 34+，引用它会触发 CA1416。
+    /// 前台服务类型 = specialUse + location（R14.5：读 Wi-Fi SSID 要求 app 持有精确定位
+    /// 权限且前台服务声明了 location 类型，只声明 specialUse 拿到的 SSID 永远是
+    /// "&lt;unknown ssid&gt;"）。specialUse = 0x40000000，location = 0x8，都写数值 ——
+    /// 具名成员 API 34+ 才有，引用会触发 CA1416；specialUse 没有 6 小时限额（dataSync 有）。
     ///
     /// 铁律（照 R12 监听服务的教训）：所有回调吞异常 —— 服务里抛了，
     /// 系统可能杀掉/不再重启，时间片就整个静默失效。
@@ -32,7 +31,7 @@ namespace PersonalHub.Client
         Enabled = true,
         Exported = false,
         Label = "PersonalHub 时间片",
-        ForegroundServiceType = (ForegroundService)0x40000000)]
+        ForegroundServiceType = (ForegroundService)(0x40000000 | 0x8))]
         // 0x40000000 = ForegroundService.TypeSpecialUse（API 34+ 才有具名成员，
         // 写数值避免 CA1416；属性声明的绑定枚举类型是 Android.Content.PM.ForegroundService）
     public class SegmentForegroundService : Service
@@ -52,13 +51,13 @@ namespace PersonalHub.Client
         {
             base.OnCreate();
 
-            try
-            {
-                RegisterScreenReceiver();
-                RegisterNetProbe();
-                StartUsageLoop();
-            }
-            catch { /* 初始化失败不炸服务：缺哪个信号就少哪个信号 */ }
+            // 各信号独立兜底：缺哪个少哪个，互不拖垮
+            try { RegisterScreenReceiver(); } catch { }
+            try { RegisterNetProbe(); } catch { }
+            try { StartUsageLoop(); } catch { }
+            try { RegisterMotionLoop(); } catch { }
+            try { ProbeWifiOnce(); } catch { }
+            try { RegisterPassiveLocation(); } catch { }
         }
 
         public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
@@ -104,6 +103,10 @@ namespace PersonalHub.Client
             }
             catch { }
 
+            try { UnregisterMotion(); } catch { }
+
+            try { UnregisterPassiveLocation(); } catch { }
+
             base.OnDestroy();
         }
 
@@ -117,7 +120,7 @@ namespace PersonalHub.Client
 
             if (OperatingSystem.IsAndroidVersionAtLeast(29))
             {
-                StartForeground(NotificationId, notification, (ForegroundService)0x40000000);
+                StartForeground(NotificationId, notification, (ForegroundService)(0x40000000 | 0x8));
             }
             else
             {
@@ -208,14 +211,17 @@ namespace PersonalHub.Client
             var cm = GetSystemService(Context.ConnectivityService) as ConnectivityManager;
             if (cm is null) return;
 
-            _netCallback = new NetworkProbe();
+            _netCallback = new NetworkProbe(this);
             cm.RegisterDefaultNetworkCallback(_netCallback);
             _netRegistered = true;
         }
 
         private sealed class NetworkProbe : ConnectivityManager.NetworkCallback
         {
+            private readonly SegmentForegroundService _owner;
             private long _lastAt;
+
+            public NetworkProbe(SegmentForegroundService owner) => _owner = owner;
 
             public override void OnAvailable(Network network) => Fire();
             public override void OnLost(Network network) => Fire();
@@ -227,6 +233,9 @@ namespace PersonalHub.Client
                 if (now - _lastAt < 60_000) return;
                 _lastAt = now;
                 SegmentCapture.HandleSignal(SegmentCapture.SigNetChange, now);
+
+                // 网络刚变，趁机读一次 Wi-Fi 身份（此刻 ConnectionInfo 最新鲜）
+                _owner.ProbeWifiOnce();
             }
         }
 
@@ -279,6 +288,195 @@ namespace PersonalHub.Client
                 }
             }
             catch { /* 没授权 / 系统限制 —— 这一拍放弃，下一拍再试 */ }
+        }
+
+        // ============================================================
+        // 4) 运动状态（R14.5：加速度计 2Hz 降频 → 每分钟算抖动均值 → 三态）
+        // ============================================================
+        //   2Hz 采样足够分辨「躺着不动 / 有动作 / 走路坐车」，耗电比游戏级采样低一个量级。
+        //   三态阈值是拍脑袋的合理值，不对味就改下面两个数。
+
+        private const int MotionSamplePeriodUs = 500_000;   // 2Hz
+        private const double MotionStillMax = 0.12;         // 均值抖动 < 0.12 ≈ 设备没动
+        private const double MotionMoveMax = 2.2;           // < 2.2 ≈ 有动作（做饭/打字）；更大 ≈ 走路/坐车
+
+        private Android.Hardware.SensorManager? _sensorMgr;
+        private Android.Hardware.Sensor? _accelSensor;
+        private MotionListener? _motionListener;
+        private Handler? _motionHandler;
+        private Java.Lang.Runnable? _motionTick;
+
+        private void RegisterMotionLoop()
+        {
+            _sensorMgr = GetSystemService(Context.SensorService) as Android.Hardware.SensorManager;
+            _accelSensor = _sensorMgr?.GetDefaultSensor(Android.Hardware.SensorType.Accelerometer);
+            if (_sensorMgr is null || _accelSensor is null) return;
+
+            _motionListener = new MotionListener();
+            // 绑定的第三参是 SensorDelay 枚举，但 Android 原生接受任意微秒值 ——
+            // 强转 500_000（= 2Hz）正是我们要的低频档（枚举成员最小 Normal 是 60ms，太快）
+            _sensorMgr.RegisterListener(_motionListener, _accelSensor, (Android.Hardware.SensorDelay)MotionSamplePeriodUs);
+
+            _motionHandler = new Handler(Looper.MainLooper);
+            _motionTick = new Java.Lang.Runnable(() =>
+            {
+                try
+                {
+                    string state = _motionListener!.DrainState();
+                    SegmentCapture.HandleSignal(SegmentCapture.SigMotion,
+                        Java.Lang.JavaSystem.CurrentTimeMillis(), state);
+                }
+                catch { }
+                _motionHandler!.PostDelayed(_motionTick!, 60_000);
+            });
+            _motionHandler.PostDelayed(_motionTick, 60_000);
+        }
+
+        private void UnregisterMotion()
+        {
+            try { _sensorMgr?.UnregisterListener(_motionListener); } catch { }
+            try { _motionHandler?.RemoveCallbacks(_motionTick!); } catch { }
+        }
+
+        private sealed class MotionListener : Java.Lang.Object, Android.Hardware.ISensorEventListener
+        {
+            private double _sumDelta;
+            private int _count;
+            private readonly float[] _last = new float[3];
+
+            public void OnSensorChanged(Android.Hardware.SensorEvent? e)
+            {
+                try
+                {
+                    if (e?.Values is null || e.Values.Count < 3) return;
+
+                    float x = e.Values[0], y = e.Values[1], z = e.Values[2];
+
+                    if (_count > 0)
+                    {
+                        // 相邻两次采样的分量差之和 ≈ 抖动强度（不用真方差，省一次开方）
+                        _sumDelta += Math.Abs(x - _last[0]) + Math.Abs(y - _last[1]) + Math.Abs(z - _last[2]);
+                    }
+                    _last[0] = x;
+                    _last[1] = y;
+                    _last[2] = z;
+                    _count++;
+                }
+                catch { }
+            }
+
+            public void OnAccuracyChanged(Android.Hardware.Sensor? sensor, Android.Hardware.SensorStatus status)
+            {
+                // 不关心
+            }
+
+            /// <summary>每分钟由服务的 tick 调一次：清空累计并给出本分钟的三态。</summary>
+            public string DrainState()
+            {
+                double avg = _count > 1 ? _sumDelta / (_count - 1) : 0;
+                _sumDelta = 0;
+                _count = 0;
+
+                if (avg < MotionStillMax) return "still";
+                if (avg < MotionMoveMax) return "move";
+                return "big";
+            }
+        }
+
+        // ============================================================
+        // 5) Wi-Fi 身份（R14.5：读 SSID 当「在家/在公司」的主证据）
+        // ============================================================
+        //   读 SSID 的三个条件：精确定位权限（manifest）+ 定位服务开着 + 本服务 FGS
+        //   带 location 类型。缺任何一个拿到的都是 "<unknown ssid>"，直接丢弃。
+        //   SSID 只进本地表，绝不上传。
+
+        internal void ProbeWifiOnce()
+        {
+            try
+            {
+                var wm = GetSystemService(Context.WifiService) as Android.Net.Wifi.WifiManager;
+                string ssid = wm?.ConnectionInfo?.SSID?.Trim('"') ?? string.Empty;
+
+                if (string.IsNullOrEmpty(ssid)) return;
+                if (ssid.Contains("unknown", StringComparison.OrdinalIgnoreCase)) return;
+
+                SegmentCapture.HandleSignal(SegmentCapture.SigWifi,
+                    Java.Lang.JavaSystem.CurrentTimeMillis(), ssid);
+            }
+            catch { }
+        }
+
+        // ============================================================
+        // 6) 被动定位（R14.5：只当 Wi-Fi 断开时的辅助证据）
+        // ============================================================
+        //   PassiveProvider = 别的 app 请求定位时系统顺路分发的修复点，本 app 零额外耗电；
+        //   状态变化才上报（static → moved 各一次），不刷缓冲。
+
+        private const float MovedMeters = 80f;
+
+        private Android.Locations.LocationManager? _locMgr;
+        private PassiveLocationListener? _locListener;
+
+        private void RegisterPassiveLocation()
+        {
+            _locMgr = GetSystemService(Context.LocationService) as Android.Locations.LocationManager;
+            if (_locMgr is null) return;
+
+            try
+            {
+                _locListener = new PassiveLocationListener();
+                _locMgr.RequestLocationUpdates(
+                    Android.Locations.LocationManager.PassiveProvider,
+                    300_000,        // 5 分钟最小间隔（被动分发本身零成本，这只是限频）
+                    MovedMeters,
+                    _locListener,
+                    Looper.MainLooper);
+            }
+            catch { /* 没定位权限：这一信号缺失，其余不受影响 */ }
+        }
+
+        private void UnregisterPassiveLocation()
+        {
+            try { _locMgr?.RemoveUpdates(_locListener); } catch { }
+        }
+
+        private sealed class PassiveLocationListener : Java.Lang.Object, Android.Locations.ILocationListener
+        {
+            private Android.Locations.Location? _last;
+            private string _lastState = string.Empty;
+
+            public void OnLocationChanged(Android.Locations.Location? location)
+            {
+                try
+                {
+                    if (location is null) return;
+
+                    string state = "static";
+                    if (_last is not null)
+                    {
+                        float meters = _last.DistanceTo(location);
+                        state = meters >= MovedMeters ? "moved" : "static";
+                    }
+
+                    // 只在状态翻转时上报，第一针必报
+                    if (state != _lastState)
+                    {
+                        _lastState = state;
+                        SegmentCapture.HandleSignal(SegmentCapture.SigLocation,
+                            Java.Lang.JavaSystem.CurrentTimeMillis(), state);
+                    }
+
+                    _last = location;
+                }
+                catch { }
+            }
+
+            public void OnProviderDisabled(string? provider) { }
+            public void OnProviderEnabled(string? provider) { }
+
+#pragma warning disable CS0618 // ILocationListener 接口要求的旧成员，API 29 起废弃但必须实现
+            public void OnStatusChanged(string? provider, Android.Locations.Availability status, Bundle? extras) { }
+#pragma warning restore CS0618
         }
     }
 }

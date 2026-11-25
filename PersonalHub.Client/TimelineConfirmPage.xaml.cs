@@ -99,8 +99,33 @@ namespace PersonalHub.Client
                 Color.FromArgb("#78766E"), Color.FromArgb("#A8A69E"));
             info.Children.Add(candidate);
 
+            // ---- 折叠备注（R14.5）：点开才出现输入框，不写直接「记入」不受影响 ----
+            // 不用 TextEditorPage 弹窗：确认卡要的是"想写就点开写"，弹窗会打断判决流。
+            var noteEditor = new Editor
+            {
+                Placeholder = "备注（可选）：这段在干嘛",
+                FontSize = 12,
+                HeightRequest = 60,
+                IsVisible = false,
+            };
+            var noteToggle = new Label
+            {
+                Text = "＋ 备注",
+                FontSize = 12,
+                VerticalOptions = LayoutOptions.Center,
+            };
+            noteToggle.SetAppThemeColor(Label.TextColorProperty,
+                Color.FromArgb("#185FA5"), Color.FromArgb("#7FB4E8"));
+            var noteTap = new TapGestureRecognizer();
+            noteTap.Tapped += (_, _) =>
+            {
+                noteEditor.IsVisible = !noteEditor.IsVisible;
+                noteToggle.Text = noteEditor.IsVisible ? "－ 备注" : "＋ 备注";
+            };
+            noteToggle.GestureRecognizers.Add(noteTap);
+
             // ---- 换片网格：先建好藏起来，点「换片」再展开（折叠套路：切 IsVisible）----
-            var picker = BuildPiecePicker(seg);
+            var picker = BuildPiecePicker(seg, noteEditor);
             picker.IsVisible = false;
 
             var btnApply = MakePill("记入", "#185FA5", "#FFFFFF", "#185FA5", "#FFFFFF");
@@ -111,7 +136,8 @@ namespace PersonalHub.Client
                     picker.IsVisible = true;
                     return;
                 }
-                await ApplySegmentAsync(seg, seg.PieceCode, confirmed: true);
+                await ApplySegmentAsync(seg, seg.PieceCode, confirmed: true,
+                    noteEditor.Text ?? string.Empty);
             };
 
             var btnChange = MakePill("换片", "#E6F1FB", "#185FA5", "#1E3550", "#7FB4E8");
@@ -133,6 +159,8 @@ namespace PersonalHub.Client
             var stack = new VerticalStackLayout { Spacing = 8 };
             stack.Children.Add(info);
             stack.Children.Add(buttons);
+            stack.Children.Add(noteToggle);
+            stack.Children.Add(noteEditor);
             stack.Children.Add(picker);
 
             var card = new Border
@@ -146,8 +174,8 @@ namespace PersonalHub.Client
             return card;
         }
 
-        /// <summary>12 个片的胶囊网格，点一个 = 按这个片记入（confirmed 路径）。</summary>
-        private FlexLayout BuildPiecePicker(LocalPendingSegment seg)
+        /// <summary>12 个片的胶囊网格，点一个 = 按这个片记入（confirmed 路径）。备注从 noteEditor 带走。</summary>
+        private FlexLayout BuildPiecePicker(LocalPendingSegment seg, Editor noteEditor)
         {
             var flex = new FlexLayout
             {
@@ -171,7 +199,8 @@ namespace PersonalHub.Client
                     Color.FromArgb("#185FA5"), Color.FromArgb("#7FB4E8"));
                 // 闭包捕获 seg 和 piece.Code（Border/手势传参的坑见 memory，闭包不赌版本）
                 btn.Clicked += async (_, _) =>
-                    await ApplySegmentAsync(seg, piece.Code, confirmed: true);
+                    await ApplySegmentAsync(seg, piece.Code, confirmed: true,
+                        noteEditor.Text ?? string.Empty);
                 flex.Children.Add(btn);
             }
 
@@ -186,7 +215,8 @@ namespace PersonalHub.Client
         /// 把一段写进正式时间块。confirmed = 人点过（状态 1）；
         /// 否则走兜底（状态 3 + AutoApplied 标记，统计口径可区分）。
         /// </summary>
-        private async Task ApplySegmentAsync(LocalPendingSegment seg, string pieceCode, bool confirmed)
+        private async Task ApplySegmentAsync(LocalPendingSegment seg, string pieceCode, bool confirmed,
+            string note = "")
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             int minutes = Math.Max(1, seg.Minutes);
@@ -198,7 +228,7 @@ namespace PersonalHub.Client
                 OccurredAt = seg.StartedAt,
                 DurationMin = minutes,
                 GoalId = _settings.HasGoalFor(pieceCode) ? _settings.GoalFor(pieceCode) : string.Empty,
-                Note = string.Empty,
+                Note = note ?? string.Empty,
                 Worth = 0,
                 Lesson = string.Empty,
                 PlanId = string.Empty,

@@ -27,6 +27,12 @@ namespace PersonalHub.Client.Services
         /// </summary>
         public const string BlockLibraryRoute = "view/blocklib";
 
+        /// <summary>
+        /// 账单明细库路由（PayLibraryPage，R14.5）：全量可翻的流水明细。
+        /// 入口在支出概览页顶部「明细 ›」。
+        /// </summary>
+        public const string PayLibraryRoute = "view/paylib";
+
         public static List<DirectoryItem> Build(
             LocalRecordStore<LocalRecord> expenses,
             LocalRecordStore<LocalBlock> blocks,

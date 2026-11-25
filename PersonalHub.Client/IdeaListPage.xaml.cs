@@ -167,27 +167,34 @@ namespace PersonalHub.Client
         {
             base.OnAppearing();
 
-            // 先渲染本机已有的（离线也立刻有内容），再问服务端要本机没有的。
+            // 先渲染本机已有的（离线也立刻有内容）。
+            // 服务端补拉改成后台不 await（R14.5 修「计划行动退出卡一下」）：
+            // 之前 await 在这里，从四象限返回时返回动画跟网络请求抢主线程/导航栈，
+            // 页面还没滑完就顿一下。火后不理，拉到东西了列表自己刷新（Pull 里有订阅路径）。
             await LoadAsync();
-            await PullFromServerAsync();
+            _ = PullFromServerAsync();
         }
 
         /// <summary>
         /// 从服务端补本机没有的想法。失败什么都不做 —— 这页本来就有本地那份。
+        /// 火后不理（OnAppearing 不再 await），所以 UI 更新要自己回主线程。
         /// </summary>
         private async Task PullFromServerAsync()
         {
             var r = await _history.PullAsync();
 
-            if (r.Added > 0 || r.Updated > 0)
+            await MainThread.InvokeOnMainThreadAsync(async () =>
             {
-                await LoadAsync();
-                SyncLabel.Text = $"服务端共 {r.RemoteTotal} 条，补回 {r.Added} 条。";
-                return;
-            }
+                if (r.Added > 0 || r.Updated > 0)
+                {
+                    await LoadAsync();
+                    SyncLabel.Text = $"服务端共 {r.RemoteTotal} 条，补回 {r.Added} 条。";
+                    return;
+                }
 
-            // 没变化就不留字：这行是"解释这一页从哪来的"，不是状态监视器
-            SyncLabel.Text = r.Ok ? string.Empty : "这次没连上服务端 —— 这页只有本机记的。";
+                // 没变化就不留字：这行是"解释这一页从哪来的"，不是状态监视器
+                SyncLabel.Text = r.Ok ? string.Empty : "这次没连上服务端 —— 这页只有本机记的。";
+            });
         }
 
         // ============================================================

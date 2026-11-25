@@ -128,6 +128,9 @@ namespace PersonalHub.Client
 
             BuildDurationChips();
             ApplyPeriodStyle();
+
+            // R14.5：番茄钟卡（两端都有；Android 上叠加通知栏倒计时）
+            PomodoroSlot.Children.Add(new Controls.PomodoroCard(blocks, settings));
         }
 
         protected override async void OnAppearing()
@@ -1900,6 +1903,39 @@ namespace PersonalHub.Client
                 bat.Clicked += (_, _) => SegmentServiceHelper.OpenBatterySettings();
                 stack.Children.Add(bat);
             }
+
+            // R14.5：定位权限是可选增强（读 Wi-Fi SSID 的硬前提）——拒绝只是少一路信号
+            try
+            {
+                var locStatus = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>();
+                if (locStatus != PermissionStatus.Granted)
+                {
+                    stack.Children.Add(new Label
+                    {
+                        Text = "可选：开定位权限后，app 能读 Wi-Fi 名字识别「在家/在公司」，时间片更准（不持续采 GPS）。",
+                        FontSize = 11,
+                        TextColor = Color.FromArgb("#D97706"),
+                    });
+                    var loc = new Button
+                    {
+                        Text = "开定位权限",
+                        FontSize = 11,
+                        HeightRequest = 26,
+                        Padding = new Thickness(8, 0),
+                        BackgroundColor = Colors.Transparent,
+                        TextColor = Color.FromArgb("#D97706"),
+                        HorizontalOptions = LayoutOptions.Start,
+                    };
+                    loc.Clicked += async (_, _) =>
+                    {
+                        await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+                        _ = RefreshSegmentPanelAsync();
+                    };
+                    stack.Children.Add(loc);
+                }
+            }
+            catch { /* 权限检查失败不挡主流程 */ }
+
             stack.Children.Add(off);
 
             SegmentPanel.IsVisible = true;

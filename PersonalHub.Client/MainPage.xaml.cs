@@ -69,6 +69,25 @@ namespace PersonalHub.Client
             }
         }
 
+        /// <summary>R14.5：进账单明细库，带上当前档位（本年映射成本月 —— 库页没有本年档）。</summary>
+        private async void OnDetailClicked(object? sender, EventArgs e)
+        {
+            try
+            {
+                string range = _period switch
+                {
+                    "today" => "today",
+                    "week" => "week",
+                    _ => "month",       // month / year 都给到月
+                };
+                await Shell.Current.GoToAsync($"{OverviewCatalog.PayLibraryRoute}?range={range}");
+            }
+            catch (Exception ex)
+            {
+                ConnLabel.Text = "打不开明细：" + ex.Message;
+            }
+        }
+
         // ============================================================
         // 取数 + 渲染
         // ============================================================

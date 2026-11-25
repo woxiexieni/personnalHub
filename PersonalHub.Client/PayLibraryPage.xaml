@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PersonalHub.Client.PayLibraryPage"
+             Title="账单明细">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20,12" Spacing="10">
+
+            <!-- 顶部：哪一段 + 汇总 + 清筛选 -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <VerticalStackLayout Grid.Column="0" Spacing="1">
+                    <Label x:Name="RangeLabel" Text="全部" FontSize="15" FontAttributes="Bold"/>
+                    <Label x:Name="RangeSubLabel" Text="本地副本" FontSize="11"
+                           TextColor="{StaticResource Gray500}"/>
+                </VerticalStackLayout>
+
+                <Button Grid.Column="1" x:Name="ClearBtn" Text="清筛选"
+                        IsVisible="False"
+                        FontSize="12" HeightRequest="32" Padding="10,0"
+                        BackgroundColor="Transparent"
+                        TextColor="{StaticResource Gray500}"
+                        BorderWidth="1" BorderColor="{StaticResource Gray300}"
+                        Clicked="OnClearClicked"/>
+            </Grid>
+
+            <!-- 搜索：搜备注 / 分类名 / 支付方式 -->
+            <Border Style="{StaticResource FieldBorder}" Padding="12,8">
+                <Entry x:Name="SearchEntry"
+                       Placeholder="搜备注、分类、支付方式…（空格 = 同时含，-开头 = 不含）"
+                       FontSize="13"
+                       TextChanged="OnSearchTextChanged"/>
+            </Border>
+
+            <!-- 筛选 chips（照时间块库：自折行，不用 FlexLayout —— 那个 wrap 的坑见库页注释） -->
+            <VerticalStackLayout x:Name="ChipRow" Spacing="6"/>
+
+            <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
+
+            <!-- 按天倒序的分节列表 -->
+            <VerticalStackLayout x:Name="Rows" Spacing="6"/>
+
+            <Label x:Name="EmptyLabel" Text=" " IsVisible="False"
+                   FontSize="13" TextColor="{StaticResource Gray500}"
+                   HorizontalOptions="Center" Margin="0,24"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
