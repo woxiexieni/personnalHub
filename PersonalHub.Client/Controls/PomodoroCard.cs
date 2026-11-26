@@ -32,6 +32,7 @@ namespace PersonalHub.Client.Controls
         private readonly PieceSettings _settings;
 
         // 待机态控件
+        private readonly FlexLayout _modeRow = new() { Wrap = FlexWrap.Wrap, JustifyContent = FlexJustify.Start };
         private readonly FlexLayout _pieceRow = new() { Wrap = FlexWrap.Wrap, JustifyContent = FlexJustify.Start };
         private readonly FlexLayout _durationRow = new() { Wrap = FlexWrap.Wrap, JustifyContent = FlexJustify.Start };
         private readonly Editor _noteEditor = new()
@@ -84,8 +85,14 @@ namespace PersonalHub.Client.Controls
 
         // 选择状态
         private string _selectedPiece = string.Empty;
+        private PomodoroMode _selectedMode = PomodoroMode.Countdown;
         private int _selectedMinutes = 25;
         private readonly Dictionary<string, Button> _pieceBtns = new();
+        private readonly Dictionary<PomodoroMode, Button> _modeBtns = new();
+
+        private string _contextGoalId = string.Empty;
+        private string _contextGoalStepId = string.Empty;
+        private string _contextStepTitle = string.Empty;
 
         // 完成提示（几秒后自动消失）
         private readonly Label _resultLabel = new()
@@ -140,6 +147,7 @@ namespace PersonalHub.Client.Controls
                         FontSize = 11,
                         TextColor = MutedFg,
                     },
+                    _modeRow,
                     _pieceRow,
                     _durationRow,
                     _noteEditor,
@@ -189,6 +197,7 @@ namespace PersonalHub.Client.Controls
             });
 
             BuildPieceChips();
+            BuildModeChips();
             BuildDurationChips();
 
             _startBtn.Clicked += OnStartClicked;
@@ -255,6 +264,46 @@ namespace PersonalHub.Client.Controls
         // 构建胶囊
         // ============================================================
 
+        private void BuildModeChips()
+        {
+            AddModeButton(PomodoroMode.Countdown, "倒计时");
+            AddModeButton(PomodoroMode.Stopwatch, "正计时");
+            StyleModeChips();
+        }
+
+        private void AddModeButton(PomodoroMode mode, string text)
+        {
+            var btn = new Button
+            {
+                Text = text,
+                FontSize = 12,
+                HeightRequest = 32,
+                Padding = new Thickness(12, 0),
+                CornerRadius = 16,
+            };
+            btn.Clicked += (_, _) =>
+            {
+                if (PomodoroState.Running) return;
+                _selectedMode = mode;
+                StyleModeChips();
+            };
+            _modeBtns[mode] = btn;
+            _modeRow.Children.Add(btn);
+        }
+
+        private void StyleModeChips()
+        {
+            foreach (var (mode, btn) in _modeBtns)
+            {
+                bool on = mode == _selectedMode;
+                btn.BackgroundColor = on ? ActiveBg : ChipBg;
+                btn.TextColor = on ? Colors.White : ChipFg;
+            }
+
+            _durationRow.IsVisible = _selectedMode == PomodoroMode.Countdown;
+            StylePieceChips();
+        }
+
         private void BuildPieceChips()
         {
             foreach (var piece in Pieces.All)
@@ -289,7 +338,9 @@ namespace PersonalHub.Client.Controls
             }
             _startBtn.Text = string.IsNullOrEmpty(_selectedPiece)
                 ? "先选一件事，再开始专注"
-                : $"开始专注 {_selectedMinutes} 分钟";
+                : _selectedMode == PomodoroMode.Stopwatch
+                    ? "开始正计时"
+                    : $"开始专注 {_selectedMinutes} 分钟";
             _startBtn.IsEnabled = !string.IsNullOrEmpty(_selectedPiece);
             _startBtn.BackgroundColor = _startBtn.IsEnabled ? ActiveBg : ChipBg;
             _startBtn.TextColor = _startBtn.IsEnabled ? Colors.White : MutedFg;
@@ -332,7 +383,9 @@ namespace PersonalHub.Client.Controls
             }
             if (!string.IsNullOrEmpty(_selectedPiece))
             {
-                _startBtn.Text = $"开始专注 {_selectedMinutes} 分钟";
+                _startBtn.Text = _selectedMode == PomodoroMode.Stopwatch
+                    ? "开始正计时"
+                    : $"开始专注 {_selectedMinutes} 分钟";
             }
         }
 
@@ -353,7 +406,14 @@ namespace PersonalHub.Client.Controls
                 _notifyHint.IsVisible = !granted
                     || NotificationPermissionHelper.IsChannelBlocked(NotificationChannels.Pomodoro);
 #endif
-                PomodoroState.Start(_selectedPiece, _noteEditor.Text ?? string.Empty, _selectedMinutes);
+                PomodoroState.Start(
+                    _selectedPiece,
+                    _noteEditor.Text ?? string.Empty,
+                    _selectedMinutes,
+                    _selectedMode,
+                    _contextGoalId,
+                    _contextGoalStepId,
+                    _contextStepTitle);
 
 #if ANDROID
                 Platforms.Android.PomodoroServiceHelper.StartService();
@@ -414,14 +474,23 @@ namespace PersonalHub.Client.Controls
 
             if (running)
             {
-                long remainMs = PomodoroState.RemainingMs;
-                var t = TimeSpan.FromMilliseconds(remainMs);
-                _countdown.Text = PomodoroState.PausedPhase
-                    ? $"已暂停 {t.Minutes:D2}:{t.Seconds:D2}"
+                var t = TimeSpan.FromMilliseconds(
+                    PomodoroState.Mode == PomodoroMode.Stopwatch
+                        ? PomodoroState.ElapsedMs
+                        : PomodoroState.RemainingMs);
+
+                string clock = t.TotalHours >= 1
+                    ? $"{(int)t.TotalHours:D2}:{t.Minutes:D2}:{t.Seconds:D2}"
                     : $"{t.Minutes:D2}:{t.Seconds:D2}";
 
+                _countdown.Text = PomodoroState.PausedPhase ? $"已暂停 {clock}" : clock;
+
                 _runningInfo.Text =
-                    $"{_settings.DisplayName(PomodoroState.PieceCode)} · 计划 {PomodoroState.PlannedMinutes} 分钟"
+                    $"{_settings.DisplayName(PomodoroState.PieceCode)} · "
+                    + (PomodoroState.Mode == PomodoroMode.Stopwatch
+                        ? "正计时"
+                        : $"计划 {PomodoroState.PlannedMinutes} 分钟")
+                    + (string.IsNullOrEmpty(PomodoroState.StepTitle) ? "" : $" · {PomodoroState.StepTitle}")
                     + (string.IsNullOrEmpty(PomodoroState.Note) ? "" : $" · {PomodoroState.Note}");
 
                 _pauseBtn.Text = PomodoroState.PausedPhase ? "继续" : "暂停";
@@ -431,8 +500,31 @@ namespace PersonalHub.Client.Controls
             else
             {
                 StylePieceChips();
+                StyleModeChips();
                 StyleDurationChips();
             }
+        }
+
+        /// <summary>
+        /// 从目标小项进入时，自动带出目标、小项、默认事情片和小项名称。
+        /// 用户仍可以在开始前改片和备注。
+        /// </summary>
+        public void ApplyContext(string goalId, string goalStepId, string pieceCode, string stepTitle)
+        {
+            _contextGoalId = goalId ?? string.Empty;
+            _contextGoalStepId = goalStepId ?? string.Empty;
+            _contextStepTitle = stepTitle ?? string.Empty;
+
+            if (Pieces.ByCode(pieceCode) is { } piece)
+            {
+                _selectedPiece = piece.Code;
+            }
+
+            _noteEditor.Text = string.Empty;
+            _noteEditor.Placeholder = string.IsNullOrWhiteSpace(stepTitle)
+                ? "备注（可选）"
+                : $"备注（可选）：{stepTitle}";
+            StylePieceChips();
         }
     }
 }

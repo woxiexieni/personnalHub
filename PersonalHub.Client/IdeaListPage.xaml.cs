@@ -1528,6 +1528,8 @@ namespace PersonalHub.Client
                 Title = title,
                 Status = 0,
                 NextStep = string.Empty,
+                SourceIdeaId = idea.Id,
+                CurrentStepId = string.Empty,
                 IsCurrent = !hasCurrent,
                 StartedAt = now,
                 CreatedAt = now,

@@ -13,11 +13,16 @@ namespace personalHub.Server.Services
     {
         private readonly ILogger<GoalServiceImpl> _logger;
         private readonly GoalStore _store;
+        private readonly GoalStepStore _steps;
 
-        public GoalServiceImpl(ILogger<GoalServiceImpl> logger, GoalStore store)
+        public GoalServiceImpl(
+            ILogger<GoalServiceImpl> logger,
+            GoalStore store,
+            GoalStepStore steps)
         {
             _logger = logger;
             _store = store;
+            _steps = steps;
         }
 
         public override Task<UploadGoalsResponse> UploadGoals(
@@ -58,5 +63,39 @@ namespace personalHub.Server.Services
             list.Goals.AddRange(_store.List());
             return Task.FromResult(list);
         }
+
+        public override Task<UploadGoalStepsResponse> UploadGoalSteps(
+            UploadGoalStepsRequest request, ServerCallContext context)
+        {
+            var failed = new List<string>();
+            string? firstError = null;
+            int accepted = 0;
+
+            foreach (var s in request.Steps)
+            {
+                var result = _steps.Save(s);
+                if (result.Ok)
+                {
+                    accepted++;
+                    continue;
+                }
+                failed.Add(string.IsNullOrEmpty(s.Id) ? "(无 id)" : s.Id);
+                firstError ??= result.Error;
+            }
+
+            var resp = new UploadGoalStepsResponse { AcceptedCount = accepted };
+            resp.FailedIds.AddRange(failed);
+            if (firstError is not null) resp.ErrorMsg = firstError;
+            return Task.FromResult(resp);
+        }
+
+        public override Task<GoalStepList> ListGoalSteps(
+            ListGoalStepsRequest request, ServerCallContext context)
+        {
+            var list = new GoalStepList();
+            list.Steps.AddRange(_steps.List(request.GoalId, request.IncludeDeleted));
+            return Task.FromResult(list);
+        }
+
     }
 }

@@ -82,6 +82,7 @@ namespace Personalhub
             OccurredAt = b.OccurredAt,
             DurationMin = b.DurationMin,
             GoalId = b.GoalId ?? string.Empty,
+            GoalStepId = b.GoalStepId ?? string.Empty,
             Note = b.Note ?? string.Empty,
             Worth = b.Worth,
             Lesson = b.Lesson ?? string.Empty,
@@ -106,6 +107,7 @@ namespace Personalhub
             OccurredAt = p.OccurredAt,
             DurationMin = p.DurationMin,
             GoalId = p.GoalId ?? string.Empty,
+            GoalStepId = p.GoalStepId ?? string.Empty,
             Note = p.Note ?? string.Empty,
             Worth = p.Worth,
             Lesson = p.Lesson ?? string.Empty,
@@ -133,6 +135,8 @@ namespace Personalhub
             Title = g.Title ?? string.Empty,
             Status = g.Status,
             NextStep = g.NextStep ?? string.Empty,
+            SourceIdeaId = g.SourceIdeaId ?? string.Empty,
+            CurrentStepId = g.CurrentStepId ?? string.Empty,
             IsCurrent = g.IsCurrent,
             StartedAt = g.StartedAt,
             CreatedAt = g.CreatedAt,
@@ -146,8 +150,44 @@ namespace Personalhub
             Title = p.Title ?? string.Empty,
             Status = p.Status,
             NextStep = p.NextStep ?? string.Empty,
+            SourceIdeaId = p.SourceIdeaId ?? string.Empty,
+            CurrentStepId = p.CurrentStepId ?? string.Empty,
             IsCurrent = p.IsCurrent,
             StartedAt = p.StartedAt,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
+            Deleted = p.Deleted,
+        };
+
+        // ============================================================
+        // R16：目标小项 / 证据
+        // ============================================================
+
+        public static GoalStep ToProto(this LocalGoalStep s) => new()
+        {
+            Id = s.Id,
+            GoalId = s.GoalId,
+            Title = s.Title,
+            Status = s.Status,
+            PieceCode = s.PieceCode,
+            EstimateMin = s.EstimateMin,
+            SourceIdeaId = s.SourceIdeaId,
+            SortOrder = s.SortOrder,
+            CreatedAt = s.CreatedAt,
+            UpdatedAt = s.UpdatedAt,
+            Deleted = s.Deleted,
+        };
+
+        public static LocalGoalStep ToLocalGoalStep(this GoalStep p) => new()
+        {
+            Id = p.Id,
+            GoalId = p.GoalId ?? string.Empty,
+            Title = p.Title ?? string.Empty,
+            Status = p.Status,
+            PieceCode = p.PieceCode ?? string.Empty,
+            EstimateMin = p.EstimateMin,
+            SourceIdeaId = p.SourceIdeaId ?? string.Empty,
+            SortOrder = p.SortOrder,
             CreatedAt = p.CreatedAt,
             UpdatedAt = p.UpdatedAt == 0 ? p.CreatedAt : p.UpdatedAt,
             Deleted = p.Deleted,

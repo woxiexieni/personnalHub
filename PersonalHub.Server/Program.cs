@@ -158,6 +158,7 @@ namespace PersonHub.Server
 
             // 目标存储（依赖 BlockStore 现算「累计投入 / 最后活动」）。
             builder.Services.AddSingleton<GoalStore>();
+            builder.Services.AddSingleton<GoalStepStore>();
 
             // 每日计划（R4）：一天最多 3 件，达成率由 BlockStore 现算。
             builder.Services.AddSingleton<PlanStore>();

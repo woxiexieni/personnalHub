@@ -286,6 +286,9 @@ namespace PersonalHub.Client.Data
         /// <summary>归属目标；空 = 没归（不报错）。</summary>
         public string GoalId { get; set; } = string.Empty;
 
+        /// <summary>归属目标小项；空 = 只归目标或未归目标。</summary>
+        public string GoalStepId { get; set; } = string.Empty;
+
         public string Note { get; set; } = string.Empty;
 
         /// <summary>0 未评 / 1 值得 / 2 一般 / 3 别做（R3）。</summary>
@@ -344,6 +347,12 @@ namespace PersonalHub.Client.Data
 
         /// <summary>「一条下一步」，一句话，可空。不是清单。</summary>
         public string NextStep { get; set; } = string.Empty;
+
+        /// <summary>来源：哪一条「计划行动 / 计划」转成了这个目标。新目标创建时必填。</summary>
+        public string SourceIdeaId { get; set; } = string.Empty;
+
+        /// <summary>当前关注的小项；只做标记，不限制其他小项存在。</summary>
+        public string CurrentStepId { get; set; } = string.Empty;
 
         /// <summary>录入时新块默认归它。全局最多一个为 true。</summary>
         public bool IsCurrent { get; set; }

@@ -197,6 +197,39 @@ namespace PersonalHub.Client.Services
         }
     }
 
+    public sealed class GoalStepUploader : IRecordUploader<LocalGoalStep>
+    {
+        private static readonly TimeSpan UploadTimeout = TimeSpan.FromSeconds(10);
+        private readonly ServerConnection _conn;
+
+        public GoalStepUploader(ServerConnection conn) => _conn = conn;
+
+        public string DisplayName => "目标小项";
+
+        public async Task<UploadOutcome> UploadAsync(
+            IReadOnlyList<LocalGoalStep> items, CancellationToken ct = default)
+        {
+            if (items.Count == 0) return UploadOutcome.Empty;
+            await _conn.EnsureAsync().ConfigureAwait(false);
+
+            var request = new UploadGoalStepsRequest();
+            request.Steps.AddRange(items.Select(x => x.ToProto()));
+            var resp = await _conn.NewGoalClient()
+                .UploadGoalStepsAsync(
+                    request,
+                    deadline: DateTime.UtcNow.Add(UploadTimeout),
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            return new UploadOutcome
+            {
+                Accepted = resp.AcceptedCount,
+                FailedIds = resp.FailedIds.ToArray(),
+                ErrorMsg = string.IsNullOrEmpty(resp.ErrorMsg) ? null : resp.ErrorMsg,
+            };
+        }
+    }
+
     /// <summary>模式上传器：LocalPattern 列表 → UploadPatternsRequest → PatternService.UploadPatterns。</summary>
     public sealed class PatternUploader : IRecordUploader<LocalPattern>
     {

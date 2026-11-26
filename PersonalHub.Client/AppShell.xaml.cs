@@ -28,10 +28,7 @@ namespace PersonalHub.Client
                 RecordCatalog.ExpenseRoute,
                 new ServiceRouteFactory(typeof(RecordEntryPage)));
 
-            // 目标回顾（三个数 + 该砍的）与「行为模式」：都不做成 Tab，只从目录里进
-            Routing.RegisterRoute(
-                RecordCatalog.QuarterReviewRoute,
-                new ServiceRouteFactory(typeof(QuarterReviewPage)));
+            // 行为模式：不做成 Tab，只从目录里进
             Routing.RegisterRoute(
                 RecordCatalog.PatternRoute,
                 new ServiceRouteFactory(typeof(PatternListPage)));
@@ -87,11 +84,6 @@ namespace PersonalHub.Client
             Routing.RegisterRoute(
                 RecordCatalog.GoalRoute,
                 new ServiceRouteFactory(typeof(GoalListPage)));
-
-            // 带 ?id= 的详情页。Shell 用 [QueryProperty] 把 id 塞进页面属性。
-            Routing.RegisterRoute(
-                RecordCatalog.GoalDetailRoute,
-                new ServiceRouteFactory(typeof(GoalDetailPage)));
 
             // 「概览」目录里的页
             Routing.RegisterRoute(

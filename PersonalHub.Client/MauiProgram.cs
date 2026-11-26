@@ -48,6 +48,7 @@ namespace PersonalHub.Client
             // R2：时间块 + 目标（同一库文件，表名 blocks / goals）。
             builder.Services.AddSingleton(new LocalRecordStore<LocalBlock>(dbPath));
             builder.Services.AddSingleton(new LocalRecordStore<LocalGoal>(dbPath));
+            builder.Services.AddSingleton(new LocalRecordStore<LocalGoalStep>(dbPath));
             builder.Services.AddSingleton(new LocalRecordStore<LocalPlan>(dbPath));
             builder.Services.AddSingleton(new LocalRecordStore<LocalPattern>(dbPath));
             builder.Services.AddSingleton(new LocalRecordStore<LocalPractice>(dbPath));
@@ -70,6 +71,7 @@ namespace PersonalHub.Client
             builder.Services.AddSingleton<IRecordUploader<ThingRecord>, ThingUploader>();
             builder.Services.AddSingleton<IRecordUploader<LocalBlock>, BlockUploader>();
             builder.Services.AddSingleton<IRecordUploader<LocalGoal>, GoalUploader>();
+            builder.Services.AddSingleton<IRecordUploader<LocalGoalStep>, GoalStepUploader>();
             builder.Services.AddSingleton<IRecordUploader<LocalPlan>, PlanUploader>();
             builder.Services.AddSingleton<IRecordUploader<LocalPattern>, PatternUploader>();
             builder.Services.AddSingleton<IRecordUploader<LocalPractice>, PracticeUploader>();
@@ -82,6 +84,7 @@ namespace PersonalHub.Client
             builder.Services.AddSingleton<RecordSyncService<ThingRecord>>();
             builder.Services.AddSingleton<RecordSyncService<LocalBlock>>();
             builder.Services.AddSingleton<RecordSyncService<LocalGoal>>();
+            builder.Services.AddSingleton<RecordSyncService<LocalGoalStep>>();
             builder.Services.AddSingleton<RecordSyncService<LocalPlan>>();
             builder.Services.AddSingleton<RecordSyncService<LocalPattern>>();
             builder.Services.AddSingleton<RecordSyncService<LocalPractice>>();
@@ -132,8 +135,6 @@ namespace PersonalHub.Client
             builder.Services.AddTransient<BlockLibraryPage>();  // 时间概览页内 → 时间块库（R10 全量可翻 + 轻编辑）
             builder.Services.AddTransient<PayLibraryPage>();    // 支出概览页「明细 ›」→ 账单明细库（R14.5）
             builder.Services.AddTransient<GoalListPage>();      // 时间块页顶部 → 目标
-            builder.Services.AddTransient<GoalDetailPage>();    // 目标列表 → 详情（带 ?id=）
-            builder.Services.AddTransient<QuarterReviewPage>(); // 目标列表 → 回顾（三个数 + 该砍的）
             builder.Services.AddTransient<PatternListPage>();   // 目录 → 行为模式
             builder.Services.AddTransient<PatternDetailPage>(); // 模式列表 → 详情（带 ?id=）
             builder.Services.AddTransient<IdeaEntryPage>();     // 目录 → 想法（记一条）
@@ -159,6 +160,7 @@ namespace PersonalHub.Client
             app.Services.GetRequiredService<RecordSyncService<ThingRecord>>().Start();
             app.Services.GetRequiredService<RecordSyncService<LocalBlock>>().Start();
             app.Services.GetRequiredService<RecordSyncService<LocalGoal>>().Start();
+            app.Services.GetRequiredService<RecordSyncService<LocalGoalStep>>().Start();
             app.Services.GetRequiredService<RecordSyncService<LocalPlan>>().Start();
             app.Services.GetRequiredService<RecordSyncService<LocalPattern>>().Start();
             app.Services.GetRequiredService<RecordSyncService<LocalPractice>>().Start();

@@ -29,6 +29,14 @@ namespace personalHub.Server.Data
         [Column("next_step")]
         public string? NextStep { get; set; }
 
+        /// <summary>来源：哪一条未成形计划转成了目标。新目标必填，老目标可为空。</summary>
+        [Column("source_idea_id")]
+        public string? SourceIdeaId { get; set; }
+
+        /// <summary>当前关注的小项；只做标记，不限制其他小项。</summary>
+        [Column("current_step_id")]
+        public string? CurrentStepId { get; set; }
+
         /// <summary>录入时新块默认归它。全局最多一个为 1。</summary>
         [Column("is_current")]
         public int IsCurrent { get; set; }

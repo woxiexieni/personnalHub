@@ -17,6 +17,10 @@ namespace PersonalHub.Client
     ///   保存 → 只写本地 SQLite（Synced=false）→ 立刻刷新列表与合计 → 后台上传 + 拉镜像。
     /// 记完必须马上看到数字变了，否则人会以为没记上、再记一次。
     /// </summary>
+    [QueryProperty(nameof(TimerGoalId), "goalId")]
+    [QueryProperty(nameof(TimerGoalStepId), "goalStepId")]
+    [QueryProperty(nameof(TimerPieceCode), "piece")]
+    [QueryProperty(nameof(TimerStepTitle), "note")]
     public partial class BlockEntryPage : ContentPage
     {
         private static readonly Color ChipBg = Color.FromArgb("#F1EFE8");
@@ -37,6 +41,13 @@ namespace PersonalHub.Client
         private readonly RecordSyncService<LocalPractice> _practiceSync;
         private readonly BlockMirrorService _mirror;
         private readonly PieceSettings _settings;
+        private readonly PomodoroCard _pomodoroCard;
+        private bool _timerContextApplied;
+
+        public string TimerGoalId { get; set; } = string.Empty;
+        public string TimerGoalStepId { get; set; } = string.Empty;
+        public string TimerPieceCode { get; set; } = string.Empty;
+        public string TimerStepTitle { get; set; } = string.Empty;
 
         /// <summary>R13：自动时间片待确认段（纯本地表，Android 才用）。</summary>
         private readonly LocalRecordStore<LocalPendingSegment> _pendingSegs;
@@ -130,7 +141,8 @@ namespace PersonalHub.Client
             ApplyPeriodStyle();
 
             // R14.5：番茄钟卡（两端都有；Android 上叠加通知栏倒计时）
-            PomodoroSlot.Children.Add(new Controls.PomodoroCard(blocks, settings));
+            _pomodoroCard = new PomodoroCard(blocks, settings);
+            PomodoroSlot.Children.Add(_pomodoroCard);
         }
 
         protected override async void OnAppearing()
@@ -153,6 +165,13 @@ namespace PersonalHub.Client
             await RefreshStatsAsync();
 
             await RefreshSegmentPanelAsync();
+
+            if (!_timerContextApplied && !string.IsNullOrEmpty(TimerGoalStepId))
+            {
+                _timerContextApplied = true;
+                _pomodoroCard.ApplyContext(
+                    TimerGoalId, TimerGoalStepId, TimerPieceCode, TimerStepTitle);
+            }
 
             _ = SyncAndRefreshAsync();
         }

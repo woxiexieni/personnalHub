@@ -41,6 +41,7 @@ namespace PersonalHub.Client.Services
         private readonly LocalRecordStore<ThingRecord> _things;
         private readonly LocalRecordStore<LocalBlock> _blocks;
         private readonly LocalRecordStore<LocalGoal> _goals;
+        private readonly LocalRecordStore<LocalGoalStep> _goalSteps;
         private readonly LocalRecordStore<LocalPlan> _plans;
         private readonly LocalRecordStore<LocalPattern> _patterns;
         private readonly LocalRecordStore<LocalPractice> _practices;
@@ -55,6 +56,7 @@ namespace PersonalHub.Client.Services
             LocalRecordStore<ThingRecord> things,
             LocalRecordStore<LocalBlock> blocks,
             LocalRecordStore<LocalGoal> goals,
+            LocalRecordStore<LocalGoalStep> goalSteps,
             LocalRecordStore<LocalPlan> plans,
             LocalRecordStore<LocalPattern> patterns,
             LocalRecordStore<LocalPractice> practices,
@@ -67,6 +69,7 @@ namespace PersonalHub.Client.Services
             _things = things;
             _blocks = blocks;
             _goals = goals;
+            _goalSteps = goalSteps;
             _plans = plans;
             _patterns = patterns;
             _practices = practices;
@@ -82,6 +85,7 @@ namespace PersonalHub.Client.Services
                  + await _things.CountAllAsync().ConfigureAwait(false)
                  + await _blocks.CountAllAsync().ConfigureAwait(false)
                  + await _goals.CountAllAsync().ConfigureAwait(false)
+                 + await _goalSteps.CountAllAsync().ConfigureAwait(false)
                  + await _plans.CountAllAsync().ConfigureAwait(false)
                  + await _patterns.CountAllAsync().ConfigureAwait(false)
                  + await _practices.CountAllAsync().ConfigureAwait(false)
@@ -167,6 +171,18 @@ namespace PersonalHub.Client.Services
                         .ConfigureAwait(false);
 
                     return r.Goals.Select(x => x.ToLocalGoal()).ToList();
+                }, now, ct).ConfigureAwait(false));
+
+                lines.Add(await StepAsync("目标小项", _goalSteps, progress, async c =>
+                {
+                    var r = await _conn.NewGoalClient()
+                        .ListGoalStepsAsync(new ListGoalStepsRequest
+                        {
+                            IncludeDeleted = false,
+                        }, deadline: DateTime.UtcNow.Add(CallTimeout), cancellationToken: c)
+                        .ConfigureAwait(false);
+
+                    return r.Steps.Select(x => x.ToLocalGoalStep()).ToList();
                 }, now, ct).ConfigureAwait(false));
 
                 // ---- 每日计划 ----

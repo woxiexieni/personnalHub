@@ -2,6 +2,12 @@ using PersonalHub.Client.Data;
 
 namespace PersonalHub.Client.Services
 {
+    public enum PomodoroMode
+    {
+        Countdown = 0,
+        Stopwatch = 1,
+    }
+
     /// <summary>
     /// 番茄钟状态机（R14.5）。静态类，两端共用：
     ///   - Android：前台服务（PomodoroForegroundService）只是"通知渲染器"，订阅
@@ -36,12 +42,19 @@ namespace PersonalHub.Client.Services
 
         public static string PieceCode { get; private set; } = string.Empty;
         public static string Note { get; private set; } = string.Empty;
+        public static string GoalId { get; private set; } = string.Empty;
+        public static string GoalStepId { get; private set; } = string.Empty;
+        public static string StepTitle { get; private set; } = string.Empty;
+        public static PomodoroMode Mode { get; private set; } = PomodoroMode.Countdown;
         public static int PlannedMinutes { get; private set; }
         public static long StartedAtMs { get; private set; }
         public static long EndsAtMs { get; private set; }
 
         /// <summary>剩余毫秒（暂停时不减）。UI 每秒读它显示。</summary>
         public static long RemainingMs { get; private set; }
+
+        /// <summary>正计时已经专注的毫秒数（暂停时不增加）。</summary>
+        public static long ElapsedMs { get; private set; }
 
         /// <summary>
         /// 进程恢复时补记的分钟数（0 = 没有）。卡片读一次就清零。
@@ -95,6 +108,10 @@ namespace PersonalHub.Client.Services
         private const string PrefActive = "ph.pomodoro.active";
         private const string PrefPiece = "ph.pomodoro.piece";
         private const string PrefNote = "ph.pomodoro.note";
+        private const string PrefGoal = "ph.pomodoro.goal";
+        private const string PrefGoalStep = "ph.pomodoro.goalStep";
+        private const string PrefStepTitle = "ph.pomodoro.stepTitle";
+        private const string PrefMode = "ph.pomodoro.mode";
         private const string PrefPlanned = "ph.pomodoro.planned";
         private const string PrefStarted = "ph.pomodoro.started";
         private const string PrefEnds = "ph.pomodoro.ends";
@@ -109,6 +126,10 @@ namespace PersonalHub.Client.Services
             {
                 Preferences.Default.Set(PrefPiece, PieceCode);
                 Preferences.Default.Set(PrefNote, Note);
+                Preferences.Default.Set(PrefGoal, GoalId);
+                Preferences.Default.Set(PrefGoalStep, GoalStepId);
+                Preferences.Default.Set(PrefStepTitle, StepTitle);
+                Preferences.Default.Set(PrefMode, (int)Mode);
                 Preferences.Default.Set(PrefPlanned, PlannedMinutes);
                 Preferences.Default.Set(PrefStarted, StartedAtMs);
                 Preferences.Default.Set(PrefEnds, EndsAtMs);
@@ -144,11 +165,13 @@ namespace PersonalHub.Client.Services
                 if (!Preferences.Default.Get(PrefActive, false)) return false;
 
                 string piece = Preferences.Default.Get(PrefPiece, string.Empty);
+                var mode = (PomodoroMode)Preferences.Default.Get(PrefMode, (int)PomodoroMode.Countdown);
                 int planned = Preferences.Default.Get(PrefPlanned, 0);
                 long started = Preferences.Default.Get(PrefStarted, 0L);
                 long ends = Preferences.Default.Get(PrefEnds, 0L);
 
-                if (string.IsNullOrEmpty(piece) || planned <= 0 || started <= 0 || ends <= 0)
+                bool validDuration = mode == PomodoroMode.Stopwatch ? planned == 0 : planned > 0 && ends > 0;
+                if (string.IsNullOrEmpty(piece) || started <= 0 || !validDuration)
                 {
                     ClearSession();
                     return false;
@@ -156,6 +179,10 @@ namespace PersonalHub.Client.Services
 
                 PieceCode = piece;
                 Note = Preferences.Default.Get(PrefNote, string.Empty);
+                GoalId = Preferences.Default.Get(PrefGoal, string.Empty);
+                GoalStepId = Preferences.Default.Get(PrefGoalStep, string.Empty);
+                StepTitle = Preferences.Default.Get(PrefStepTitle, string.Empty);
+                Mode = mode;
                 PlannedMinutes = planned;
                 StartedAtMs = started;
                 EndsAtMs = ends;
@@ -165,13 +192,18 @@ namespace PersonalHub.Client.Services
                 _stopRequested = false;
 
                 long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                RemainingMs = PausedPhase
-                    ? Math.Max(0, Preferences.Default.Get(PrefRemaining, 0L))
-                    : Math.Max(0, ends - now);
+                RemainingMs = Mode == PomodoroMode.Countdown
+                    ? (PausedPhase
+                        ? Math.Max(0, Preferences.Default.Get(PrefRemaining, 0L))
+                        : Math.Max(0, ends - now))
+                    : 0;
+                ElapsedMs = Mode == PomodoroMode.Stopwatch
+                    ? Math.Max(0, now - started - _pausedTotalMs)
+                    : 0;
 
                 Running = true;
 
-                if (RemainingMs <= 0)
+                if (Mode == PomodoroMode.Countdown && RemainingMs <= 0)
                 {
                     // 结束时刻早就过了，当时进程不在（服务也一起被杀了）。
                     // 补记这一段 —— 时长按计划上限，不会凭空多算。
@@ -202,17 +234,33 @@ namespace PersonalHub.Client.Services
         // ============================================================
 
         public static void Start(string pieceCode, string note, int minutes)
+            => Start(pieceCode, note, minutes, PomodoroMode.Countdown, string.Empty, string.Empty, string.Empty);
+
+        public static void Start(
+            string pieceCode,
+            string note,
+            int minutes,
+            PomodoroMode mode,
+            string goalId = "",
+            string goalStepId = "",
+            string stepTitle = "")
         {
-            if (Running || minutes <= 0 || string.IsNullOrEmpty(pieceCode)) return;
+            if (Running || string.IsNullOrEmpty(pieceCode)) return;
+            if (mode == PomodoroMode.Countdown && minutes <= 0) return;
 
             var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             PieceCode = pieceCode;
             Note = note ?? string.Empty;
-            PlannedMinutes = minutes;
+            GoalId = goalId ?? string.Empty;
+            GoalStepId = goalStepId ?? string.Empty;
+            StepTitle = stepTitle ?? string.Empty;
+            Mode = mode;
+            PlannedMinutes = mode == PomodoroMode.Countdown ? minutes : 0;
             StartedAtMs = now;
-            EndsAtMs = now + minutes * 60_000L;
-            RemainingMs = minutes * 60_000L;
+            EndsAtMs = mode == PomodoroMode.Countdown ? now + minutes * 60_000L : 0;
+            RemainingMs = mode == PomodoroMode.Countdown ? minutes * 60_000L : 0;
+            ElapsedMs = 0;
             PausedPhase = false;
             _stopRequested = false;
             _pausedTotalMs = 0;
@@ -286,9 +334,16 @@ namespace PersonalHub.Client.Services
                     if (!PausedPhase)
                     {
                         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                        RemainingMs = Math.Max(0, EndsAtMs - now);
+                        if (Mode == PomodoroMode.Countdown)
+                        {
+                            RemainingMs = Math.Max(0, EndsAtMs - now);
+                        }
+                        else
+                        {
+                            ElapsedMs = Math.Max(0, now - StartedAtMs - _pausedTotalMs);
+                        }
                         Changed?.Invoke();
-                        if (RemainingMs <= 0) break;
+                        if (Mode == PomodoroMode.Countdown && RemainingMs <= 0) break;
                     }
                 }
             }
@@ -324,14 +379,15 @@ namespace PersonalHub.Client.Services
                     }
 
                     // 自然走完 = 没点「结束」+ 剩余已经归零。手动停是"我要走了"，不该响铃。
-                    natural = !_stopRequested && RemainingMs <= 0;
+                    natural = Mode == PomodoroMode.Countdown && !_stopRequested && RemainingMs <= 0;
 
                     // 真实专注分钟 = 墙钟时长 - 累计暂停。以前直接拿 StartedAtMs 算，
                     // 暂停十分钟会多记十分钟。
                     long focusMs = Math.Max(0, endAt - StartedAtMs - _pausedTotalMs);
                     actualMinutes = (int)Math.Round(focusMs / 60_000.0, MidpointRounding.ToEven);
 
-                    if (actualMinutes > PlannedMinutes) actualMinutes = PlannedMinutes;
+                    if (Mode == PomodoroMode.Countdown && actualMinutes > PlannedMinutes)
+                        actualMinutes = PlannedMinutes;
                     if (actualMinutes < 1) actualMinutes = 0;   // 不足 1 分钟丢弃
 
                     if (actualMinutes > 0 && _blocks is not null)
@@ -340,14 +396,19 @@ namespace PersonalHub.Client.Services
                         var now = endAt;
 
                         await _blocks.EnsureReadyAsync().ConfigureAwait(false);
+                        string blockNote = BuildBlockNote();
+                        string blockGoalId = !string.IsNullOrEmpty(GoalId)
+                            ? GoalId
+                            : (settings?.GoalFor(PieceCode) ?? string.Empty);
                         await _blocks.InsertAsync(new LocalBlock
                         {
                             Id = Guid.NewGuid().ToString("N"),
                             PieceCode = PieceCode,
                             OccurredAt = StartedAtMs,          // 归属日 = 开始那天
                             DurationMin = actualMinutes,
-                            GoalId = settings?.GoalFor(PieceCode) ?? string.Empty,
-                            Note = Note,
+                            GoalId = blockGoalId,
+                            GoalStepId = GoalStepId,
+                            Note = blockNote,
                             StartedAt = StartedAtMs,
                             EndedAt = StartedAtMs + (long)actualMinutes * 60_000L,
                             CreatedAt = now,
@@ -385,6 +446,16 @@ namespace PersonalHub.Client.Services
             }
 
             return actualMinutes;
+        }
+
+        private static string BuildBlockNote()
+        {
+            string title = (StepTitle ?? string.Empty).Trim();
+            string note = (Note ?? string.Empty).Trim();
+
+            if (title.Length == 0) return note;
+            if (note.Length == 0 || string.Equals(note, title, StringComparison.Ordinal)) return title;
+            return title + " · " + note;
         }
     }
 }

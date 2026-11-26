@@ -79,6 +79,8 @@ namespace personalHub.Server.Data
             if (g.Title.Length == 0) return GoalSaveResult.Fail("目标名称不能为空");
             if (g.Title.Length > 60) return GoalSaveResult.Fail("目标名称不能超过 60 字");
             if ((g.NextStep?.Length ?? 0) > 100) return GoalSaveResult.Fail("「下一步」不能超过 100 字");
+            g.SourceIdeaId = (g.SourceIdeaId ?? string.Empty).Trim();
+            g.CurrentStepId = (g.CurrentStepId ?? string.Empty).Trim();
 
             GoalRow? old;
             lock (_db.Sync)
@@ -89,6 +91,12 @@ namespace personalHub.Server.Data
             if (old is not null && g.UpdatedAt != 0 && old.UpdatedAt != 0 && g.UpdatedAt < old.UpdatedAt)
             {
                 return GoalSaveResult.ConflictWith(ToProto(old, 0, 0));
+            }
+
+            // 新目标必须从「未成形计划」转入。旧目标列已经存在时允许继续编辑。
+            if (old is null && g.SourceIdeaId.Length == 0)
+            {
+                return GoalSaveResult.Fail("新目标必须从「计划行动 · 还没形状」转入");
             }
 
             // ---- 活跃上限：只在"变成活跃"这一步拦，避免历史数据被卡住 ----
@@ -196,6 +204,8 @@ namespace personalHub.Server.Data
             Title = g.Title,
             Status = g.Status,
             NextStep = g.NextStep,
+            SourceIdeaId = g.SourceIdeaId,
+            CurrentStepId = g.CurrentStepId,
             IsCurrent = g.IsCurrent ? 1 : 0,
             StartedAt = g.StartedAt,
             CreatedAt = g.CreatedAt,
@@ -209,6 +219,8 @@ namespace personalHub.Server.Data
             Title = r.Title ?? string.Empty,
             Status = r.Status,
             NextStep = r.NextStep ?? string.Empty,
+            SourceIdeaId = r.SourceIdeaId ?? string.Empty,
+            CurrentStepId = r.CurrentStepId ?? string.Empty,
             IsCurrent = r.IsCurrent != 0,
             StartedAt = r.StartedAt,
             CreatedAt = r.CreatedAt,

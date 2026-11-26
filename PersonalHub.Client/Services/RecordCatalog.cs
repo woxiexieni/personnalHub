@@ -39,12 +39,6 @@ namespace PersonalHub.Client.Services
         /// <summary>目标列表路由。</summary>
         public const string GoalRoute = "goal/list";
 
-        /// <summary>目标详情路由（带 ?id=）。</summary>
-        public const string GoalDetailRoute = "goal/detail";
-
-        /// <summary>回顾页（三个数 + 停滞目标 + 奖励自决）。</summary>
-        public const string QuarterReviewRoute = "goal/review";
-
         /// <summary>想法录入路由（R6）：一个大框 + 四个类型，默认未分类。</summary>
         public const string IdeaRoute = "idea/entry";
 

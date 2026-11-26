@@ -2,56 +2,92 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="PersonalHub.Client.GoalListPage"
-             Title="目标">
+             Title="目标总览">
 
-    <ScrollView>
-        <VerticalStackLayout Padding="20,12" Spacing="12">
+    <Grid RowDefinitions="Auto,Auto,*" Padding="14,12" RowSpacing="10">
 
-            <Label Text="目标不是待办。它只回答一件事：这条线还在不在动。"
-                   FontSize="12" TextColor="{StaticResource Gray500}"/>
-
-            <Button Text="回顾：三个数 + 该砍的"
-                    FontSize="12" HeightRequest="34" Padding="14,0"
-                    BackgroundColor="Transparent" TextColor="#185FA5"
-                    BorderWidth="1" BorderColor="#C9D8EA"
-                    HorizontalOptions="Start"
-                    Clicked="OnReviewClicked"/>
-
-            <!-- ============ 新建 ============ -->
-            <Border Style="{StaticResource FieldBorder}">
-                <Editor x:Name="NewGoalEntry"
-                        Style="{StaticResource FieldEditor}"
-                        Placeholder="比如：做完 PersonalHub"
-                        MaxLength="120"/>
-            </Border>
-            <Button Text="建这个目标" HeightRequest="38" Clicked="OnCreateClicked"/>
-
-            <Label x:Name="StatusLabel" Text="" FontSize="12" LineBreakMode="WordWrap"/>
-
-            <!-- ============ 在推进 ============ -->
-            <Label Text="在推进" Style="{StaticResource SubHeadline}"/>
-            <VerticalStackLayout x:Name="ActivePanel" Spacing="8"/>
-
-            <!-- ============ 停滞（14 天没有块，自动折叠） ============ -->
-            <Button x:Name="StalledHeader"
-                    Text="停滞 ▾"
-                    FontSize="12"
-                    HeightRequest="34"
-                    BackgroundColor="Transparent"
-                    TextColor="{StaticResource Gray500}"
-                    BorderWidth="1"
-                    BorderColor="{StaticResource Gray300}"
-                    HorizontalOptions="Start"
-                    Padding="14,0"
-                    IsVisible="False"
-                    Clicked="OnToggleStalledClicked"/>
-
-            <VerticalStackLayout x:Name="StalledPanel" Spacing="8" IsVisible="False"/>
-
-            <Label x:Name="EmptyLabel" Text="" FontSize="12"
-                   TextColor="{StaticResource Gray500}" IsVisible="False"/>
-
+        <VerticalStackLayout Grid.Row="0" Spacing="2">
+                <Label Text="目标总览" FontSize="21" FontAttributes="Bold"/>
+                <Label Text="一行一个目标，点开后直接管理小项和计时。"
+                       FontSize="11" TextColor="{StaticResource Gray500}" LineBreakMode="WordWrap"/>
         </VerticalStackLayout>
-    </ScrollView>
 
+        <!-- 计时不跳页：只选模式和时间，备注自动使用小项名称。 -->
+        <Border Grid.Row="1" x:Name="TimerPanel" IsVisible="False"
+                Stroke="#C9D8EA" StrokeThickness="1" Padding="12,9">
+            <VerticalStackLayout Spacing="8">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Grid.Column="0" x:Name="TimerStepLabel" Text=""
+                           FontSize="13" FontAttributes="Bold"
+                           LineBreakMode="TailTruncation"/>
+                    <Label Grid.Column="1" x:Name="TimerStateLabel" Text="可以开始"
+                           FontSize="10" TextColor="{StaticResource Gray500}"/>
+                </Grid>
+
+                <Grid x:Name="TimerIdlePanel" ColumnDefinitions="Auto,90,Auto,*" ColumnSpacing="8">
+                    <HorizontalStackLayout Grid.Column="0" Spacing="4">
+                        <Button x:Name="CountdownModeBtn" Text="倒计时"
+                                FontSize="10" HeightRequest="30" Padding="9,0" CornerRadius="6"
+                                Clicked="OnCountdownModeClicked"/>
+                        <Button x:Name="StopwatchModeBtn" Text="正计时"
+                                FontSize="10" HeightRequest="30" Padding="9,0" CornerRadius="6"
+                                Clicked="OnStopwatchModeClicked"/>
+                    </HorizontalStackLayout>
+                    <Entry Grid.Column="1" x:Name="TimerMinutesEntry"
+                           Placeholder="分钟" Keyboard="Numeric"
+                           FontSize="11" HeightRequest="32"/>
+                    <Button Grid.Column="2" Text="开始"
+                            FontSize="11" HeightRequest="30" Padding="12,0"
+                            CornerRadius="6" BackgroundColor="#185FA5"
+                            TextColor="White" Clicked="OnTimerStartClicked"/>
+                    <Label Grid.Column="3" Text="备注自动使用小项名称"
+                           FontSize="10" TextColor="{StaticResource Gray500}"
+                           VerticalOptions="Center"/>
+                </Grid>
+
+                <Grid x:Name="TimerRunningPanel" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"
+                      IsVisible="False">
+                    <Label Grid.Column="0" x:Name="TimerClockLabel" Text=""
+                           FontSize="22" FontAttributes="Bold" VerticalOptions="Center"/>
+                    <Button Grid.Column="1" x:Name="TimerPauseBtn" Text="暂停"
+                            FontSize="10" HeightRequest="30" Padding="10,0"
+                            CornerRadius="6" BackgroundColor="#F1EFE8"
+                            TextColor="#2C2C2A" Clicked="OnTimerPauseClicked"/>
+                    <Button Grid.Column="2" Text="结束并记入"
+                            FontSize="10" HeightRequest="30" Padding="10,0"
+                            CornerRadius="6" BackgroundColor="#FAEEDA"
+                            TextColor="#854F0B" Clicked="OnTimerStopClicked"/>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Spacing="8">
+
+                <Border Stroke="#CFCBC0" StrokeThickness="1" BackgroundColor="#F3F1EB"
+                        Padding="10,8">
+                    <Grid ColumnDefinitions="3*,2*,Auto,Auto" ColumnSpacing="8">
+                        <Label Text="目标" FontSize="10" FontAttributes="Bold"
+                               TextColor="{StaticResource Gray500}"/>
+                        <Label Grid.Column="1" Text="当前小项" FontSize="10"
+                               FontAttributes="Bold" TextColor="{StaticResource Gray500}"/>
+                        <Label Grid.Column="2" Text="推进" FontSize="10"
+                               FontAttributes="Bold" TextColor="{StaticResource Gray500}"/>
+                        <Label Grid.Column="3" Text="状态" FontSize="10"
+                               FontAttributes="Bold" TextColor="{StaticResource Gray500}"/>
+                    </Grid>
+                </Border>
+
+                <VerticalStackLayout x:Name="GoalRows" Spacing="6"/>
+
+                <Label x:Name="EmptyLabel" Text=""
+                       FontSize="12" TextColor="{StaticResource Gray500}"
+                       IsVisible="False" Margin="2,8"/>
+
+                <Label x:Name="StatusLabel" Text=""
+                       FontSize="11" TextColor="{StaticResource Gray500}"
+                       LineBreakMode="WordWrap"/>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
 </ContentPage>

@@ -34,6 +34,10 @@ namespace personalHub.Server.Data
         [Column("goal_id")]
         public string? GoalId { get; set; }
 
+        /// <summary>归属目标小项；空 = 只归目标或未归。</summary>
+        [Column("goal_step_id")]
+        public string? GoalStepId { get; set; }
+
         [Column("note")]
         public string? Note { get; set; }
 

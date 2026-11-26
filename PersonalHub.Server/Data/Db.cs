@@ -82,6 +82,7 @@ namespace personalHub.Server.Data
             // R2：时间块 + 目标。新建表，CreateTable 就是完整的建表语句，不需要补列迁移。
             Conn.CreateTable<BlockRow>();
             Conn.CreateTable<GoalRow>();
+            Conn.CreateTable<GoalStepRow>();
             Conn.CreateTable<PlanRow>();
             Conn.CreateTable<PatternRow>();
             Conn.CreateTable<PracticeRow>();
@@ -136,6 +137,11 @@ namespace personalHub.Server.Data
             EnsureColumn("ideas",   "urgent",     "INTEGER NOT NULL DEFAULT 0", "0");
             EnsureColumn("ideas",   "important",  "INTEGER NOT NULL DEFAULT 0", "0");
 
+            // R16：目标来源 / 当前小项；时间块挂到具体小项。
+            EnsureColumn("goals",   "source_idea_id",  "TEXT NOT NULL DEFAULT ''", "''");
+            EnsureColumn("goals",   "current_step_id", "TEXT NOT NULL DEFAULT ''", "''");
+            EnsureColumn("blocks",  "goal_step_id",    "TEXT NOT NULL DEFAULT ''", "''");
+
             // R7.2：事件卡挂问题卡。老行补空串（NULL 穿进 string 字段会变成空引用）。
             EnsureColumn("things",  "problem_id", "TEXT NOT NULL DEFAULT ''", "''");
 
@@ -154,8 +160,11 @@ namespace personalHub.Server.Data
             // 没有一条是单列查询，所以索引都带 occurred_at。
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_blocks_occurred ON blocks(occurred_at)");
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_blocks_goal     ON blocks(goal_id, occurred_at)");
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_blocks_goal_step ON blocks(goal_step_id, occurred_at)");
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_blocks_piece    ON blocks(piece_code, occurred_at)");
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_plans_day      ON plans(day)");
+            Conn.Execute("CREATE INDEX IF NOT EXISTS ix_goal_steps_goal ON goal_steps(goal_id, sort_order)");
+            Conn.Execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_goals_source_idea ON goals(source_idea_id) WHERE source_idea_id <> ''");
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_practices_pat ON practices(pattern_id, occurred_at)");
             Conn.Execute("CREATE INDEX IF NOT EXISTS ix_practices_at  ON practices(occurred_at)");
 

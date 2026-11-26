@@ -243,6 +243,17 @@ namespace PersonalHub.Client.Platforms.Android
         {
             string pieceName = PomodoroState.PieceDisplay;
             long remainSec = PomodoroState.RemainingMs / 1000;
+            long elapsedSec = PomodoroState.ElapsedMs / 1000;
+            bool stopwatch = PomodoroState.Mode == PomodoroMode.Stopwatch;
+            string context = string.IsNullOrEmpty(PomodoroState.StepTitle)
+                ? PomodoroState.Note
+                : PomodoroState.StepTitle;
+            string clock = stopwatch
+                ? $"{elapsedSec / 60:D2}:{elapsedSec % 60:D2}"
+                : $"{remainSec / 60:D2}:{remainSec % 60:D2}";
+            string detail = string.IsNullOrEmpty(context)
+                ? (stopwatch ? $"已专注 {clock}" : $"剩余 {clock}")
+                : $"{context} · {(stopwatch ? $"已专注 {clock}" : $"剩余 {clock}")}";
 
             // 渠道由 MainApplication 在进程启动时建好（NotificationChannels.EnsureAll）。
             // 不在这里建：用户拒过通知权限时这里会静默失败，接着 startForeground 抛异常，
@@ -255,10 +266,10 @@ namespace PersonalHub.Client.Platforms.Android
 #pragma warning restore CS0618
 
             builder
-                .SetContentTitle(PomodoroState.PausedPhase ? "🍅 已暂停" : $"🍅 专注中 · {pieceName}")
-                .SetContentText(string.IsNullOrEmpty(PomodoroState.Note)
-                    ? $"剩余 {remainSec / 60:D2}:{remainSec % 60:D2}"
-                    : $"{PomodoroState.Note} · 剩余 {remainSec / 60:D2}:{remainSec % 60:D2}")
+                .SetContentTitle(PomodoroState.PausedPhase
+                    ? "🍅 已暂停"
+                    : $"🍅 {(stopwatch ? "正计时" : "专注中")} · {pieceName}")
+                .SetContentText(detail)
                 .SetSmallIcon(global::Android.Resource.Drawable.SymDefAppIcon)
                 .SetOngoing(true)
                 .SetOnlyAlertOnce(true)
@@ -273,15 +284,17 @@ namespace PersonalHub.Client.Platforms.Android
                     global::Android.Resource.Drawable.IcMenuCloseClearCancel,
                     ActionStop, 2));
 
-            if (OperatingSystem.IsAndroidVersionAtLeast(24))
+            if (OperatingSystem.IsAndroidVersionAtLeast(24) && !PomodoroState.PausedPhase)
             {
-                // 系统 Chronometer 倒计时：文本每秒自己跳，零刷新成本
+                // 倒计时用系统 Chronometer 递减；正计时从“现在 - 已专注”开始递增。
                 builder.SetUsesChronometer(true)
-                       .SetWhen(PomodoroState.EndsAtMs)
-                       .SetChronometerCountDown(true);
+                       .SetWhen(stopwatch
+                           ? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - PomodoroState.ElapsedMs
+                           : PomodoroState.EndsAtMs)
+                       .SetChronometerCountDown(!stopwatch);
             }
 
-            if (PomodoroState.PlannedMinutes > 0)
+            if (!stopwatch && PomodoroState.PlannedMinutes > 0)
             {
                 builder.SetProgress(
                     PomodoroState.PlannedMinutes * 60,

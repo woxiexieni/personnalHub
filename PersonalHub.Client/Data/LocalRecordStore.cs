@@ -66,6 +66,11 @@ namespace PersonalHub.Client.Data
             ("ideas",         "Important", "INTEGER NOT NULL DEFAULT 1"),
             ("ideas",         "TouchedAt", "INTEGER NOT NULL DEFAULT 0"),
 
+            // R16：目标来源 / 当前小项，时间块关联小项。老目标保留空来源。
+            ("goals",         "SourceIdeaId", "TEXT NOT NULL DEFAULT ''"),
+            ("goals",         "CurrentStepId", "TEXT NOT NULL DEFAULT ''"),
+            ("blocks",        "GoalStepId", "TEXT NOT NULL DEFAULT ''"),
+
             // R14.5：时间片特征列（运动状态 / Wi-Fi 身份）。老行补空串。
             // 这两列是切片引擎 v0.5 的输入 —— Wi-Fi 先验（这个 Wi-Fi 下你常干什么）就存在这。
             ("pending_segments", "Motion", "TEXT NOT NULL DEFAULT ''"),

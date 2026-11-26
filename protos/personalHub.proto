@@ -324,6 +324,7 @@ message Block {
     optional int64 created_at = 14;
     optional int64 updated_at = 15;      // 版本比较；0 = 未知版本，服务端直接接受
     optional bool deleted = 16 [default = false];
+    optional string goal_step_id = 17;   // 目标小项；空 = 只归目标或未归目标
 }
 
 message UploadBlocksRequest {
@@ -380,6 +381,8 @@ message PieceStatsResponse {
 service GoalService {
     rpc UploadGoals (UploadGoalsRequest) returns (UploadGoalsResponse);
     rpc ListGoals (Empty) returns (GoalList);
+    rpc UploadGoalSteps (UploadGoalStepsRequest) returns (UploadGoalStepsResponse);
+    rpc ListGoalSteps (ListGoalStepsRequest) returns (GoalStepList);
 }
 
 message Goal {
@@ -397,6 +400,10 @@ message Goal {
     // ---- 以下是 ListGoals 补上的计算值，客户端不要回传 ----
     optional int32 total_minutes = 10;   // 该目标全部块的 duration_min 之和
     optional int64 last_activity_at = 11; // 最后一次有块的时间；0 = 从未
+
+    // ---- R16：目标来自未成形计划，并指向当前小项 ----
+    optional string source_idea_id = 12;  // 新目标必填；老目标可为空
+    optional string current_step_id = 13; // 当前关注的小项；空 = 未选择
 }
 
 message UploadGoalsRequest {
@@ -412,6 +419,33 @@ message UploadGoalsResponse {
 message GoalList {
     repeated Goal goals = 1;
 }
+
+// 目标小项：目标下真正可执行的步骤。与 ideas 分开，避免"原料"和"任务"混表。
+message GoalStep {
+    optional string id = 1;
+    optional string goal_id = 2;
+    optional string title = 3;
+    optional int32 status = 4 [default = 0]; // 0 未开始 / 1 进行中 / 2 完成 / 3 放弃
+    optional string piece_code = 5;          // 默认事情片；可空
+    optional int32 estimate_min = 6;         // 预计分钟；0 = 没估
+    optional string source_idea_id = 7;      // 可选：从哪条想法转为小项
+    optional int32 sort_order = 8 [default = 0];
+    optional int64 created_at = 9;
+    optional int64 updated_at = 10;
+    optional bool deleted = 11 [default = false];
+}
+
+message UploadGoalStepsRequest { repeated GoalStep steps = 1; }
+message UploadGoalStepsResponse {
+    optional int32 accepted_count = 1 [default = 0];
+    repeated string failed_ids = 2;
+    optional string error_msg = 3;
+}
+message ListGoalStepsRequest {
+    optional string goal_id = 1; // 空 = 全部
+    optional bool include_deleted = 2 [default = false];
+}
+message GoalStepList { repeated GoalStep steps = 1; }
 
 // =====================
 // 每日计划（R4）

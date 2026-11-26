@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>计划行动 · 还没形状</title>
+  <style>
+    :root {
+      --ink: #2c2c2a;
+      --muted: #78766e;
+      --faint: #a7a49b;
+      --line: #e2dfd6;
+      --line-strong: #cfcbc0;
+      --paper: #f7f6f3;
+      --surface: #ffffff;
+      --soft: #f1efe8;
+      --blue: #185fa5;
+      --blue-soft: #e7f0f9;
+      --green: #3b6d11;
+      --green-soft: #eaf3de;
+      --amber: #8a5b00;
+      --amber-soft: #fff3d9;
+      --red: #a32d2d;
+      --red-soft: #fcebeb;
+      --shadow: 0 1px 2px rgba(44, 44, 42, .04);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(rgba(247, 246, 243, .94), rgba(247, 246, 243, .94)),
+        repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(44,44,42,.02) 31px, rgba(44,44,42,.02) 32px);
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    button, input { font: inherit; }
+
+    .page {
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 28px 32px 48px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line-strong);
+    }
+
+    .eyebrow {
+      margin: 0 0 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface);
+      color: var(--ink);
+      cursor: pointer;
+      box-shadow: var(--shadow);
+    }
+
+    .btn:hover { background: #fbfaf7; }
+
+    .btn-primary {
+      border-color: var(--blue);
+      background: var(--blue);
+      color: white;
+    }
+
+    .btn-primary:hover { background: #134f8a; }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 0 12px;
+    }
+
+    .filters {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .filter {
+      height: 30px;
+      padding: 0 11px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .filter.active {
+      border-color: var(--ink);
+      background: var(--ink);
+      color: white;
+    }
+
+    .count {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .table-shell {
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line-strong);
+      background: #f3f1eb;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 13px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    tbody tr.plan-row {
+      cursor: pointer;
+      transition: background .14s ease;
+    }
+
+    tbody tr.plan-row:hover { background: #fbfaf7; }
+    tbody tr.plan-row.open { background: #fcfbf8; }
+    tbody tr.plan-row.open td { border-bottom-color: transparent; }
+
+    .plan-title {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      min-width: 0;
+    }
+
+    .chevron {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 15px;
+      text-align: center;
+      flex: 0 0 auto;
+    }
+
+    .plan-name {
+      display: block;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .plan-meta, .cell-sub {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .focus-mark {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: var(--blue);
+      color: white;
+      font-size: 10px;
+      font-weight: 500;
+      vertical-align: 2px;
+    }
+
+    .current {
+      font-weight: 600;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 4px;
+      margin-top: 7px;
+      overflow: hidden;
+      border-radius: 2px;
+      background: var(--soft);
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: var(--blue);
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 23px;
+      padding: 0 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+    }
+
+    .s-active { background: var(--blue-soft); color: var(--blue); }
+    .s-active .dot { background: var(--blue); }
+    .s-done { background: var(--green-soft); color: var(--green); }
+    .s-done .dot { background: var(--green); }
+    .s-wait { background: var(--soft); color: var(--muted); }
+    .s-wait .dot { background: var(--faint); }
+    .s-stale { background: var(--red-soft); color: var(--red); }
+    .s-stale .dot { background: var(--red); }
+    .s-shape { background: var(--amber-soft); color: var(--amber); }
+    .s-shape .dot { background: var(--amber); }
+
+    .detail-cell {
+      padding: 0 !important;
+      background: #fcfbf8;
+    }
+
+    .detail-wrap {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 0;
+      border-top: 1px dashed var(--line-strong);
+    }
+
+    .commitment {
+      padding: 16px 18px 18px 40px;
+      border-right: 1px solid var(--line);
+      background: #f8f7f3;
+    }
+
+    .section-label {
+      margin: 0 0 5px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .commitment p {
+      margin: 0 0 12px;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .commitment p:last-child { margin-bottom: 0; }
+
+    .steps {
+      min-width: 0;
+      padding: 16px 14px 18px;
+    }
+
+    .steps-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 9px;
+    }
+
+    .steps-head h2 {
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .steps-table {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .steps-table th { background: #f7f5ef; }
+    .steps-table td { padding: 10px; font-size: 12px; }
+    .steps-table tr:last-child td { border-bottom: 0; }
+    .steps-table tr.current-step { background: #f2f7fc; }
+    .steps-table tr.current-step td:first-child { box-shadow: inset 3px 0 0 var(--blue); }
+
+    .step-name { font-weight: 600; }
+    .dependency { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .type-tag { color: var(--muted); font-size: 11px; }
+
+    .footer-note {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .legend span { display: inline-flex; align-items: center; gap: 5px; }
+
+    .col-plan { width: 22%; }
+    .col-evidence { width: 21%; }
+    .col-next { width: 17%; }
+    .col-obstacle { width: 18%; }
+    .col-progress { width: 9%; }
+    .col-update { width: 7%; }
+    .col-status { width: 6%; }
+
+    .step-col-status { width: 14%; }
+    .step-col-name { width: 34%; }
+    .step-col-dep { width: 16%; }
+    .step-col-type { width: 12%; }
+    .step-col-time { width: 12%; }
+    .step-col-date { width: 12%; }
+
+    @media (max-width: 980px) {
+      .page { padding: 20px 16px 36px; }
+      .detail-wrap { grid-template-columns: 1fr; }
+      .commitment {
+        padding: 15px 16px;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .col-evidence, .col-obstacle, .col-update,
+      .steps-table .step-col-type, .steps-table .step-col-time, .steps-table .step-col-date {
+        display: none;
+      }
+      .steps-table th:nth-child(4), .steps-table td:nth-child(4),
+      .steps-table th:nth-child(5), .steps-table td:nth-child(5),
+      .steps-table th:nth-child(6), .steps-table td:nth-child(6) {
+        display: none;
+      }
+      .col-plan { width: 29%; }
+      .col-next { width: 35%; }
+      .col-progress { width: 16%; }
+      .col-status { width: 20%; }
+      .step-col-status { width: 20%; }
+      .step-col-name { width: 46%; }
+      .step-col-dep { width: 34%; }
+    }
+
+    @media (max-width: 560px) {
+      body { font-size: 13px; }
+      .page { padding: 16px 10px 28px; }
+      .topbar { align-items: flex-start; flex-direction: column; gap: 12px; }
+      .top-actions { width: 100%; }
+      .top-actions .btn-primary { margin-left: auto; }
+      h1 { font-size: 20px; }
+      .toolbar { align-items: flex-start; flex-direction: column; gap: 8px; }
+      th, td { padding: 10px 8px; }
+      th { font-size: 10px; }
+      .plan-name { font-size: 13px; }
+      .plan-meta, .cell-sub { font-size: 10px; }
+      .current { font-size: 12px; }
+      .status { height: 21px; padding: 0 6px; font-size: 10px; }
+      .col-plan { width: 34%; }
+      .col-next { width: 30%; }
+      .col-progress { width: 16%; }
+      .col-status { width: 20%; }
+      .detail-cell { display: table-cell; }
+      .detail-wrap { display: block; }
+      .steps { padding: 13px 9px 15px; }
+      .steps-head { align-items: flex-start; }
+      .steps-head .btn { min-height: 30px; padding: 0 9px; font-size: 11px; }
+      .steps-table th, .steps-table td { padding: 8px 6px; }
+      .step-col-status { width: 24%; }
+      .step-col-name { width: 48%; }
+      .step-col-dep { width: 28%; }
+      .footer-note { display: block; }
+      .legend { margin-top: 8px; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">想法库 / 计划行动</p>
+        <h1>计划 · 还没形状</h1>
+      </div>
+      <div class="top-actions">
+        <button class="btn">调整列</button>
+        <button class="btn btn-primary">新建计划</button>
+      </div>
+    </header>
+
+    <section class="toolbar" aria-label="表格工具栏">
+      <div class="filters">
+        <button class="filter active">全部 9</button>
+        <button class="filter">主攻 1</button>
+        <button class="filter">停滞 3</button>
+        <button class="filter">最近更新</button>
+      </div>
+      <span class="count">表中只记录字段，不自动判断值不值得做</span>
+    </section>
+
+    <section class="table-shell">
+      <table aria-label="未成形长期计划">
+        <colgroup>
+          <col class="col-plan">
+          <col class="col-evidence">
+          <col class="col-next">
+          <col class="col-obstacle">
+          <col class="col-progress">
+          <col class="col-update">
+          <col class="col-status">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>长期计划</th>
+            <th class="col-evidence">结果 / 完成证据</th>
+            <th>当前下一步</th>
+            <th class="col-obstacle">主要卡点</th>
+            <th>推进</th>
+            <th class="col-update">更新</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="plan-row open" data-target="detail-ai">
+            <td>
+              <div class="plan-title">
+                <span class="chevron">−</span>
+                <div>
+                  <span class="plan-name">做一款 AI 小产品<span class="focus-mark">主攻</span></span>
+                  <span class="plan-meta">11-20 创建 · 还有 4 个下游步骤</span>
+                </div>
+              </div>
+            </td>
+            <td class="col-evidence">
+              <span>30 天内 5 个用户完成核心流程</span>
+              <span class="cell-sub">3 次访谈 · 1 个原型 · 5 次试用</span>
+            </td>
+            <td>
+              <span class="current">写一页用户使用流程</span>
+              <span class="cell-sub">25 分钟 · 依赖 S1</span>
+            </td>
+            <td class="col-obstacle">
+              <span>沉迷技术选型，不敢给用户看</span>
+              <span class="cell-sub">如果折腾技术，就先写流程</span>
+            </td>
+            <td>
+              <span>1 / 6</span>
+              <div class="bar-track"><div class="bar-fill" style="width:16.7%"></div></div>
+            </td>
+            <td class="col-update">今天</td>
+            <td><span class="status s-active"><span class="dot"></span>推进中</span></td>
+          </tr>
+          <tr id="detail-ai">
+            <td class="detail-cell" colspan="7">
+              <div class="detail-wrap">
+                <aside class="commitment">
+                  <p class="section-label">目标结果</p>
+                  <p>30 天内，让 5 个真实用户完成一次核心流程。</p>
+                  <p class="section-label">完成证据</p>
+                  <p>3 次访谈、1 个可运行原型、5 次试用记录。</p>
+                  <p class="section-label">主要卡点</p>
+                  <p>一直研究技术和改架构，不敢把粗糙版本给别人看。</p>
+                  <p class="section-label">如果……就</p>
+                  <p>如果开始折腾技术选型，就先写一页用户流程并约 2 个人看。</p>
+                </aside>
+
+                <div class="steps">
+                  <div class="steps-head">
+                    <h2>拆解步骤</h2>
+                    <button class="btn">+ 添加步骤</button>
+                  </div>
+                  <div class="steps-table">
+                    <table aria-label="长期计划拆解步骤">
+                      <colgroup>
+                        <col class="step-col-status">
+                        <col class="step-col-name">
+                        <col class="step-col-dep">
+                        <col class="step-col-type">
+                        <col class="step-col-time">
+                        <col class="step-col-date">
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th>状态</th>
+                          <th>步骤</th>
+                          <th>依赖</th>
+                          <th>类型</th>
+                          <th>预计</th>
+                          <th>完成 / 备注</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td><span class="status s-done"><span class="dot"></span>完成</span></td>
+                          <td class="step-name">明确一句话用户问题</td>
+                          <td class="dependency">—</td>
+                          <td class="type-tag">起点</td>
+                          <td>25 分钟</td>
+                          <td>11-24</td>
+                        </tr>
+                        <tr class="current-step">
+                          <td><span class="status s-active"><span class="dot"></span>当前</span></td>
+                          <td class="step-name">写一页用户使用流程</td>
+                          <td class="dependency">S1</td>
+                          <td class="type-tag">行动</td>
+                          <td>25 分钟</td>
+                          <td>—</td>
+                        </tr>
+                        <tr>
+                          <td><span class="status s-wait"><span class="dot"></span>待开始</span></td>
+                          <td class="step-name">做可点击原型</td>
+                          <td class="dependency">S2</td>
+                          <td class="type-tag">行动</td>
+                          <td>60 分钟</td>
+                          <td>—</td>
+                        </tr>
+                        <tr>
+                          <td><span class="status s-wait"><span class="dot"></span>待开始</span></td>
+                          <td class="step-name">找 5 个目标用户试用</td>
+                          <td class="dependency">S3</td>
+                          <td class="type-tag">验证</td>
+                          <td>60 分钟</td>
+                          <td>—</td>
+                        </tr>
+                        <tr>
+                          <td><span class="status s-wait"><span class="dot"></span>待开始</span></td>
+                          <td class="step-name">接入真实模型</td>
+                          <td class="dependency">S3</td>
+                          <td class="type-tag">行动</td>
+                          <td>120 分钟</td>
+                          <td>—</td>
+                        </tr>
+                        <tr>
+                          <td><span class="status s-wait"><span class="dot"></span>待开始</span></td>
+                          <td class="step-name">做出可发布版本</td>
+                          <td class="dependency">S4, S5</td>
+                          <td class="type-tag">交付</td>
+                          <td>90 分钟</td>
+                          <td>—</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+
+          <tr class="plan-row" data-target="detail-ai-skill">
+            <td>
+              <div class="plan-title">
+                <span class="chevron">+</span>
+                <div>
+                  <span class="plan-name">成为一个精通使用 AI 的人</span>
+                  <span class="plan-meta">11-05 创建 · 14 天未更新</span>
+                </div>
+              </div>
+            </td>
+            <td class="col-evidence">
+              <span>能独立完成日常工作任务</span>
+              <span class="cell-sub">还没有明确完成证据</span>
+            </td>
+            <td>
+              <span class="current">未指定</span>
+              <span class="cell-sub">需要先缩小成一个可验证结果</span>
+            </td>
+            <td class="col-obstacle">
+              <span>目标太宽，不知道从哪里开始</span>
+              <span class="cell-sub">—</span>
+            </td>
+            <td>
+              <span>0 / 0</span>
+              <div class="bar-track"><div class="bar-fill" style="width:0"></div></div>
+            </td>
+            <td class="col-update">11-05</td>
+            <td><span class="status s-stale"><span class="dot"></span>停滞</span></td>
+          </tr>
+
+          <tr class="plan-row" data-target="detail-insurance">
+            <td>
+              <div class="plan-title">
+                <span class="chevron">+</span>
+                <div>
+                  <span class="plan-name">给老爸办养老保险</span>
+                  <span class="plan-meta">11-25 创建 · 2 个步骤</span>
+                </div>
+              </div>
+            </td>
+            <td class="col-evidence">
+              <span>材料提交成功并拿到回执</span>
+              <span class="cell-sub">回执截图或办理编号</span>
+            </td>
+            <td>
+              <span class="current">确认需要哪些材料</span>
+              <span class="cell-sub">15 分钟 · 依赖 S1</span>
+            </td>
+            <td class="col-obstacle">
+              <span>一直拖着没打电话</span>
+              <span class="cell-sub">如果不想打，就先查官网材料清单</span>
+            </td>
+            <td>
+              <span>0 / 2</span>
+              <div class="bar-track"><div class="bar-fill" style="width:0"></div></div>
+            </td>
+            <td class="col-update">11-25</td>
+            <td><span class="status s-shape"><span class="dot"></span>待拆</span></td>
+          </tr>
+
+          <tr class="plan-row" data-target="detail-video">
+            <td>
+              <div class="plan-title">
+                <span class="chevron">+</span>
+                <div>
+                  <span class="plan-name">开始做短视频</span>
+                  <span class="plan-meta">11-06 创建 · 20 天未更新</span>
+                </div>
+              </div>
+            </td>
+            <td class="col-evidence">
+              <span>发布 4 条完整视频</span>
+              <span class="cell-sub">账号里能看到 4 条公开作品</span>
+            </td>
+            <td>
+              <span class="current">未指定</span>
+              <span class="cell-sub">先决定第一条视频要解决什么</span>
+            </td>
+            <td class="col-obstacle">
+              <span>总想一次做到专业水平</span>
+              <span class="cell-sub">如果开始买设备，就先写完 30 秒口播</span>
+            </td>
+            <td>
+              <span>0 / 4</span>
+              <div class="bar-track"><div class="bar-fill" style="width:0"></div></div>
+            </td>
+            <td class="col-update">11-06</td>
+            <td><span class="status s-stale"><span class="dot"></span>停滞</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer class="footer-note">
+      <span>点击计划行展开或收起拆解步骤。表格只保存内容、依赖和状态。</span>
+      <span class="legend">
+        <span><i class="dot" style="background:var(--blue)"></i>当前</span>
+        <span><i class="dot" style="background:var(--green)"></i>完成</span>
+        <span><i class="dot" style="background:var(--faint)"></i>待开始</span>
+        <span><i class="dot" style="background:var(--red)"></i>停滞</span>
+      </span>
+    </footer>
+  </main>
+
+  <script>
+    document.querySelectorAll(".plan-row").forEach((row) => {
+      row.addEventListener("click", (event) => {
+        if (event.target.closest("button")) return;
+
+        const target = document.getElementById(row.dataset.target);
+        if (!target) return;
+
+        const isOpen = row.classList.contains("open");
+        row.classList.toggle("open", !isOpen);
+        target.hidden = isOpen;
+        row.querySelector(".chevron").textContent = isOpen ? "+" : "−";
+      });
+    });
+
+    document.querySelectorAll(".filter").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".filter").forEach((item) => item.classList.remove("active"));
+        button.classList.add("active");
+      });
+    });
+  </script>
+</body>
+</html>
