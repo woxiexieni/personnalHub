@@ -509,8 +509,15 @@ namespace PersonalHub.Client
         // 重叠规则：贪心分轨（轨尾 ≤ 本段起点才能进），竖屏最多 2 轨，塞不下的计数说明。
         // ============================================================
 
-        private const double HourPx = 52;   // 一小时的高度
-        private const double Gutter = 0.07; // 左侧时刻标签占的宽度比例
+        private const double HourPx = 52;  // 一小时的高度
+        private const double LabelW = 40;  // 左侧时刻列固定像素宽（与块区物理隔离，杜绝色块压时刻文字）
+
+        /// <summary>日视图形态："axis" 时间轴 / "list" 时间流列表，记在 Preferences，下次打开保持。</summary>
+        private string DayMode
+        {
+            get => Microsoft.Maui.Storage.Preferences.Get("cal_day_mode", "axis");
+            set => Microsoft.Maui.Storage.Preferences.Set("cal_day_mode", value);
+        }
 
         private async Task RenderCalendarAsync()
         {
@@ -726,6 +733,12 @@ namespace PersonalHub.Client
             head.Add(legend, 1);
             stack.Children.Add(head);
 
+            // 轴/列表双模式切换（R19）：轴看空档分布，列表翻得快
+            var toggleRow = new HorizontalStackLayout { Spacing = 6, HorizontalOptions = LayoutOptions.End };
+            toggleRow.Children.Add(ModePill("axis", "轴"));
+            toggleRow.Children.Add(ModePill("list", "列表"));
+            stack.Children.Add(toggleRow);
+
             // 贪心分轨：轨尾 ≤ 本段起点才能进这条轨；最多 2 轨，塞不下的进 overflow
             var trackEnds = new List<long>();
             var placed = new List<((LocalBlock B, long S, long E) X, int Track)>();
@@ -751,89 +764,9 @@ namespace PersonalHub.Client
             }
             int tracks = Math.Max(1, trackEnds.Count);
 
-            var layout = new AbsoluteLayout { HeightRequest = 24 * HourPx };
-
-            // 时刻刻度线 + 左侧标签
-            for (int h = 0; h <= 24; h++)
-            {
-                double y = h * HourPx;
-
-                var line = new BoxView { HeightRequest = 1 };
-                line.SetAppThemeColor(BoxView.ColorProperty, LineLight, LineDark);
-                AbsoluteLayout.SetLayoutBounds(line, new Rect(Gutter, y, 1 - Gutter, 1));
-                AbsoluteLayout.SetLayoutFlags(line,
-                    AbsoluteLayoutFlags.XProportional | AbsoluteLayoutFlags.WidthProportional);
-                layout.Children.Add(line);
-
-                if (h < 24)
-                {
-                    var lab = new Label { Text = $"{h:00}:00", FontSize = 9 };
-                    lab.SetAppThemeColor(Label.TextColorProperty, MutedLight, MutedDark);
-                    AbsoluteLayout.SetLayoutBounds(lab, new Rect(0, y, 44, 12));
-                    layout.Children.Add(lab);
-                }
-            }
-
-            // 时间块
-            foreach (var (x, track) in placed)
-            {
-                double fx = Gutter + track * ((1 - Gutter) / tracks);
-                double fw = (1 - Gutter) / tracks - 0.006;
-                double yStart = (x.S - ds) / 60000.0 / 60.0 * HourPx;
-                double hPx = Math.Max(4, (x.E - x.S) / 60000.0 / 60.0 * HourPx);
-
-                var fill = PieceColors.For(x.B.PieceCode);
-                string name = _settings.DisplayName(x.B.PieceCode);
-
-                View block;
-                if (hPx >= 18)
-                {
-                    // 高度够才写字：太窄的块只出色条，字挤进去谁都读不了
-                    string text = hPx >= 34 ? $"{name} {FormatHm(x.S)}-{FormatHm(x.E)}" : name;
-                    block = new Border
-                    {
-                        BackgroundColor = fill,
-                        StrokeThickness = 0,
-                        // Border 没有 CornerRadius（CS0117），圆角走 StrokeShape
-                        StrokeShape = new RoundRectangle { CornerRadius = 4 },
-                        Content = new Label
-                        {
-                            Text = text,
-                            FontSize = 10,
-                            TextColor = PieceColors.OnFill,
-                            Padding = new Thickness(4, 1),
-                            LineBreakMode = LineBreakMode.TailTruncation,
-                            VerticalOptions = LayoutOptions.Center,
-                        },
-                    };
-                }
-                else
-                {
-                    block = new BoxView { Color = fill, CornerRadius = 4 };
-                }
-
-                AbsoluteLayout.SetLayoutBounds(block, new Rect(fx, yStart, fw, hPx));
-                AbsoluteLayout.SetLayoutFlags(block,
-                    AbsoluteLayoutFlags.XProportional | AbsoluteLayoutFlags.WidthProportional);
-                layout.Children.Add(block);
-            }
-
-            // "现在"红线（只有看今天时画）：一眼看到此刻在轴上哪儿
-            if (ds == Period.StartOfDay(DateTimeOffset.UtcNow).ToUnixTimeMilliseconds())
-            {
-                long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                if (now >= ds && now < de)
-                {
-                    double y = (now - ds) / 60000.0 / 60.0 * HourPx;
-                    var nowLine = new BoxView { Color = Color.FromArgb("#C24A4A"), HeightRequest = 2 };
-                    AbsoluteLayout.SetLayoutBounds(nowLine, new Rect(Gutter, y, 1 - Gutter, 2));
-                    AbsoluteLayout.SetLayoutFlags(nowLine,
-                        AbsoluteLayoutFlags.XProportional | AbsoluteLayoutFlags.WidthProportional);
-                    layout.Children.Add(nowLine);
-                }
-            }
-
-            stack.Children.Add(layout);
+            stack.Children.Add(DayMode == "list"
+                ? BuildDayList(ds, de, timed, manual)
+                : BuildDayAxis(ds, de, placed, tracks));
 
             // 底部说明：说清楚"轴上没有"不等于"没记录"
             void Note(string text)
@@ -849,6 +782,327 @@ namespace PersonalHub.Client
 
             return stack;
         }
+
+        /// <summary>
+        /// 轴模式（R19 重构）：左侧固定 40px 时刻列 + 右侧独立绘图区。
+        /// 旧版 Gutter=0.07 是比例、时刻标签却是 44px 绝对宽，窄屏 7% 约 24px 小于 44px，
+        /// 色块左缘压进时刻文字列还盖住刻度线——这次两个画布物理隔离，永不再挡。
+        /// </summary>
+        private View BuildDayAxis(long ds, long de, List<((LocalBlock B, long S, long E) X, int Track)> placed, int tracks)
+        {
+            var axis = new Grid
+            {
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(new GridLength(LabelW)),
+                    new ColumnDefinition(GridLength.Star),
+                },
+                ColumnSpacing = 0,
+            };
+
+            // 左列：时刻文字，自己的画布
+            var labels = new AbsoluteLayout { HeightRequest = 24 * HourPx };
+            for (int h = 0; h < 24; h++)
+            {
+                var lab = new Label { Text = $"{h:00}:00", FontSize = 9 };
+                lab.SetAppThemeColor(Label.TextColorProperty, MutedLight, MutedDark);
+                AbsoluteLayout.SetLayoutBounds(lab, new Rect(0, h * HourPx, LabelW, 12));
+                AbsoluteLayout.SetLayoutFlags(lab, AbsoluteLayoutFlags.YProportional);
+                labels.Children.Add(lab);
+            }
+            axis.Add(labels, 0, 0);
+
+            // 右列：刻度线 + 色块 + 现在线，坐标互不掺和
+            var plot = new AbsoluteLayout { HeightRequest = 24 * HourPx };
+            for (int h = 0; h <= 24; h++)
+            {
+                var line = new BoxView { HeightRequest = 1 };
+                line.SetAppThemeColor(BoxView.ColorProperty, LineLight, LineDark);
+                AbsoluteLayout.SetLayoutBounds(line, new Rect(0, h * HourPx, 1, 1));
+                AbsoluteLayout.SetLayoutFlags(line,
+                    AbsoluteLayoutFlags.XProportional | AbsoluteLayoutFlags.WidthProportional
+                    | AbsoluteLayoutFlags.YProportional);
+                plot.Children.Add(line);
+            }
+
+            double unit = 1.0 / tracks;
+            foreach (var (x, track) in placed)
+            {
+                double fx = track * unit + 0.006;
+                double fw = Math.Max(0.05, unit - 0.012);
+                double yStart = (x.S - ds) / 60000.0 / 60.0 * HourPx;
+                double hPx = Math.Max(4, (x.E - x.S) / 60000.0 / 60.0 * HourPx);
+
+                var v = BuildCalBlock(x.B, x.S, x.E, hPx);
+                AbsoluteLayout.SetLayoutBounds(v, new Rect(fx, yStart, fw, hPx));
+                AbsoluteLayout.SetLayoutFlags(v,
+                    AbsoluteLayoutFlags.XProportional | AbsoluteLayoutFlags.WidthProportional);
+                plot.Children.Add(v);
+            }
+
+            // "现在"红线（只有看今天时画）：一眼看到此刻在轴上哪儿
+            if (ds == Period.StartOfDay(DateTimeOffset.UtcNow).ToUnixTimeMilliseconds())
+            {
+                long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                if (now >= ds && now < de)
+                {
+                    double y = (now - ds) / 60000.0 / 60.0 * HourPx;
+                    var nowLine = new BoxView { Color = Color.FromArgb("#C24A4A"), HeightRequest = 2 };
+                    AbsoluteLayout.SetLayoutBounds(nowLine, new Rect(0, y, 1, 2));
+                    AbsoluteLayout.SetLayoutFlags(nowLine,
+                        AbsoluteLayoutFlags.XProportional | AbsoluteLayoutFlags.WidthProportional
+                        | AbsoluteLayoutFlags.YProportional);
+                    plot.Children.Add(nowLine);
+                }
+            }
+
+            axis.Add(plot, 1, 0);
+            return axis;
+        }
+
+        /// <summary>
+        /// 日历日视图专用淡雅块（R19）：低饱和填充 + 左色条 + 主题成对文字。
+        /// 统计页/月视图的 PieceColors 实色不动，只有这里换新装。
+        /// 高度仍 = 真实时长（用户拍板不封顶），靠淡色解决"补丁感"。
+        /// </summary>
+        private View BuildCalBlock(LocalBlock b, long s, long e, double hPx)
+        {
+            var base_ = PieceColors.For(b.PieceCode);
+            string name = _settings.DisplayName(b.PieceCode);
+
+            var fillL = Mix(base_, Colors.White, 0.84);
+            var fillD = Mix(base_, Color.FromArgb("#1E1E24"), 0.80);
+            var textL = Mix(base_, Colors.Black, 0.55);
+            var textD = Mix(base_, Colors.White, 0.42);
+
+            // 太窄的块只出淡色条（连左色条都省了，读不了字就是噪音）
+            if (hPx < 16)
+            {
+                var slim = new BoxView { CornerRadius = 4 };
+                slim.SetAppThemeColor(BoxView.ColorProperty, fillL, fillD);
+                return slim;
+            }
+
+            var fill = new Border
+            {
+                StrokeThickness = 0,
+                StrokeShape = new RoundRectangle { CornerRadius = 6 },
+                Padding = 0,
+            };
+            fill.SetAppThemeColor(Border.BackgroundColorProperty, fillL, fillD);
+
+            var textCol = new VerticalStackLayout { Spacing = 1, Padding = new Thickness(6, 3) };
+
+            var nameL = new Label { Text = name, FontSize = 11, FontAttributes = FontAttributes.Bold, LineBreakMode = LineBreakMode.TailTruncation };
+            nameL.SetAppThemeColor(Label.TextColorProperty, textL, textD);
+            textCol.Children.Add(nameL);
+
+            if (hPx >= 46)
+            {
+                var timeL = new Label { Text = $"{FormatHm(s)}–{FormatHm(e)}", FontSize = 9 };
+                timeL.SetAppThemeColor(Label.TextColorProperty, textL, textD);
+                var durL = new Label { Text = Fmt((int)((e - s) / 60000)), FontSize = 9 };
+                durL.SetAppThemeColor(Label.TextColorProperty, textL, textD);
+                textCol.Children.Add(timeL);
+                textCol.Children.Add(durL);
+            }
+            else if (hPx >= 30)
+            {
+                var timeL = new Label { Text = $"{FormatHm(s)}–{FormatHm(e)}", FontSize = 9 };
+                timeL.SetAppThemeColor(Label.TextColorProperty, textL, textD);
+                textCol.Children.Add(timeL);
+            }
+
+            // 左色条：实色的片身份，一眼归片
+            var g = new Grid
+            {
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(new GridLength(3)),
+                    new ColumnDefinition(GridLength.Star),
+                },
+                ColumnSpacing = 0,
+            };
+            var bar = new BoxView { Color = base_ };
+            g.Add(bar, 0, 0);
+            g.Add(textCol, 1, 0);
+
+            fill.Content = g;
+            return fill;
+        }
+
+        /// <summary>
+        /// 列表模式（R19）：时间流卡片 + 圆点连线 + 空档标注。
+        /// 手动块（无起止）也进列表——按录入时刻占位，标"手动记录"。
+        /// </summary>
+        private View BuildDayList(long ds, long de, List<(LocalBlock B, long S, long E)> timed, int manual)
+        {
+            var stack = new VerticalStackLayout { Spacing = 0 };
+
+            var entries = timed
+                .Select(x => (Start: x.S, End: x.E, B: x.B, Manual: false))
+                .Concat(_calBlocks
+                    .Where(b => b.OccurredAt >= ds && b.OccurredAt < de
+                                && !(b.StartedAt > 0 && b.EndedAt > b.StartedAt))
+                    .Select(b => (Start: b.OccurredAt,
+                                  End: b.OccurredAt + Math.Max(1, b.DurationMin) * 60000L,
+                                  B: b, Manual: true)))
+                .OrderBy(x => x.Start)
+                .ToList();
+
+            if (entries.Count == 0)
+            {
+                var empty = new Label
+                {
+                    Text = manual > 0 ? "只有手动记录（见下方说明）" : "这一天还没有时间块",
+                    FontSize = 12,
+                    Padding = new Thickness(0, 8),
+                };
+                empty.SetAppThemeColor(Label.TextColorProperty, MutedLight, MutedDark);
+                stack.Children.Add(empty);
+                return stack;
+            }
+
+            long prevEnd = 0;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var (start, end, b, isManual) = entries[i];
+
+                // 空档 ≥15 分钟才标，别把页面标成筛子
+                if (i > 0 && start - prevEnd >= 15 * 60000L)
+                {
+                    var gap = new Label
+                    {
+                        Text = "空档 " + Fmt((int)((start - prevEnd) / 60000)),
+                        FontSize = 10,
+                        Padding = new Thickness(LabelW + 20, 3, 0, 3),
+                    };
+                    gap.SetAppThemeColor(Label.TextColorProperty, MutedLight, MutedDark);
+                    stack.Children.Add(gap);
+                }
+                prevEnd = Math.Max(prevEnd, end);
+
+                var row = new Grid
+                {
+                    ColumnDefinitions =
+                    {
+                        new ColumnDefinition(new GridLength(LabelW)),
+                        new ColumnDefinition(new GridLength(16)),
+                        new ColumnDefinition(GridLength.Star),
+                    },
+                    ColumnSpacing = 0,
+                    Padding = new Thickness(0, 0, 0, 6),
+                };
+
+                var time = new Label { Text = FormatHm(start), FontSize = 10, VerticalOptions = LayoutOptions.Start };
+                time.SetAppThemeColor(Label.TextColorProperty, MutedLight, MutedDark);
+                row.Add(time, 0, 0);
+
+                // 圆点 + 上下连线：串成一条时间流
+                var rail = new Grid
+                {
+                    RowDefinitions =
+                    {
+                        new RowDefinition(GridLength.Star),
+                        new RowDefinition(GridLength.Auto),
+                        new RowDefinition(GridLength.Star),
+                    },
+                };
+                var dot = new BoxView
+                {
+                    WidthRequest = 8,
+                    HeightRequest = 8,
+                    CornerRadius = 4,
+                    Color = PieceColors.For(b.PieceCode),
+                };
+                rail.Add(dot, 0, 1);
+
+                if (i > 0)
+                {
+                    var lineTop = new BoxView { WidthRequest = 2 };
+                    lineTop.SetAppThemeColor(BoxView.ColorProperty, LineLight, LineDark);
+                    rail.Add(lineTop, 0, 0);
+                }
+                if (i < entries.Count - 1)
+                {
+                    var lineBot = new BoxView { WidthRequest = 2 };
+                    lineBot.SetAppThemeColor(BoxView.ColorProperty, LineLight, LineDark);
+                    rail.Add(lineBot, 0, 2);
+                }
+                row.Add(rail, 1, 0);
+
+                var base_ = PieceColors.For(b.PieceCode);
+                var fillL = Mix(base_, Colors.White, 0.86);
+                var fillD = Mix(base_, Color.FromArgb("#1E1E24"), 0.80);
+                var textL = Mix(base_, Colors.Black, 0.55);
+                var textD = Mix(base_, Colors.White, 0.42);
+
+                var subText = isManual
+                    ? $"手动记录 · {Fmt(Math.Max(1, b.DurationMin))} · 记于 {FormatHm(start)}"
+                    : $"{FormatHm(start)}–{FormatHm(end)} · {Fmt((int)((end - start) / 60000))}";
+
+                var cardName = new Label { Text = _settings.DisplayName(b.PieceCode), FontSize = 12, FontAttributes = FontAttributes.Bold, LineBreakMode = LineBreakMode.TailTruncation };
+                cardName.SetAppThemeColor(Label.TextColorProperty, textL, textD);
+                var cardSub = new Label { Text = subText, FontSize = 10 };
+                cardSub.SetAppThemeColor(Label.TextColorProperty, textL, textD);
+
+                var cardCol = new VerticalStackLayout { Spacing = 1, Padding = new Thickness(8, 5) };
+                cardCol.Children.Add(cardName);
+                cardCol.Children.Add(cardSub);
+
+                var card = new Border
+                {
+                    StrokeThickness = 0,
+                    StrokeShape = new RoundRectangle { CornerRadius = 8 },
+                    Padding = 0,
+                    Content = cardCol,
+                };
+                card.SetAppThemeColor(Border.BackgroundColorProperty, fillL, fillD);
+                row.Add(card, 2, 0);
+
+                stack.Children.Add(row);
+            }
+
+            return stack;
+        }
+
+        /// <summary>轴/列表切换胶囊。</summary>
+        private View ModePill(string mode, string text)
+        {
+            var btn = new Button
+            {
+                Text = text,
+                FontSize = 11,
+                HeightRequest = 26,
+                Padding = new Thickness(12, 0),
+                CornerRadius = 13,
+            };
+            bool active = DayMode == mode;
+            var captured = mode;
+            btn.Clicked += (_, _) =>
+            {
+                DayMode = captured;
+                RenderCalendar();
+            };
+            if (active)
+            {
+                btn.BackgroundColor = ActiveBg;
+                btn.TextColor = Colors.White;
+            }
+            else
+            {
+                btn.SetAppThemeColor(Button.BackgroundColorProperty, InactiveBgLight, InactiveBgDark);
+                btn.SetAppThemeColor(Button.TextColorProperty, ChipTextLight, ChipTextDark);
+            }
+            return btn;
+        }
+
+        /// <summary>两色线性插值：t=0 全 a，t=1 全 b。淡雅配色靠它从 PieceColors 派生，不另养一套色表。</summary>
+        private static Color Mix(Color a, Color b, double t) => new(
+            (float)(a.Red + (b.Red - a.Red) * t),
+            (float)(a.Green + (b.Green - a.Green) * t),
+            (float)(a.Blue + (b.Blue - a.Blue) * t),
+            1f);
 
         private static string FormatHm(long unixMs)
             => DateTimeOffset.FromUnixTimeMilliseconds(unixMs).ToOffset(Period.Cst).ToString("HH:mm");
