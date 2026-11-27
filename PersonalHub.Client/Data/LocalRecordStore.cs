@@ -75,6 +75,9 @@ namespace PersonalHub.Client.Data
             // 这两列是切片引擎 v0.5 的输入 —— Wi-Fi 先验（这个 Wi-Fi 下你常干什么）就存在这。
             ("pending_segments", "Motion", "TEXT NOT NULL DEFAULT ''"),
             ("pending_segments", "Wifi",   "TEXT NOT NULL DEFAULT ''"),
+
+            // R17：时间片处理完成时刻（确认页灰卡"隔天清空"的显示过滤依据）。老行补 0。
+            ("pending_segments", "ConfirmedAt", "INTEGER NOT NULL DEFAULT 0"),
         };
 
         /// <summary>

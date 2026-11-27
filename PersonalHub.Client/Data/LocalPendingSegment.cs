@@ -54,6 +54,13 @@ namespace PersonalHub.Client.Data
         public bool AutoApplied { get; set; }
 
         /// <summary>
+        /// 处理完成的时刻（Unix 毫秒，记入/换片/自动入库都算）。0 = 还没处理。
+        /// 确认页的灰卡（已处理但当天还在时间线上躺着）靠它做"隔天清空"的显示过滤 —— 纯显示层，
+        /// 数据本体不动，历史随时可翻。
+        /// </summary>
+        public long ConfirmedAt { get; set; }
+
+        /// <summary>
         /// 0 待确认 / 1 已确认（人点过「记入」或「换片」，已写 blocks） /
         /// 2 已忽略 / 3 已自动入库（兜底路径，AutoApplied = true）。
         /// </summary>

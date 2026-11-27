@@ -497,6 +497,10 @@ out/
 .tmp-build/
 # 服务端正在运行时编不了 bin（exe 被锁），用 -p:OutputPath=.tmp-check/ 旁路验证
 .tmp-check/
+# AI 工具做设计稿截图时启动无头浏览器留下的临时 profile（Chrome/Edge user-data-dir）
+# 以及临时 html 草稿。用通配兜住所有 .tmp-* 变体（.tmp-chrome-* / .tmp-edge-* 等）
+.tmp-*/
+.tmp-*.html
 
 # 数据库快照（本地备份，不提交）
 backups/
