@@ -71,6 +71,13 @@ namespace PersonalHub.Client.Data
             ("goals",         "CurrentStepId", "TEXT NOT NULL DEFAULT ''"),
             ("blocks",        "GoalStepId", "TEXT NOT NULL DEFAULT ''"),
 
+            // R18：小项 deadline / 原因 / 成果链接 / 完成时刻。
+            // 按类型回填：数值回 0、TEXT 回 ''（老坑：TEXT 一律回 0 会变成字符串 "0"）。
+            ("goal_steps",    "Deadline",     "INTEGER NOT NULL DEFAULT 0"),
+            ("goal_steps",    "Reason",       "TEXT NOT NULL DEFAULT ''"),
+            ("goal_steps",    "ArtifactUri",  "TEXT NOT NULL DEFAULT ''"),
+            ("goal_steps",    "CompletedAt",  "INTEGER NOT NULL DEFAULT 0"),
+
             // R14.5：时间片特征列（运动状态 / Wi-Fi 身份）。老行补空串。
             // 这两列是切片引擎 v0.5 的输入 —— Wi-Fi 先验（这个 Wi-Fi 下你常干什么）就存在这。
             ("pending_segments", "Motion", "TEXT NOT NULL DEFAULT ''"),

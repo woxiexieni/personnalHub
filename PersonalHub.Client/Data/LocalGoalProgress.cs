@@ -15,8 +15,20 @@ namespace PersonalHub.Client.Data
 
         public string Title { get; set; } = string.Empty;
 
-        /// <summary>0 未开始 / 1 进行中 / 2 完成 / 3 放弃。</summary>
+        /// <summary>0 待办 / 1 进行中 / 2 完成 / 3 放弃 / 4 阻塞。</summary>
         public int Status { get; set; }
+
+        /// <summary>截止日期（当天零点时间戳毫秒）；0 = 没设。超期只标红提醒，不拦操作。</summary>
+        public long Deadline { get; set; }
+
+        /// <summary>阻塞/放弃原因（按 Status 区分语义）；0 状态下为空。</summary>
+        public string Reason { get; set; } = string.Empty;
+
+        /// <summary>成果链接（obsidian:// 等 URI）；空 = 没填。完成态有值时状态列变「打开成果」按钮。</summary>
+        public string ArtifactUri { get; set; } = string.Empty;
+
+        /// <summary>切到「完成」的时刻；0 = 未完成。</summary>
+        public long CompletedAt { get; set; }
 
         /// <summary>默认事情片；实际时间块可以改。</summary>
         public string PieceCode { get; set; } = string.Empty;

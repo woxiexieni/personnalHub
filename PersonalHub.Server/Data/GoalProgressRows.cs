@@ -26,6 +26,18 @@ namespace personalHub.Server.Data
         [Column("source_idea_id")]
         public string? SourceIdeaId { get; set; }
 
+        [Column("deadline")]
+        public long Deadline { get; set; }
+
+        [Column("reason")]
+        public string? Reason { get; set; }
+
+        [Column("artifact_uri")]
+        public string? ArtifactUri { get; set; }
+
+        [Column("completed_at")]
+        public long CompletedAt { get; set; }
+
         [Column("sort_order")]
         public int SortOrder { get; set; }
 

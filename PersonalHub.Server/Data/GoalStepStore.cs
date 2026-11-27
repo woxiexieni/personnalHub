@@ -46,11 +46,13 @@ namespace personalHub.Server.Data
             s.Title = (s.Title ?? string.Empty).Trim();
             s.PieceCode = (s.PieceCode ?? string.Empty).Trim();
             s.SourceIdeaId = (s.SourceIdeaId ?? string.Empty).Trim();
+            s.Reason = (s.Reason ?? string.Empty).Trim();
+            s.ArtifactUri = (s.ArtifactUri ?? string.Empty).Trim();
 
             if (s.GoalId.Length == 0) return GoalStepSaveResult.Fail("小项缺少目标");
             if (s.Title.Length == 0) return GoalStepSaveResult.Fail("小项名称不能为空");
             if (s.Title.Length > 120) return GoalStepSaveResult.Fail("小项名称不能超过 120 字");
-            if (s.Status < 0 || s.Status > 3) s.Status = 0;
+            if (s.Status < 0 || s.Status > 4) s.Status = 0;
             if (s.EstimateMin < 0) return GoalStepSaveResult.Fail("预计时间不能为负");
             if (s.EstimateMin > 1440) return GoalStepSaveResult.Fail("小项预计时间不能超过 24 小时");
 
@@ -95,6 +97,10 @@ namespace personalHub.Server.Data
             PieceCode = s.PieceCode,
             EstimateMin = s.EstimateMin,
             SourceIdeaId = s.SourceIdeaId,
+            Deadline = s.Deadline,
+            Reason = s.Reason,
+            ArtifactUri = s.ArtifactUri,
+            CompletedAt = s.CompletedAt,
             SortOrder = s.SortOrder,
             CreatedAt = s.CreatedAt,
             UpdatedAt = s.UpdatedAt,
@@ -110,6 +116,10 @@ namespace personalHub.Server.Data
             PieceCode = r.PieceCode ?? string.Empty,
             EstimateMin = r.EstimateMin,
             SourceIdeaId = r.SourceIdeaId ?? string.Empty,
+            Deadline = r.Deadline,
+            Reason = r.Reason ?? string.Empty,
+            ArtifactUri = r.ArtifactUri ?? string.Empty,
+            CompletedAt = r.CompletedAt,
             SortOrder = r.SortOrder,
             CreatedAt = r.CreatedAt,
             UpdatedAt = r.UpdatedAt,

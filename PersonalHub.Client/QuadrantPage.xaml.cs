@@ -47,6 +47,8 @@ namespace PersonalHub.Client
         private readonly RecordSyncService<LocalIdea> _ideaSync;
         private readonly LocalRecordStore<LocalGoal> _goals;
         private readonly RecordSyncService<LocalGoal> _goalSync;
+        private readonly LocalRecordStore<LocalGoalStep> _goalSteps;
+        private readonly RecordSyncService<LocalGoalStep> _goalStepSync;
 
         /// <summary>要进四格的：未落实的 + 今天刚落实的。</summary>
         private List<LocalIdea> _active = new();
@@ -79,7 +81,9 @@ namespace PersonalHub.Client
             LocalRecordStore<LocalIdea> ideas,
             RecordSyncService<LocalIdea> ideaSync,
             LocalRecordStore<LocalGoal> goals,
-            RecordSyncService<LocalGoal> goalSync)
+            RecordSyncService<LocalGoal> goalSync,
+            LocalRecordStore<LocalGoalStep> goalSteps,
+            RecordSyncService<LocalGoalStep> goalStepSync)
         {
             InitializeComponent();
 
@@ -87,6 +91,8 @@ namespace PersonalHub.Client
             _ideaSync = ideaSync;
             _goals = goals;
             _goalSync = goalSync;
+            _goalSteps = goalSteps;
+            _goalStepSync = goalStepSync;
 
             // 拖放的目标必须常驻挂一次：每格知道自己代表"急/重"的哪种组合，
             // 卡片拖进来就按它改这两个布尔值。重渲染不会重建格子的手势。
@@ -385,6 +391,17 @@ namespace PersonalHub.Client
                 bar.Children.Add(add);
             }
 
+            // 「转小项」：能干的想法挂到某个目标下当小项（R18）。
+            // 只给"能干的、还没转出去的"：计划类有它自己的「转成目标」，落实过的不算。
+            if (idea.Kind == 3 && idea.PlanKind == 0 && !idea.Done && string.IsNullOrEmpty(idea.GoalId))
+            {
+                var toStep = new Label { Text = "转小项", FontSize = 10, TextColor = LinkBlue };
+                var toStepTap = new TapGestureRecognizer();
+                toStepTap.Tapped += async (_, _) => await ConvertToStepAsync(idea);
+                toStep.GestureRecognizers.Add(toStepTap);
+                bar.Children.Add(toStep);
+            }
+
             var del = new Label
             {
                 Text = "删除",
@@ -496,6 +513,12 @@ namespace PersonalHub.Client
                 (true, false) => "Ⅲ 不重要且紧急",
                 (false, false) => "Ⅳ 不重要不紧急",
             };
+
+        private static string Shorten(string text, int max)
+        {
+            text = (text ?? string.Empty).Replace("\n", " ").Trim();
+            return text.Length <= max ? text : text[..max] + "…";
+        }
 
         // ============================================================
         // 已落实 / 成果 / 删除
@@ -917,6 +940,67 @@ namespace PersonalHub.Client
             ShowStatus($"已建目标「{title}」—— 去目标页给它配时间片，想法才算真的开始。");
 
             _ = _goalSync.SyncAsync();
+            _ = _ideaSync.SyncAsync();
+        }
+
+        /// <summary>
+        /// 能干的想法 → 某个目标下的小项（R18）。选目标 → 建小项 → 想法打上"已转"标。
+        /// 用 idea.GoalId 做去重标：转过一次的不再出「转小项」，跟「转成目标」共用口径。
+        /// </summary>
+        private async Task ConvertToStepAsync(LocalIdea idea)
+        {
+            var goals = (await _goals.GetByRangeAsync(0, long.MaxValue))
+                .Where(g => !g.Deleted && g.Status != 2 && g.Status != 3)
+                .OrderByDescending(g => g.IsCurrent)
+                .ThenByDescending(g => g.StartedAt)
+                .ToList();
+
+            if (goals.Count == 0)
+            {
+                ShowStatus("还没有可挂的目标 —— 先「转成目标」建一个，或去目标页从计划转。");
+                return;
+            }
+
+            var options = goals.Select((g, i) => $"{i + 1}. {Shorten(g.Title, 18)}").ToArray();
+            string? pick = await DisplayActionSheet("挂到哪个目标？", "取消", null, options);
+            if (string.IsNullOrEmpty(pick) || pick == "取消") return;
+
+            var goal = goals.ElementAtOrDefault(Array.IndexOf(options, pick));
+            if (goal is null) return;
+
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            var existing = await _goalSteps.GetAllAsync();
+            var mine = existing.Where(s => !s.Deleted && s.GoalId == goal.Id).ToList();
+
+            var step = new LocalGoalStep
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GoalId = goal.Id,
+                Title = (idea.Text ?? string.Empty).Trim(),
+                Status = 0,
+                PieceCode = "work",
+                EstimateMin = 0,
+                SourceIdeaId = idea.Id,
+                SortOrder = mine.Count == 0 ? 10 : mine.Max(s => s.SortOrder) + 10,
+                CreatedAt = now,
+                UpdatedAt = now,
+                Deleted = false,
+                Synced = false,
+                SyncedAt = 0,
+            };
+            await _goalSteps.InsertAsync(step);
+
+            idea.GoalId = goal.Id;
+            idea.UpdatedAt = now;
+            idea.TouchedAt = now;
+            idea.Synced = false;
+            await _ideas.UpdateAsync(idea);
+
+            await LoadAsync();
+            ShowStatus($"已挂到「{Shorten(goal.Title, 14)}」当小项 —— 去目标总览排它。");
+
+            _ = _goalStepSync.SyncAsync();
             _ = _ideaSync.SyncAsync();
         }
 

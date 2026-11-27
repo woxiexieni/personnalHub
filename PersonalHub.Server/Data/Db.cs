@@ -142,6 +142,13 @@ namespace personalHub.Server.Data
             EnsureColumn("goals",   "current_step_id", "TEXT NOT NULL DEFAULT ''", "''");
             EnsureColumn("blocks",  "goal_step_id",    "TEXT NOT NULL DEFAULT ''", "''");
 
+            // R18：小项 deadline / 阻塞放弃原因 / 成果链接 / 完成时刻。
+            // 老行按类型回填：数值回 0、TEXT 回 ''（老坑：TEXT 一律回 0 会变成字符串 "0"）。
+            EnsureColumn("goal_steps", "deadline",     "INTEGER NOT NULL DEFAULT 0", "0");
+            EnsureColumn("goal_steps", "reason",       "TEXT NOT NULL DEFAULT ''",   "''");
+            EnsureColumn("goal_steps", "artifact_uri", "TEXT NOT NULL DEFAULT ''",   "''");
+            EnsureColumn("goal_steps", "completed_at", "INTEGER NOT NULL DEFAULT 0", "0");
+
             // R7.2：事件卡挂问题卡。老行补空串（NULL 穿进 string 字段会变成空引用）。
             EnsureColumn("things",  "problem_id", "TEXT NOT NULL DEFAULT ''", "''");
 

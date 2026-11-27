@@ -425,7 +425,7 @@ message GoalStep {
     optional string id = 1;
     optional string goal_id = 2;
     optional string title = 3;
-    optional int32 status = 4 [default = 0]; // 0 未开始 / 1 进行中 / 2 完成 / 3 放弃
+    optional int32 status = 4 [default = 0]; // 0 待办 / 1 进行中 / 2 完成 / 3 放弃 / 4 阻塞
     optional string piece_code = 5;          // 默认事情片；可空
     optional int32 estimate_min = 6;         // 预计分钟；0 = 没估
     optional string source_idea_id = 7;      // 可选：从哪条想法转为小项
@@ -433,6 +433,10 @@ message GoalStep {
     optional int64 created_at = 9;
     optional int64 updated_at = 10;
     optional bool deleted = 11 [default = false];
+    optional int64 deadline = 12 [default = 0];       // 截止日期（当天零点时间戳毫秒）；0 = 没设
+    optional string reason = 13;                      // 阻塞/放弃原因（按 status 区分语义）
+    optional string artifact_uri = 14;                // 成果链接（obsidian:// 等 URI）；空 = 没填
+    optional int64 completed_at = 15 [default = 0];   // 切到「完成」的时刻；0 = 未完成
 }
 
 message UploadGoalStepsRequest { repeated GoalStep steps = 1; }
