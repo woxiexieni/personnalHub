@@ -21,12 +21,14 @@ namespace PersonalHub.Server.Pages.Blocks
 
         private readonly BlockStore _blocks;
         private readonly GoalStore _goals;
+        private readonly GoalStepStore _steps;
         private readonly PlanStore _plans;
 
-        public IndexModel(BlockStore blocks, GoalStore goals, PlanStore plans)
+        public IndexModel(BlockStore blocks, GoalStore goals, GoalStepStore steps, PlanStore plans)
         {
             _blocks = blocks;
             _goals = goals;
+            _steps = steps;
             _plans = plans;
         }
 
@@ -39,6 +41,9 @@ namespace PersonalHub.Server.Pages.Blocks
 
         public IReadOnlyList<Block> Items { get; private set; } = Array.Empty<Block>();
         public IReadOnlyList<Goal> Goals { get; private set; } = Array.Empty<Goal>();
+
+        /// <summary>全部小项（含软删）：把块上的 goal_step_id 解析成名字用。</summary>
+        public IReadOnlyList<GoalStep> Steps { get; private set; } = Array.Empty<GoalStep>();
 
         /// <summary>按片聚合（分钟降序），只统计未删除的。</summary>
         public IReadOnlyList<(string Code, int Minutes, int Count)> ByPiece { get; private set; }
@@ -89,6 +94,13 @@ namespace PersonalHub.Server.Pages.Blocks
             return Goals.FirstOrDefault(g => g.Id == id)?.Title ?? "（已删除的目标）";
         }
 
+        /// <summary>块挂的小项名；没挂返回空串（表格里留白，不是每行都在喊"未挂"）。</summary>
+        public string StepTitle(string? stepId)
+        {
+            if (string.IsNullOrEmpty(stepId)) return string.Empty;
+            return Steps.FirstOrDefault(s => s.Id == stepId)?.Title ?? "（已删小项）";
+        }
+
         public string PieceName(string? code) => Pieces.Name(code);
 
         public void OnGet()
@@ -109,6 +121,7 @@ namespace PersonalHub.Server.Pages.Blocks
             To = Fmt.ToDateInput(to - 1);
 
             Goals = _goals.List();
+            Steps = _steps.List(null, true);
 
             var all = _blocks.List(
                 from, to,

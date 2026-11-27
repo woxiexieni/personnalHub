@@ -18,15 +18,24 @@ namespace PersonalHub.Server.Pages.Goals
     public class DetailModel : PageModel
     {
         private readonly GoalStore _goals;
+        private readonly GoalStepStore _steps;
         private readonly BlockStore _blocks;
 
-        public DetailModel(GoalStore goals, BlockStore blocks)
+        public DetailModel(GoalStore goals, GoalStepStore steps, BlockStore blocks)
         {
             _goals = goals;
+            _steps = steps;
             _blocks = blocks;
         }
 
         public Goal? Goal { get; private set; }
+
+        /// <summary>这个目标的小项（R18 加了阻塞/截止/原因/成果，管理端跟着显示）。</summary>
+        public IReadOnlyList<GoalStep> Steps { get; private set; } = Array.Empty<GoalStep>();
+
+        /// <summary>每个小项的实际投入分钟（挂到该小项的时间块之和），key = stepId。</summary>
+        public IReadOnlyDictionary<string, int> StepMinutes { get; private set; }
+            = new Dictionary<string, int>();
 
         /// <summary>按天分组的时间块（新 → 旧），每组是一个「节点串」。</summary>
         public IReadOnlyList<(string DayLabel, int Minutes, IReadOnlyList<Block> Blocks)> Days { get; private set; }
@@ -46,6 +55,12 @@ namespace PersonalHub.Server.Pages.Goals
             // 全量（不设区间上限），但最多取 500 条：单目标的演进看最近 500 个节点够了
             var all = _blocks.List(0, long.MaxValue, goalId: Goal.Id, limit: 500);
             TotalCount = all.Count;
+
+            Steps = _steps.List(Goal.Id, false);
+            StepMinutes = all
+                .Where(b => !string.IsNullOrEmpty(b.GoalStepId))
+                .GroupBy(b => b.GoalStepId!, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.Sum(x => Math.Max(0, x.DurationMin)));
 
             Days = all
                 .GroupBy(b => Period.StartOfDay(DateTimeOffset.FromUnixTimeMilliseconds(b.OccurredAt)))
@@ -76,6 +91,42 @@ namespace PersonalHub.Server.Pages.Goals
         }
 
         public string PieceName(string? code) => Pieces.Name(code);
+
+        /// <summary>小项状态文案（与手机端 0待办/1进行中/2完成/3放弃/4阻塞 同一套口径）。</summary>
+        public string StepStatusText(int status) => status switch
+        {
+            1 => "进行中",
+            2 => "已完成",
+            3 => "已放弃",
+            4 => "阻塞",
+            _ => "待办",
+        };
+
+        public string StepStatusClass(int status) => status switch
+        {
+            1 => "done",
+            3 => "deleted",
+            4 => "bad",
+            _ => "",
+        };
+
+        public int StepMinutesFor(string? stepId)
+            => !string.IsNullOrEmpty(stepId) && StepMinutes.TryGetValue(stepId, out var m) ? m : 0;
+
+        public string StepDeadlineText(long deadline)
+            => DateTimeOffset.FromUnixTimeMilliseconds(deadline).ToOffset(Period.Cst).ToString("MM-dd");
+
+        /// <summary>截止日已过且小项还没完成 → 红标（只提醒，与手机端一致不拦操作）。</summary>
+        public bool StepOverdue(GoalStep s)
+            => s.Deadline > 0 && s.Status is 0 or 1 or 4
+               && s.Deadline < DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        /// <summary>时间块挂的小项名（演进节点上显示）；空 id 返回空串。</summary>
+        public string StepTitle(string? stepId)
+        {
+            if (string.IsNullOrEmpty(stepId)) return string.Empty;
+            return Steps.FirstOrDefault(s => s.Id == stepId)?.Title ?? "（已删小项）";
+        }
 
         public string TimeText(long ms)
             => DateTimeOffset.FromUnixTimeMilliseconds(ms).ToOffset(Period.Cst).ToString("HH:mm");

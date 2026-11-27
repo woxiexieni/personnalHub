@@ -50,6 +50,63 @@
 
 <div class="card">
     <div class="card-head">
+        <h2>小项</h2>
+        <span class="hint">手机端「目标总览」那张 3 列表的全量视角 · 实际 = 挂到该小项的时间块之和</span>
+    </div>
+
+    @if (Model.Steps.Count == 0)
+    {
+        <div class="empty">这个目标还没有小项。在手机端「目标总览」展开目标后添加，或从能干的想法转过来。</div>
+    }
+    else
+    {
+        <table class="grid">
+            <thead>
+            <tr>
+                <th>名称</th>
+                <th>状态</th>
+                <th class="num">预计</th>
+                <th class="num">实际</th>
+                <th>截止</th>
+                <th>成果</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var s in Model.Steps)
+            {
+                <tr>
+                    <td>@s.Title</td>
+                    <td>
+                        <span class="tag @Model.StepStatusClass(s.Status)">@Model.StepStatusText(s.Status)</span>
+                        @* 阻塞/放弃的原因：手机端必填的那句，网页上也要看得见 *@
+                        @if ((s.Status == 4 || s.Status == 3) && !string.IsNullOrEmpty(s.Reason))
+                        {
+                            <div class="hint" style="max-width:240px">@s.Reason</div>
+                        }
+                    </td>
+                    <td class="num">@(s.EstimateMin > 0 ? Pieces.Minutes(s.EstimateMin) : "—")</td>
+                    <td class="num">@Pieces.Minutes(Model.StepMinutesFor(s.Id))</td>
+                    <td>
+                        @if (s.Deadline > 0)
+                        {
+                            <span class="tag @(Model.StepOverdue(s) ? "bad" : "")">@Model.StepDeadlineText(s.Deadline)</span>
+                        }
+                    </td>
+                    <td>
+                        @if (!string.IsNullOrEmpty(s.ArtifactUri))
+                        {
+                            <a class="btn sm" href="@s.ArtifactUri">打开成果</a>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>
+
+<div class="card">
+    <div class="card-head">
         <h2>最近四周</h2>
         <span class="hint">空的那一周就是没动，不是没数据</span>
     </div>
@@ -99,6 +156,10 @@
                             <div class="tl-line1">
                                 <span class="tl-time">@Model.TimeText(b.OccurredAt)</span>
                                 <span class="tl-piece">@Model.PieceName(b.PieceCode)</span>
+                                @if (!string.IsNullOrEmpty(Model.StepTitle(b.GoalStepId)))
+                                {
+                                    <span class="hint">· @Model.StepTitle(b.GoalStepId)</span>
+                                }
                                 <span class="tl-min">@(b.DurationMin > 0 ? Pieces.Minutes(b.DurationMin) : "未填时长")</span>
                                 @if (b.Worth != 0)
                                 {

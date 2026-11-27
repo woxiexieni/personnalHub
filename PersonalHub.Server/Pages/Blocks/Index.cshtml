@@ -182,6 +182,7 @@
                 <th>事情片</th>
                 <th class="num">时长</th>
                 <th>目标</th>
+                <th>小项</th>
                 <th>备注</th>
                 <th>评价</th>
                 <th>状态</th>
@@ -199,6 +200,7 @@
                     </td>
                     <td class="num">@(b.DurationMin > 0 ? Pieces.Minutes(b.DurationMin) : "未填")</td>
                     <td>@Model.GoalTitle(b.GoalId)</td>
+                    <td>@Model.StepTitle(b.GoalStepId)</td>
                     <td>@b.Note</td>
                     <td>
                         @* 复盘评价：手机上点「值得 / 一般 / 别做了」写的那一句，电脑端一直看不到。
